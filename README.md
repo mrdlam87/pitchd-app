@@ -1,23 +1,23 @@
 # 🏕️ Pitchd
-> The AI-powered camping companion for Australians.
+> Your AI-powered camping travel and planning companion.
 
 ---
 
-## What is it?
-Pitchd is an AI-powered web app that makes finding the perfect campsite as easy as having a conversation. Instead of juggling multiple apps and endless filter dropdowns, just describe what you want in plain English and Pitchd does the rest.
+## The Problem
+Planning a camping trip in Australia is surprisingly time-consuming and fragmented. A typical camper might spend hours across multiple apps and websites just to answer basic questions — where should I go this weekend? Will it be raining? Is there a dump point nearby? Can I bring my dog?
 
-> *"Dog-friendly campsite within 3 hours of Melbourne near a good fishing spot"*
-> *"Free campsite in Queensland with a dump point nearby"*
-> *"Somewhere peaceful to pitch a tent this weekend with my kids"*
-
-Pitchd interprets your request, finds the best matches, and displays them on an interactive map — along with everything else you need nearby.
+There is no single tool that brings this all together intelligently. And not one existing camping app uses AI.
 
 ---
 
-## Why AI?
-Every other camping app is essentially a database with a search bar. You already know what filters to apply, you just have to find them. Pitchd is different — it understands what you're looking for, the way a knowledgeable mate would.
+## The Solution
+Pitchd understands what you're looking for and does the research for you. Describe your trip in plain English, and Pitchd checks the weather, finds matching campsites, and displays everything on a map.
 
-This also means Pitchd is useful from day one, without needing years of community-built reviews to add value.
+> *"Find me a campsite a few hours from Sydney this weekend where it's not raining"*
+> *"Dog-friendly spot in the Blue Mountains with a dump point nearby"*
+> *"Free campsite in Queensland near a good fishing spot"*
+
+What used to take hours now takes seconds.
 
 ---
 
@@ -25,11 +25,13 @@ This also means Pitchd is useful from day one, without needing years of communit
 - 🏕️ **Campsites** — free, paid, national parks, state parks
 - 🚿 **Essential amenities** — dump points, public toilets, water fill stations, laundromats
 - 🐕 **Activity filters** — dog-friendly, fishing, swimming, hiking trails nearby
+- ⛅ **Weather-aware search** — find somewhere dry without manually checking forecasts across multiple regions
+- 🗺️ **Open in Google Maps** — one tap to get directions to any campsite or amenity
 
 ---
 
-## Why does this exist?
-The most popular Australian camping app has declined significantly following a 2024 redesign and commercial acquisition — and no existing app uses AI. Pitchd is built to fill that gap with something smarter, faster, and more useful.
+## Why AI?
+Every other camping app is essentially a database with a search bar. You pick your filters and hope for the best. Pitchd is different — it understands what you're looking for, factors in real-time weather, and gives you intelligent results. Like asking a well-travelled mate who knows every campsite in the country.
 
 ---
 
@@ -39,7 +41,7 @@ The most popular Australian camping app has declined significantly following a 2
 ---
 
 ## Tech Stack
-Next.js · Tailwind CSS · PostgreSQL · Prisma · Supabase · Anthropic Claude API · Vercel
+Next.js · Tailwind CSS · PostgreSQL · Prisma · Supabase · Anthropic Claude API · Open-Meteo · Vercel
 
 ---
 
@@ -49,7 +51,7 @@ Next.js · Tailwind CSS · PostgreSQL · Prisma · Supabase · Anthropic Claude 
 - [ ] User personas & problem definition
 - [ ] UI/UX design & prototyping
 - [ ] Architecture & data modelling
-- [ ] MVP — AI natural language search + map
+- [ ] MVP — AI natural language search, weather-aware results, map
 - [ ] Beta launch
 - [ ] AI trip planner, campsite summaries, smart recommendations
 
