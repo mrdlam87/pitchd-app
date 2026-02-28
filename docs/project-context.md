@@ -18,7 +18,10 @@
 Finding campsites and essential road amenities (dump points, public toilets, laundromats, water fill stations) is a fragmented and frustrating experience. The leading Australian app (WikiCamp) has alienated its loyal user base through a poorly received redesign and an acquisition that prioritised commercial interests. No app combines campsite discovery, amenity finding, and nearby activity search in a clean, reliable, map-first experience.
 
 ### The Solution
-A clean, fast, map-first camp trip companion for Australian campers. Find campsites, essential road amenities, and nearby activities (hikes, fishing spots, swimming holes) all in one place — the way Google Maps works, but built specifically for camping life.
+An AI-powered camp trip companion for Australian campers. Pitchd goes beyond a map directory by letting campers describe what they want in natural language, get intelligent trip recommendations, and receive AI-generated summaries of campsites — making it genuinely useful from day one without needing years of community-built reviews.
+
+### Strategic Positioning
+Pitchd is not competing with WikiCamp as a map directory — it's building a fundamentally different product. WikiCamp is a database with a map. Pitchd is a **camping intelligence platform** with AI at its core. The AI layer is the differentiator that sidesteps the cold start problem and provides value that established players can't easily replicate.
 
 ---
 
@@ -31,20 +34,21 @@ A clean, fast, map-first camp trip companion for Australian campers. Find campsi
 
 ## 3. MVP Features
 
-- Map-first UI — browse and search via an interactive map (like Google Maps)
-- Campsite search by location (nearby or region)
-- Filter by activity: dog-friendly, fishing, swimming
-- Essential road amenities on the map: dump points, public toilets, water fill stations, laundromats
-- Nearby activities: hikes, walking trails
+- **Natural language search** — describe what you want in plain English (e.g. *"dog-friendly campsite near Melbourne with fishing access"*)
+- **AI campsite summaries** — intelligently synthesised descriptions drawn from open data sources, so every campsite has useful context from day one
+- Map-first UI — browse and search via an interactive map
+- Core filters: dog-friendly, fishing, swimming, dump points, public toilets, water fill stations, laundromats, nearby hikes
 - Clean, fast, reliable results
 
 ### Future Features (post-MVP)
+- **AI trip planner** — input your dates, starting point, setup and interests and get a full itinerary
+- **Smart recommendations** — learns your camping style and surfaces spots you'd love
+- **Conversational trip assistant** — ask questions about any campsite and get intelligent answers
+- **AI photo tagging** — automatically categorise user-submitted photos
 - Save / favourite locations
 - User accounts & login
-- Trip planning / route builder
+- User-submitted reviews and photos
 - Offline support
-- User-submitted reviews and photo updates
-- Additional amenity types (fuel, BBQ areas, playgrounds, mobile coverage etc.)
 - Expand beyond Australia
 
 ---
@@ -139,7 +143,7 @@ _To be populated in Phase 4_
 | Date | Phase | What Was Covered |
 |---|---|---|
 | Feb 28, 2026 | Phase 0 | Project concept defined, MVP scoped, tech stack chosen and rationale documented |
-| Feb 28, 2026 | Phase 1 | Market research completed — competitors mapped, key gaps and user pain points identified |
+| Feb 28, 2026 | Phase 1 | Market research completed — competitors mapped, key gaps and user pain points identified. WikiCamp identified as declining incumbent. AI-first strategy adopted as core differentiator. App named Pitchd. |
 
 ---
 
