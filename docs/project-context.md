@@ -39,12 +39,68 @@ This is the problem. This is the user. This is the product.
 
 ---
 
-## 2. Target User
+## 2. Target Users
 
-- To be refined during Phase 2 — User Personas
-- Initial assumption: Australian campers who camp regularly (1-2x per month) and find the current fragmented research process frustrating
-- Likely camps within a few hours of a major city (Sydney, Melbourne, Brisbane etc.)
-- May camp with dogs, fish, or have other specific requirements that make generic search tools inadequate
+### Persona 1 — Matt, The Weekend Warrior (Primary MVP Persona)
+
+**Age:** 34 | **Location:** Western Sydney | **Camping frequency:** 1–2x per month
+**Setup:** Car camper or roof-top tent, often brings his dog
+
+**Situation:** Matt works a demanding job and camping is his reset button. He plans trips on Thursday or Friday evening for the upcoming weekend — short planning window, limited patience for friction. He knows the areas he likes (Blue Mountains, Hunter Valley, South Coast) but weather makes or breaks the trip. A wet weekend with no shelter is a write-off.
+
+**Current behaviour:** Checks BOM or Weatherzone across 3–4 regions to find somewhere dry, then cross-references WikiCamp, Google Maps, and Facebook groups to find a matching site. The whole process takes 1–2 hours and still feels uncertain.
+
+**The killer query:** *"Find me a dog-friendly campsite a few hours from Sydney this weekend where it's not going to rain"*
+
+**Frustrations:**
+- Can't get weather and campsite info in one place
+- WikiCamp has deteriorated since the G'Day Group acquisition
+- Amenity info (dump points, dog rules) is often wrong or missing
+- Ends up calling campgrounds to confirm what apps should tell him
+
+**What he wants:** Type what he's looking for, get a trustworthy answer on a map, and go.
+
+---
+
+### Persona 2 — Sarah, The Road Tripper (Secondary Persona)
+
+**Age:** 41 | **Location:** Melbourne | **Camping frequency:** 4–6 longer trips per year
+**Setup:** Caravan with dump tank, travels with partner and two kids
+
+**Situation:** Sarah plans further in advance but her trips are more complex — she needs dump points along the route, caravan-friendly sites, somewhere the kids can swim or fish, and proper toilets. She's less spontaneous than Matt but just as frustrated by fragmented tools, and will spend hours across multiple apps still feeling unsure.
+
+**Current behaviour:** Uses WikiCamp for dump points and toilets, a separate weather app, and GeoScout or Hema Explorer for caravan-friendly routes. She's well aware of how broken the process is.
+
+**The killer query:** *"Plan a 5-day caravan trip from Melbourne to Adelaide with dump points and kid-friendly swimming stops"*
+
+**Frustrations:**
+- Dump point and amenity data is unreliable — she's driven 20 minutes out of the way to a dump point that no longer exists
+- No app handles route-based planning with amenities
+- Weather planning across a multi-day route requires entirely manual checking
+
+**What she wants:** One tool that handles the full planning sequence — route, weather, sites, amenities — so she can focus on the trip, not the research.
+
+> **Note:** Sarah is well served by the MVP for individual site searches. Route-based trip planning and multi-day itineraries are post-MVP features.
+
+---
+
+### Problem Statement
+
+**Australian campers waste hours every trip doing research that should take seconds.** Planning a camping trip today means checking weather across multiple regions, cross-referencing two or three apps for campsites, manually verifying amenity data that's often wrong, and still feeling uncertain when you leave. There is no single tool that understands what you're looking for and brings it all together.
+
+Pitchd solves this with a single natural language query. Describe your trip — where you're starting, when you're going, what you need — and Pitchd handles the rest: finding campsites, checking live weather across regions, and surfacing results that actually match. What used to take hours now takes seconds.
+
+---
+
+### MVP Feature Validation
+
+| Feature | Solves for Matt? | Solves for Sarah? |
+|---|---|---|
+| Natural language search | ✅ Core need | ✅ Core need |
+| Weather-aware search | ✅ Primary pain point | ✅ Multi-day route planning |
+| Map-first UI | ✅ Spatial decision making | ✅ Route visualisation |
+| Core filters (dog, dump points, fishing, etc.) | ✅ Dog-friendly is critical | ✅ Dump points are critical |
+| Open in Google Maps | ✅ Confirms and navigates | ✅ Turn-by-turn to site |
 
 ---
 
@@ -91,7 +147,7 @@ This is the problem. This is the user. This is the product.
 
 - [x] **Phase 0** — Project scoping & stack decisions ✅
 - [x] **Phase 1** — Market research ✅
-- [ ] **Phase 2** — Define user personas & problem statement
+- [x] **Phase 2** — Define user personas & problem statement ✅
 - [ ] **Phase 3** — Prototyping & design (Figma wireframes)
 - [ ] **Phase 4** — Technical planning (architecture, data models, milestones)
 - [ ] **Phase 5** — Build & ship (iterative development)
@@ -176,13 +232,14 @@ _To be populated in Phase 3_
 |---|---|---|
 | Feb 28, 2026 | Phase 0 | Project concept defined, MVP scoped, tech stack chosen and rationale documented. App named Pitchd. |
 | Feb 28, 2026 | Phase 1 | Market research completed — competitors mapped, key gaps and user pain points identified. WikiCamp identified as declining incumbent. AI-first strategy adopted as core differentiator. Weather-aware search added to MVP. Origin story captured. |
+| Mar 1, 2026 | Phase 2 | User personas defined (Matt — Weekend Warrior, Sarah — Road Tripper). Problem statement written. MVP features validated against both personas. Phase 2 complete. |
 
 ---
 
 ## 10. Current Status & Next Steps
 
-**Current Phase:** 2 — Define User Personas & Problem Statement
-**Next Action:** Switch to personal Claude.ai account, paste this document, and continue with Phase 2
+**Current Phase:** 3 — Prototyping & Design
+**Next Action:** Begin Figma wireframes — start with the core search flow (home screen → natural language input → map results)
 
 ---
 
