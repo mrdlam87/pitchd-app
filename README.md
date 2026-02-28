@@ -1,24 +1,35 @@
 # 🏕️ Pitchd
-> Google Maps for Australian campers — everything you need for a trip, in one place.
+> The AI-powered camping companion for Australians.
 
 ---
 
 ## What is it?
-CampFinder is a map-first web app that helps Australian campers find everything they need for a trip without jumping between multiple apps.
+Pitchd is an AI-powered web app that makes finding the perfect campsite as easy as having a conversation. Instead of juggling multiple apps and endless filter dropdowns, just describe what you want in plain English and Pitchd does the rest.
 
-Search the map and instantly see:
+> *"Dog-friendly campsite within 3 hours of Melbourne near a good fishing spot"*
+> *"Free campsite in Queensland with a dump point nearby"*
+> *"Somewhere peaceful to pitch a tent this weekend with my kids"*
+
+Pitchd interprets your request, finds the best matches, and displays them on an interactive map — along with everything else you need nearby.
+
+---
+
+## Why AI?
+Every other camping app is essentially a database with a search bar. You already know what filters to apply, you just have to find them. Pitchd is different — it understands what you're looking for, the way a knowledgeable mate would.
+
+This also means Pitchd is useful from day one, without needing years of community-built reviews to add value.
+
+---
+
+## What you can find
 - 🏕️ **Campsites** — free, paid, national parks, state parks
 - 🚿 **Essential amenities** — dump points, public toilets, water fill stations, laundromats
 - 🐕 **Activity filters** — dog-friendly, fishing, swimming, hiking trails nearby
 
-Think Google Maps, but built specifically for camping life.
-
 ---
 
 ## Why does this exist?
-Finding the right campsite — one that's dog-friendly, near a good fishing spot, and within range of a dump point — currently means bouncing between 2-3 different apps, none of which do all of it well. The most popular Australian app in this space (WikiCamp) has declined significantly following a 2024 redesign and commercial acquisition.
-
-CampFinder is built to be the app that Australian campers actually want.
+The most popular Australian camping app has declined significantly following a 2024 redesign and commercial acquisition — and no existing app uses AI. Pitchd is built to fill that gap with something smarter, faster, and more useful.
 
 ---
 
@@ -28,20 +39,21 @@ CampFinder is built to be the app that Australian campers actually want.
 ---
 
 ## Tech Stack
-Built with Next.js, Tailwind CSS, PostgreSQL, Prisma, Supabase, and deployed on Vercel.
+Next.js · Tailwind CSS · PostgreSQL · Prisma · Supabase · Anthropic Claude API · Vercel
 
 ---
 
 ## Roadmap
 - [x] Market research & competitor analysis
+- [x] AI-first strategy defined
 - [ ] User personas & problem definition
 - [ ] UI/UX design & prototyping
 - [ ] Architecture & data modelling
-- [ ] MVP build — map, search, core filters
+- [ ] MVP — AI natural language search + map
 - [ ] Beta launch
-- [ ] User accounts, favourites, trip planning
+- [ ] AI trip planner, campsite summaries, smart recommendations
 
 ---
 
 ## Contributing
-This is currently a solo side project. Contribution guidelines will be added as the project matures.# pitchd-app
+This is currently a solo side project. Contribution guidelines will be added as the project matures.
