@@ -4,8 +4,9 @@
 ---
 
 ## Project Overview
-**Pitchd** is a map-first web app for Australian campers — "Google Maps for campers." Users can discover campsites, essential road amenities (dump points, public toilets, laundromats, water fill stations), and nearby activities (hikes, fishing spots, swimming holes) all in one place.
+**Pitchd** is an AI-powered camping companion for Australian campers. Users find campsites, essential road amenities (dump points, public toilets, laundromats, water fill stations), and nearby activities (hikes, fishing spots, swimming holes) via a map-first interface and natural language AI search.
 
+**Core differentiator:** Natural language search powered by the Anthropic Claude API — no competing camping app offers this.  
 **Target market:** Australian campers (primary)  
 **Current stage:** Pre-development — design & architecture phase
 
@@ -16,10 +17,13 @@
 |---|---|
 | Frontend | Next.js (React) + Tailwind CSS |
 | Backend | Next.js API Routes |
+| AI | Anthropic Claude API (Haiku for MVP) |
 | Database | PostgreSQL + Prisma ORM |
 | Hosted DB | Supabase |
+| Map | TBD — Mapbox or Google Maps |
 | Deployment | Vercel |
 | Version Control | GitHub |
+| Data Sources | OpenStreetMap, data.gov.au, state park APIs |
 
 ---
 
