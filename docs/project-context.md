@@ -34,13 +34,13 @@ Pitchd is not competing with WikiCamp as a map directory — it's building a fun
 
 ## 3. MVP Features
 
-- **Natural language search** — describe what you want in plain English (e.g. *"dog-friendly campsite near Melbourne with fishing access"*)
-- **AI campsite summaries** — intelligently synthesised descriptions drawn from open data sources, so every campsite has useful context from day one
+- **Natural language search** — describe what you want in plain English (e.g. *"dog-friendly campsite near Melbourne with fishing access"*). This is the core AI feature and primary differentiator for launch.
 - Map-first UI — browse and search via an interactive map
 - Core filters: dog-friendly, fishing, swimming, dump points, public toilets, water fill stations, laundromats, nearby hikes
 - Clean, fast, reliable results
 
-### Future Features (post-MVP)
+### Post-MVP — Phase 2
+- **AI campsite summaries** — intelligently synthesised descriptions drawn from open data sources
 - **AI trip planner** — input your dates, starting point, setup and interests and get a full itinerary
 - **Smart recommendations** — learns your camping style and surfaces spots you'd love
 - **Conversational trip assistant** — ask questions about any campsite and get intelligent answers
@@ -125,16 +125,27 @@ _To be populated in Phase 3_
 ---
 
 ## 8. Architecture & Technical Decisions
-_To be populated in Phase 4_
+
+### AI Cost Management Strategy
+- **Use Claude Haiku for MVP** — significantly cheaper than Sonnet/Opus, fully capable for natural language search interpretation
+- **Cache AI responses** — identical or similar searches return cached results rather than making repeated API calls
+- **Rate limit free users** — limit AI searches per day on the free tier to control costs
+- **Hybrid search approach** — use traditional filters for simple queries, only invoke AI for genuinely conversational or complex natural language input
+- **Pre-generate where possible** — for future AI summaries, run batch jobs to generate and store in the database rather than on-demand generation
+- **Monitor usage from day one** — set up cost alerts in the Anthropic Console to avoid surprises
+
+### AI Feature Rollout
+- **MVP:** Natural language search only — keeps AI scope tight and costs predictable
+- **Phase 2:** AI campsite summaries, trip planner, smart recommendations
 
 ### Data Models
--
+- TBD in Phase 4
 
 ### API Structure
--
+- TBD in Phase 4
 
 ### Key Technical Decisions
--
+- TBD in Phase 4
 
 ---
 
