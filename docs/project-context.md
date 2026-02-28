@@ -54,6 +54,7 @@ This is the problem. This is the user. This is the product.
 - **Weather-aware search** — integrates live weather forecasts into search results so campers can find somewhere dry without manually checking multiple locations
 - **Map-first UI** — browse and search results via an interactive map
 - **Core filters** — dog-friendly, fishing, swimming, dump points, public toilets, water fill stations, laundromats, nearby hikes
+- **Open in Google Maps** — every campsite and amenity has a one-tap link to open directly in Google Maps for navigation
 
 ### Post-MVP — Phase 2
 - **AI campsite summaries** — intelligently synthesised descriptions drawn from open data sources
