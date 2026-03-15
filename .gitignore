@@ -13,7 +13,7 @@ dist/
 .env.*.local
 
 # Claude Code
-.claude/
+.claude/settings.local.json
 
 # OS
 .DS_Store

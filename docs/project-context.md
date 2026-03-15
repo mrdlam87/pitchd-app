@@ -140,8 +140,9 @@ Pitchd solves this with a single natural language query. Describe your trip — 
 | Weather | Open-Meteo | Free, no API key needed, great Australian coverage |
 | Database | PostgreSQL + Prisma ORM | Battle-tested DB, Prisma makes it approachable with type safety |
 | Hosted DB | Supabase | Managed Postgres, generous free tier, no vendor lock-in |
-| Map | TBD (Mapbox or Google Maps) | To be decided in architecture phase |
+| Map | Mapbox (tentative) | Polished tiles, customisable styles, good AU coverage — to confirm at start of Phase 5 |
 | Deployment | Vercel | Native Next.js integration, auto CI/CD from GitHub, preview deployments |
+| Auth | Auth.js (NextAuth) + Google OAuth | No password storage, one-click sign in, easy Next.js integration |
 | Version Control | GitHub | Industry standard, builds good habits |
 | Data Sources | OpenStreetMap, data.gov.au, state park APIs | Free, open Australian camping and amenity data |
 
@@ -152,7 +153,7 @@ Pitchd solves this with a single natural language query. Describe your trip — 
 - [x] **Phase 0** — Project scoping & stack decisions ✅
 - [x] **Phase 1** — Market research ✅
 - [x] **Phase 2** — Define user personas & problem statement ✅
-- [ ] **Phase 3** — Prototyping & design ✅ UI complete · UX in progress
+- [x] **Phase 3** — Prototyping & design ✅
 - [ ] **Phase 4** — Technical planning (architecture, data models, milestones)
 - [ ] **Phase 5** — Build & ship (iterative development)
 
@@ -241,32 +242,16 @@ See `docs/ux-session-1.md` for detailed flow decisions covering:
 
 ## 8. Architecture & Technical Decisions
 
-### AI Cost Management Strategy
-- **Use Claude Haiku for MVP** — significantly cheaper than Sonnet/Opus, fully capable for natural language search interpretation
-- **Cache AI responses** — identical or similar searches return cached results rather than making repeated API calls
-- **Rate limit free users** — limit AI searches per day on the free tier to control costs
-- **Hybrid search approach** — use traditional filters for simple queries, only invoke AI for genuinely conversational or complex natural language input
-- **Pre-generate where possible** — for future AI summaries, run batch jobs to generate and store in the database rather than on-demand generation
-- **Monitor usage from day one** — set up cost alerts in the Anthropic Console to avoid surprises
+Full technical detail lives in `docs/technical/technical-design.md`.
 
-### AI Feature Rollout
-- **MVP:** Natural language search + weather-aware results + Pitchd pick
-- **Phase 2:** AI campsite summaries, trip planner, smart recommendations, Pitchd pick personalisation
-
-### Weather Fetching Strategy (TBD)
-- Browse mode weather fetching is a performance and cost consideration — do not architect against a viewport-based fetch approach
-- Likely solution: fetch weather only for pins in current viewport, re-fetch on pan
-- Zoom level should determine fetch granularity: zoomed out = area-level weather, zoomed in = individual pin weather
-- To be fully resolved in Phase 4
-
-### Data Models
-- TBD in Phase 4
-
-### API Structure
-- TBD in Phase 4
-
-### Key Technical Decisions
-- TBD in Phase 4
+**Key decisions summary:**
+- Next.js App Router + Tailwind, deployed to Vercel
+- Auth.js with Google OAuth — no passwords, closed beta at launch
+- Mapbox for maps (tentative — confirm at Phase 5 start)
+- PostgreSQL via Prisma on Supabase
+- OSM as campsite data base layer, enriched from state park sources
+- Claude Haiku for all MVP AI features, responses cached in DB
+- Navigate button uses Google Maps URL scheme — no SDK or API key required
 
 ---
 
