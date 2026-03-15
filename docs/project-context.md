@@ -111,6 +111,8 @@ Pitchd solves this with a single natural language query. Describe your trip — 
 - **Map-first UI** — browse and search results via an interactive map
 - **Core filters** — dog-friendly, fishing, swimming, dump points, public toilets, water fill stations, laundromats, nearby hikes
 - **Open in Google Maps** — every campsite and amenity has a one-tap link to open directly in Google Maps for navigation
+- **Pitchd pick** — one-tap best recommendation based on location, upcoming weekend weather and balanced defaults. No input required.
+- **Browse mode** — swipe to map without searching, explore nearby campsites and amenities based on current device location
 
 ### Post-MVP — Phase 2
 - **AI campsite summaries** — intelligently synthesised descriptions drawn from open data sources
@@ -118,6 +120,8 @@ Pitchd solves this with a single natural language query. Describe your trip — 
 - **Smart recommendations** — learns your camping style and surfaces spots you'd love
 - **Conversational trip assistant** — ask questions about any campsite and get intelligent answers
 - **AI photo tagging** — automatically categorise user-submitted photos
+- **Pitchd pick personalisation** — evolves from signal-based to learned preferences and usage history
+- **Area-level weather overlays** — Google Maps "local vibe" style weather at zoom-out, individual site weather at zoom-in
 - Save / favourite locations
 - User accounts & login
 - User-submitted reviews and photos
@@ -148,7 +152,7 @@ Pitchd solves this with a single natural language query. Describe your trip — 
 - [x] **Phase 0** — Project scoping & stack decisions ✅
 - [x] **Phase 1** — Market research ✅
 - [x] **Phase 2** — Define user personas & problem statement ✅
-- [ ] **Phase 3** — Prototyping & design (Figma wireframes)
+- [ ] **Phase 3** — Prototyping & design ✅ UI complete · UX in progress
 - [ ] **Phase 4** — Technical planning (architecture, data models, milestones)
 - [ ] **Phase 5** — Build & ship (iterative development)
 
@@ -188,16 +192,50 @@ Pitchd solves this with a single natural language query. Describe your trip — 
 ---
 
 ## 7. Design & Prototype Notes
-_To be populated in Phase 3_
+
+### Figma
+- Prototype: https://www.figma.com/design/pHfkpN27vM0zYhNbU0bK0r/Pitchd-%E2%80%94-Prototype?node-id=30-2
+- UI design complete as of March 2026
+- Generated via Claude Code MCP from interactive prototype
+
+### Visual Direction (settled)
+- **Fonts:** Nunito + Lora pairing
+- **Palette:** Light cream/sand base with forest green accents, terracotta/coral highlights (#c4714a) — warm and consumer-grade, departed from earlier dark green prototype
+- **Photography / illustration:** Illustrated landscape scenes with tent silhouette used as hero on home screen and card headers; to be replaced with real location photography in production
+- **Cards:** Clean white/cream cards with subtle shadows — frosted glass dropped in favour of lighter palette
+- **Weather badge:** "Great / Good / Poor" pill top-right of each card, colour-coded green/yellow/red
+- **Active filter state:** Terracotta outline + checkmark — communicates AI sync state clearly
+
+### Screen Architecture
+Three core screens:
+
+1. **Home screen** — Illustrated hero, AI search textarea, predefined searches below input, suggested searches list. Swipe left to map.
+2. **Filter panel** — Full-screen overlay accessible from Filters button in search bar. Activities and Amenities in separate sections. Date picker, city dropdown, drive time slider. "Search with these filters" CTA.
+3. **Map results view** — Real map tiles, persistent pill search bar + predefined searches pinned at top, numbered campsite pins + icon amenity pins, AllTrails-style bottom drawer with peek / half / full states.
+
+### Confirmed Design Patterns (from Figma review)
+- Predefined searches sit below search input on home screen and below search bar on map — consistent placement confirmed
+- "More / Less" text toggle on drawer alongside drag handle — accessibility addition, keep
+- Summary row in drawer: "X areas found · ranked by [intent] · [drive time] of [city]" — language confirmed
+- Active predefined search chip: terracotta outline + checkmark = AI sync state visible at a glance
+- Full drawer card structure: illustrated header image → name + badge → drive time + blurb → weather bar → day columns → amenity tags → AI summary text
+- Loading state: map screen shown immediately, spinner centred, ghost drawer at bottom with "0 areas found"
+
+### UX Decisions
+See `docs/ux-session-1.md` for full UX decisions. Key principles:
+- AI and filters are always in sync — filter panel reflects AI interpretation, user can correct
+- Map is always the hero — interactions keep the map prominent
+- Minimum necessary movement — drawer and map only move when they need to
+- Two modes (browse + search results) share consistent design language, differ in data and ordering
+- Pitchd pick is the north star interaction — one tap, best answer, no friction
 
 ### User Flows
--
-
-### Wireframe Decisions
--
-
-### Figma Link
--
+See `docs/ux-session-1.md` for detailed flow decisions covering:
+- Home → search → map transition
+- Browse mode (swipe to map)
+- Pin tap behaviour
+- Drawer states and interactions
+- Filter + AI sync
 
 ---
 
@@ -212,8 +250,14 @@ _To be populated in Phase 3_
 - **Monitor usage from day one** — set up cost alerts in the Anthropic Console to avoid surprises
 
 ### AI Feature Rollout
-- **MVP:** Natural language search + weather-aware results
-- **Phase 2:** AI campsite summaries, trip planner, smart recommendations
+- **MVP:** Natural language search + weather-aware results + Pitchd pick
+- **Phase 2:** AI campsite summaries, trip planner, smart recommendations, Pitchd pick personalisation
+
+### Weather Fetching Strategy (TBD)
+- Browse mode weather fetching is a performance and cost consideration — do not architect against a viewport-based fetch approach
+- Likely solution: fetch weather only for pins in current viewport, re-fetch on pan
+- Zoom level should determine fetch granularity: zoomed out = area-level weather, zoomed in = individual pin weather
+- To be fully resolved in Phase 4
 
 ### Data Models
 - TBD in Phase 4
@@ -233,14 +277,27 @@ _To be populated in Phase 3_
 | Feb 28, 2026 | Phase 0 | Project concept defined, MVP scoped, tech stack chosen and rationale documented. App named Pitchd. |
 | Feb 28, 2026 | Phase 1 | Market research completed — competitors mapped, key gaps and user pain points identified. WikiCamp identified as declining incumbent. AI-first strategy adopted as core differentiator. Weather-aware search added to MVP. Origin story captured. |
 | Mar 1, 2026 | Phase 2 | User personas defined (Matt — Weekend Warrior, Sarah — Road Tripper). Problem statement written. MVP features validated against both personas. Phase 2 complete. |
+| Mar 15, 2026 | Phase 3 | UI design complete (Figma via Claude Code). UX Session 1 completed — core search flow, map interactions, pin behaviour, drawer interactions, filters, predefined searches and Pitchd pick defined. Full decisions in ux-session-1.md. |
 
 ---
 
 ## 10. Current Status & Next Steps
 
-**Current Phase:** 3 — Prototyping & Design
-**Next Action:** Begin Figma wireframes — start with the core search flow (home screen → natural language input → map results)
+**Current Phase:** 3 — Prototyping & Design (UI complete, UX in progress)
+
+**Completed this session:**
+- Core search flow defined
+- Browse mode defined
+- Pin behaviour defined
+- Drawer interactions defined
+- AI + filter sync principle established
+- Predefined searches named and scoped
+- Pitchd pick MVP behaviour defined
+
+**Next Actions:**
+- UX Session 2 — remaining interactions TBD (edge cases, empty states, onboarding)
+- Begin Phase 4 — technical planning, architecture, data models
 
 ---
 
-*Tip for Claude Code: Paste sections 1–5 and the relevant phase section to give Claude the context it needs to help you build.*
+*Tip for Claude Code: Paste sections 1–5, section 7, and the relevant phase section to give Claude the context it needs to help you build.*
