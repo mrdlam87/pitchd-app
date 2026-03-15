@@ -23,6 +23,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_tools: "Bash(gh pr comment:*),Bash(gh pr view:*),Bash(git diff:*),Bash(git log:*),Read,Glob,Grep"
           prompt: |
             Please review this pull request. Focus on:
             - Correctness and bugs
@@ -30,4 +31,5 @@ jobs:
             - Security issues
             - Anything that looks out of place or incomplete
 
-            Post your review as a comment on the PR. Be concise and constructive.
+            Post your review as a comment on the PR using: gh pr comment ${{ github.event.pull_request.number }} --body "your review here"
+            Be concise and constructive.
