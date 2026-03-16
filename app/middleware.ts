@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
+import { UserRole } from "@/lib/generated/prisma/enums";
 
 export default auth((req) => {
   const { nextUrl, auth: session } = req;
@@ -15,7 +16,7 @@ export default auth((req) => {
   }
 
   // Authenticated but not invited — show 403
-  if (session.user.role === "user") {
+  if (session.user.role === UserRole.user) {
     return new NextResponse("Access restricted to invited users.", {
       status: 403,
     });
