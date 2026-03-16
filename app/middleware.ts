@@ -1,25 +1,29 @@
-import { auth } from "@/auth";
+import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
-import { UserRole } from "@/lib/generated/prisma/enums";
+import { authConfig } from "@/auth.config";
+
+const { auth } = NextAuth(authConfig);
 
 export default auth((req) => {
   const { nextUrl, auth: session } = req;
 
-  // Allow auth routes through unconditionally
-  if (nextUrl.pathname.startsWith("/api/auth")) {
+  // Allow auth routes and public pages through unconditionally
+  if (
+    nextUrl.pathname.startsWith("/api/auth") ||
+    nextUrl.pathname === "/sign-in" ||
+    nextUrl.pathname === "/access-denied"
+  ) {
     return NextResponse.next();
   }
 
   // Unauthenticated — redirect to sign-in
   if (!session) {
-    return NextResponse.redirect(new URL("/api/auth/signin", nextUrl.origin));
+    return NextResponse.redirect(new URL("/sign-in", nextUrl.origin));
   }
 
-  // Authenticated but not invited — show 403
-  if (session.user.role === UserRole.user) {
-    return new NextResponse("Access restricted to invited users.", {
-      status: 403,
-    });
+  // Authenticated but not invited — redirect to access-denied page
+  if (session.user.role === "user") {
+    return NextResponse.redirect(new URL("/access-denied", nextUrl.origin));
   }
 
   return NextResponse.next();
