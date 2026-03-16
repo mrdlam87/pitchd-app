@@ -1,5 +1,5 @@
 ---
-description: Implement a GitHub issue by number. Creates a branch, implements the work, and opens a PR.
+description: Implement a GitHub issue by number. Creates a branch, implements the work, verifies acceptance criteria, and opens a PR.
 allowed-tools: Bash(git:*), Bash(gh:*), Read, Edit, Write, Grep, Glob, Agent
 argument-hint: <issue-number>
 ---
@@ -9,7 +9,7 @@ You are implementing a GitHub issue for the Pitchd app.
 ## Step 1 — Fetch the issue
 Run: `!gh issue view $ARGUMENTS --json number,title,body,labels,milestone`
 
-Read the issue title, body, labels, and milestone carefully.
+Read the issue title, body, labels, milestone, and **acceptance criteria** carefully. The acceptance criteria are the definition of done — every item must be met before the PR is raised.
 
 ## Step 2 — Load context
 Always read these before writing any code:
@@ -38,7 +38,20 @@ Implement the issue following all conventions in CLAUDE.md:
 
 Keep the implementation focused on exactly what the issue describes. Do not add extra features or refactor unrelated code.
 
-## Step 5 — Open a PR
+## Step 5 — Verify acceptance criteria
+Go through each acceptance criteria item from the issue body one by one. For each item:
+1. Verify it is met by reading the relevant code, running a check, or confirming the behaviour
+2. If an item is not met, fix it before proceeding
+3. Once verified, tick it off on the GitHub issue by updating the issue body — replace `- [ ]` with `- [x]` for that item
+
+Update the issue body with all ticked items:
+```
+gh issue edit $ARGUMENTS --repo mrdlam87/pitchd-app --body "<full updated body with ticked checkboxes>"
+```
+
+Do not raise the PR until all acceptance criteria are ticked.
+
+## Step 6 — Open a PR
 Run: `!git add <relevant files> && git commit -m "<message>"`
 
 Then create a PR:
