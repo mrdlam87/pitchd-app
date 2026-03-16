@@ -87,6 +87,17 @@ PitchdLight          ← root, owns all state (screen, results, searchState, etc
 - All API routes in `/app/api/`
 - Environment variables in `.env.local`
 
+### UI conventions
+- **Always reference the prototype before writing UI code** — check `prototypes/pitchd-light-v2.jsx` for colours, spacing, typography, component behaviour, and design patterns
+- **Figma is the source of truth for visual design** — use the Figma MCP (`get_design_context`, `get_screenshot`) when a Figma URL is available
+- **Design tokens from the prototype** (use these, don't invent new values):
+  - Background: `#f7f5f0`
+  - Forest green (headings): `#2d4a2d`
+  - Sage (secondary text): `#5a7a5a`
+  - Coral (CTA / accent): `#e8674a`
+  - Warm border: `1.5px solid #e0dbd0`
+  - Wordmark: "Pitch" in forest green + "d" in coral, Lora serif, bold
+
 ### Auth
 - Google OAuth only — no passwords stored
 - MVP is closed/invite-only — access controlled via `role` field (`admin` | `beta` | `user`)
