@@ -1,6 +1,8 @@
-import { auth } from "@/auth";
+import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
-import { UserRole } from "@/lib/generated/prisma/enums";
+import { authConfig } from "@/auth.config";
+
+const { auth } = NextAuth(authConfig);
 
 export default auth((req) => {
   const { nextUrl, auth: session } = req;
@@ -20,7 +22,7 @@ export default auth((req) => {
   }
 
   // Authenticated but not invited — redirect to access-denied page
-  if (session.user.role === UserRole.user) {
+  if (session.user.role === "user") {
     return NextResponse.redirect(new URL("/access-denied", nextUrl.origin));
   }
 

@@ -4,8 +4,9 @@ export default function SignInPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#f7f5f0]">
       <div className="flex flex-col items-center gap-8">
-        <h1 className="font-[family-name:var(--font-lora)] text-4xl text-[#2d4a2d]">
-          Pitchd
+        <h1 className="font-[family-name:var(--font-lora)] text-4xl font-bold tracking-tight">
+          <span className="text-[#2d4a2d]">Pitch</span>
+          <span className="text-[#e8674a]">d</span>
         </h1>
         <p className="text-[#5a7a5a] text-center max-w-xs">
           AI-powered camping companion for Australian campers.
@@ -18,7 +19,8 @@ export default function SignInPage() {
         >
           <button
             type="submit"
-            className="flex items-center gap-3 rounded-full bg-white px-6 py-3 text-sm font-semibold text-gray-700 shadow-md ring-1 ring-gray-200 hover:shadow-lg transition-shadow"
+            className="flex items-center gap-3 rounded-full bg-white px-6 py-3 text-sm font-semibold text-gray-700 shadow-md hover:shadow-lg transition-shadow"
+            style={{ border: "1.5px solid #e0dbd0" }}
           >
             <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
               <path
