@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  admin
+  beta
+  user
+}
+
+enum SyncStatus {
+  active
+  unverified
+  removed
+}
+
+model Campsite {
+  id              String     @id @default(cuid())
+  name            String
+  slug            String     @unique
+  lat             Float
+  lng             Float
+  state           String
+  region          String?
+  blurb           String?
+  bookingRequired Boolean    @default(false)
+  bookingUrl      String?
+  source          String
+  sourceId        String?
+  lastSyncedAt    DateTime?
+  syncStatus      SyncStatus @default(active)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  amenities       CampsiteAmenity[]
+}
+
+model AmenityType {
+  id         String    @id @default(cuid())
+  key        String    @unique
+  label      String
+  icon       String
+  color      String
+  category   String
+  campsites  CampsiteAmenity[]
+  pois       AmenityPOI[]
+}
+
+model CampsiteAmenity {
+  campsiteId    String
+  amenityTypeId String
+  campsite      Campsite    @relation(fields: [campsiteId], references: [id])
+  amenityType   AmenityType @relation(fields: [amenityTypeId], references: [id])
+
+  @@id([campsiteId, amenityTypeId])
+}
+
+model AmenityPOI {
+  id            String      @id @default(cuid())
+  name          String?
+  lat           Float
+  lng           Float
+  amenityTypeId String
+  amenityType   AmenityType @relation(fields: [amenityTypeId], references: [id])
+  source        String
+  sourceId      String?
+  verified      Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model WeatherCache {
+  id           String   @id @default(cuid())
+  lat          Float
+  lng          Float
+  fetchedAt    DateTime
+  expiresAt    DateTime
+  updatedAt    DateTime @updatedAt
+  forecastJson Json
+
+  @@unique([lat, lng])
+}
+
+model SearchCache {
+  id               String   @id @default(cuid())
+  queryHash        String   @unique
+  queryText        String
+  parsedIntentJson Json
+  createdAt        DateTime @default(now())
+  expiresAt        DateTime
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  avatarUrl String?
+  googleId  String   @unique
+  role      UserRole @default(user)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
