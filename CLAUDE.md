@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Core differentiator:** Natural language search with live weather-awareness.
 **Target market:** Australian campers (primary), architecture should allow future expansion.
-**Current stage:** Phase 4 complete — technical planning done, ready to build.
+**Current stage:** Phase 5 — M1 complete. App live at https://pitchd-app.vercel.app. Starting M2 (campsite data pipeline).
 **GitHub:** github.com/mrdlam87/pitchd-app
 
 ---
