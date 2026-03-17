@@ -51,7 +51,34 @@ gh issue edit $ARGUMENTS --repo mrdlam87/pitchd-app --body "<full updated body w
 
 Do not raise the PR until all acceptance criteria are ticked.
 
-## Step 6 — Open a PR
+## Step 6 — Build & smoke test
+Run these checks before opening the PR. Fix any errors before proceeding.
+
+**Always run:**
+```bash
+cd app && npm run lint
+cd app && npm run build
+```
+
+**If `prisma/schema.prisma` or `prisma/migrations/` were changed:**
+```bash
+cd app && npx prisma generate
+cd app && npx prisma migrate status
+```
+
+**Issue-type smoke tests** — run the most relevant check(s) for the issue:
+| Issue type | Manual check |
+|---|---|
+| Auth / protected routes | Start dev server, visit a protected route unauthenticated — confirm redirect |
+| API route | `curl` or browser fetch the endpoint with a valid session |
+| DB schema / migration | Check Supabase dashboard — confirm tables/columns match schema |
+| UI component | Start dev server, visually verify the component renders correctly |
+| Data pipeline / seed | Query the DB — confirm expected rows exist |
+| AI / search | Trigger a sample query end-to-end and inspect the response |
+
+Report the results of each check. If a check fails, fix it before proceeding.
+
+## Step 7 — Open a PR
 Run: `!git add <relevant files> && git commit -m "<message>"`
 
 Then create a PR:
