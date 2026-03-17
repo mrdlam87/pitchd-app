@@ -24,8 +24,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          allowed_tools: "Bash,Read,Write,Edit,Glob,Grep"
-          show_full_output: "true"
+          settings: '{"permissions":{"allow":["Bash","Read","Glob","Grep"]}}'
           prompt: |
             Please review this pull request. Focus on:
             - Correctness and bugs
