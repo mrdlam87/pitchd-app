@@ -155,7 +155,7 @@ Pitchd solves this with a single natural language query. Describe your trip — 
 - [x] **Phase 2** — Define user personas & problem statement ✅
 - [x] **Phase 3** — Prototyping & design ✅
 - [x] **Phase 4** — Technical planning (architecture, data models, milestones) ✅
-- [ ] **Phase 5** — Build & ship (iterative development) — M1 complete ✅
+- [ ] **Phase 5** — Build & ship (iterative development) — M1 complete ✅, M2 in progress
 
 ---
 
@@ -264,20 +264,21 @@ Full technical detail lives in `docs/technical/technical-design.md`.
 | Mar 1, 2026 | Phase 2 | User personas defined (Matt — Weekend Warrior, Sarah — Road Tripper). Problem statement written. MVP features validated against both personas. Phase 2 complete. |
 | Mar 15, 2026 | Phase 3 | UI design complete (Figma via Claude Code). UX Session 1 completed — core search flow, map interactions, pin behaviour, drawer interactions, filters, predefined searches and Pitchd pick defined. Full decisions in ux-session-1.md. |
 | Mar 16, 2026 | Phase 5 — M1 | M1 complete. Scaffolded Next.js app (#13), configured Prisma + Supabase (#14), set up Auth.js + Google OAuth (#15), implemented protected routes with beta/admin access control (#16), deployed to Vercel with all env vars configured (#17). App live at pitchd-app.vercel.app. |
+| Mar 18, 2026 | Phase 5 — M2 | M2 started. Wrote Prisma schema for all data models (#18). Seeded AmenityType lookup table with 8 records — 4 activities (dog_friendly, fishing, hiking, swimming) and 4 POIs (dump_point, water_fill, laundromat, toilets) (#19). Fixed CI claude-code-review workflow — now posts as claude[bot] in the PR Reviews section using the Claude GitHub App. Added .gitattributes for consistent line endings. |
 
 ---
 
 ## 10. Current Status & Next Steps
 
-**Current Phase:** Phase 5 — Build & ship (M1 complete, starting M2)
+**Current Phase:** Phase 5 — Build & ship (M2 in progress)
 
-**Completed this session:**
-- M1 fully complete — app boots, Google sign-in works, protected routes active
-- Next.js + Tailwind scaffold, Prisma + Supabase, Auth.js + Google OAuth, Vercel deployment
-- App live at https://pitchd-app.vercel.app
+**Completed:**
+- M1 fully complete — app boots, Google sign-in works, protected routes active, deployed to Vercel
+- M2 started — Prisma schema written (#18), AmenityType lookup table seeded (#19)
+- CI: claude-code-review workflow working — posts as `claude[bot]` reviewer via Claude GitHub App
 
 **Next Actions:**
-- M2 — Campsite data pipeline: run Prisma migrations, seed AmenityType data, build OSM ingestion script (Overpass API → Postgres)
+- M2 — Build OSM ingestion script (Overpass API → Postgres) to seed campsite data
 
 ---
 
