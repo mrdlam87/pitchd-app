@@ -62,6 +62,7 @@ cd app && npm run build
 
 **If `prisma/schema.prisma` or `prisma/migrations/` were changed:**
 ```bash
+cd app && npx prisma format
 cd app && npx prisma generate
 cd app && npx prisma migrate status
 ```
