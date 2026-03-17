@@ -20,34 +20,34 @@ enum SyncStatus {
 }
 
 model Campsite {
-  id              String     @id @default(cuid())
+  id              String            @id @default(cuid())
   name            String
-  slug            String     @unique
+  slug            String            @unique
   lat             Float
   lng             Float
   state           String
   region          String?
   blurb           String?
-  bookingRequired Boolean    @default(false)
+  bookingRequired Boolean           @default(false)
   bookingUrl      String?
   source          String
   sourceId        String?
   lastSyncedAt    DateTime?
-  syncStatus      SyncStatus @default(active)
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  syncStatus      SyncStatus        @default(active)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
   amenities       CampsiteAmenity[]
 }
 
 model AmenityType {
-  id         String    @id @default(cuid())
-  key        String    @unique
-  label      String
-  icon       String
-  color      String
-  category   String
-  campsites  CampsiteAmenity[]
-  pois       AmenityPOI[]
+  id        String            @id @default(cuid())
+  key       String            @unique
+  label     String
+  icon      String
+  color     String
+  category  String
+  campsites CampsiteAmenity[]
+  pois      AmenityPOI[]
 }
 
 model CampsiteAmenity {
