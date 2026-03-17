@@ -24,7 +24,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          allowed_tools: "Bash(gh pr comment:*),Bash(gh pr view:*),Bash(git diff:*),Bash(git log:*),Read,Glob,Grep"
+          allowed_tools: "Bash(gh pr comment*),Bash(gh pr view*),Bash(git diff*),Bash(git log*),Read,Glob,Grep"
           prompt: |
             Please review this pull request. Focus on:
             - Correctness and bugs
