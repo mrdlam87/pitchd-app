@@ -74,13 +74,13 @@ const amenityTypes = [
 async function main() {
   console.log("Seeding AmenityType records...");
 
-  for (const amenity of amenityTypes) {
+  for (const { key, ...rest } of amenityTypes) {
     await prisma.amenityType.upsert({
-      where: { key: amenity.key },
-      update: amenity,
-      create: amenity,
+      where: { key },
+      update: rest,
+      create: { key, ...rest },
     });
-    console.log(`  ✓ ${amenity.key}`);
+    console.log(`  ✓ ${key}`);
   }
 
   console.log(`Done. ${amenityTypes.length} AmenityType records seeded.`);
