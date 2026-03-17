@@ -32,6 +32,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Check Prisma schema formatting
+        run: npx prisma format --check
+
       - name: Validate Prisma schema
         run: npx prisma validate
 
