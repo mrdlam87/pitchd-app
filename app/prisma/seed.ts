@@ -37,7 +37,7 @@ const amenityTypes = [
     key: "swimming",
     label: "Swimming",
     icon: "🏊",
-    color: "#2a8ab0",
+    color: "#2aa8a0",
     category: "activity",
   },
   // POIs
