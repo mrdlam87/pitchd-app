@@ -240,7 +240,7 @@ function elementToRecord(el: OverpassElement): {
   }
 
   const tags = el.tags ?? {};
-  const name = tags.name ?? tags["name:en"] ?? "Unnamed campsite";
+  const name = tags.name || tags["name:en"] || "Unnamed campsite";
   const sourceId = `osm:${el.type}:${el.id}`;
   const state = detectState(lat, lng);
   const slug = makeSlug(name, sourceId);
@@ -315,21 +315,24 @@ async function main() {
     for (let i = 0; i < toUpdate.length; i += UPDATE_BATCH) {
       const batch = toUpdate.slice(i, i + UPDATE_BATCH);
       await prisma.$transaction(
-        batch.map((r) => {
-          const dbId = existingMap.get(r.sourceId)!;
-          return prisma.campsite.update({
-            where: { id: dbId },
-            data: {
-              name: r.name,
-              slug: r.slug,
-              lat: r.lat,
-              lng: r.lng,
-              state: r.state,
-              syncStatus: r.syncStatus,
-              lastSyncedAt: r.lastSyncedAt,
-            },
-          });
-        })
+        async (tx) => {
+          for (const r of batch) {
+            const dbId = existingMap.get(r.sourceId)!;
+            await tx.campsite.update({
+              where: { id: dbId },
+              data: {
+                name: r.name,
+                slug: r.slug,
+                lat: r.lat,
+                lng: r.lng,
+                state: r.state,
+                syncStatus: r.syncStatus,
+                lastSyncedAt: r.lastSyncedAt,
+              },
+            });
+          }
+        },
+        { timeout: 60_000 }
       );
       updated += batch.length;
       process.stdout.write(`\r  → Updated ${updated}/${toUpdate.length}`);
