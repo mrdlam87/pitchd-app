@@ -5,17 +5,20 @@
  * Usage: npm run db:ingest-osm
  */
 
+import * as https from "https";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, SyncStatus } from "../lib/generated/prisma/client";
 import * as dotenv from "dotenv";
 
 dotenv.config({ path: ".env.local" });
 
-// AU bounding box: south, west, north, east
-const AU_BBOX = "-43.6,113.3,-10.7,153.6";
-
-const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
-const OVERPASS_TIMEOUT_MS = 300_000; // 5 minutes
+const OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+];
+const OVERPASS_TIMEOUT_MS = 120_000; // 2 minutes per state query
+// Delay between region queries to avoid rate-limiting
+const BETWEEN_REQUESTS_MS = 10_000;
 
 // State bounding boxes — checked in priority order (smaller/more specific first)
 const STATE_BOXES: Array<{
@@ -87,48 +90,129 @@ function makeSlug(name: string, sourceId: string): string {
   return `${base}-${suffix}`;
 }
 
-async function fetchOverpassData(): Promise<OverpassElement[]> {
+async function fetchStateElementsOnce(
+  stateCode: string,
+  bbox: string,
+  endpointUrl: string
+): Promise<OverpassElement[]> {
   const query = `
-[out:json][timeout:300];
+[out:json][timeout:120];
 (
-  node["tourism"="camp_site"](${AU_BBOX});
-  way["tourism"="camp_site"](${AU_BBOX});
-  relation["tourism"="camp_site"](${AU_BBOX});
+  node["tourism"="camp_site"](${bbox});
+  way["tourism"="camp_site"](${bbox});
+  relation["tourism"="camp_site"](${bbox});
 );
 out center;
 `.trim();
 
-  console.log("Querying Overpass API...");
+  const body = `data=${encodeURIComponent(query)}`;
+  const url = new URL(endpointUrl);
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), OVERPASS_TIMEOUT_MS);
-
-  let response: Response;
-  try {
-    response = await fetch(OVERPASS_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: `data=${encodeURIComponent(query)}`,
-      signal: controller.signal,
-    });
-  } catch (err: unknown) {
-    clearTimeout(timer);
-    if (err instanceof Error && err.name === "AbortError") {
-      throw new Error("Overpass API request timed out after 5 minutes");
-    }
-    throw new Error(`Overpass API request failed: ${String(err)}`);
-  }
-  clearTimeout(timer);
-
-  if (!response.ok) {
-    throw new Error(
-      `Overpass API returned HTTP ${response.status}: ${response.statusText}`
+  const json = await new Promise<string>((resolve, reject) => {
+    const req = https.request(
+      {
+        hostname: url.hostname,
+        path: url.pathname,
+        method: "POST",
+        family: 4, // force IPv4 — IPv6 is unreachable on this host
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Content-Length": Buffer.byteLength(body),
+          "User-Agent": "pitchd-osm-ingest/1.0 (github.com/mrdlam87/pitchd-app)",
+        },
+        timeout: OVERPASS_TIMEOUT_MS,
+      },
+      (res) => {
+        if (res.statusCode !== 200) {
+          reject(new Error(`${stateCode}: HTTP ${res.statusCode}`));
+          res.resume();
+          return;
+        }
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => {
+          const text = Buffer.concat(chunks).toString("utf8");
+          if (!text.trimStart().startsWith("{")) {
+            reject(new Error(`${stateCode}: unexpected response: ${text.slice(0, 200)}`));
+          } else {
+            resolve(text);
+          }
+        });
+        res.on("error", reject);
+      }
     );
+    req.on("timeout", () => {
+      req.destroy(new Error(`${stateCode}: request timed out`));
+    });
+    req.on("error", (err) => reject(new Error(`${stateCode}: ${(err as NodeJS.ErrnoException).code ?? err.message}`)));
+    req.write(body);
+    req.end();
+  });
+
+  const data = JSON.parse(json) as OverpassResponse;
+  return data.elements;
+}
+
+async function fetchStateElements(
+  stateCode: string,
+  bbox: string
+): Promise<OverpassElement[]> {
+  // Try each endpoint in order, with a retry per endpoint
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        return await fetchStateElementsOnce(stateCode, bbox, endpoint);
+      } catch (err) {
+        const isLastAttempt = attempt === 2;
+        const isLastEndpoint = endpoint === OVERPASS_ENDPOINTS[OVERPASS_ENDPOINTS.length - 1];
+        if (isLastAttempt && isLastEndpoint) throw err;
+        if (!isLastAttempt) {
+          console.log(` attempt ${attempt} failed (${endpoint.includes("kumi") ? "kumi" : "main"}), retrying in 15s...`);
+          await new Promise((resolve) => setTimeout(resolve, 15_000));
+        } else {
+          console.log(` failed on main, trying mirror...`);
+        }
+      }
+    }
+  }
+  throw new Error(`${stateCode}: all endpoints exhausted`);
+}
+
+// Regions to fetch — large states are split into sub-regions to stay within Overpass limits
+const FETCH_REGIONS: Array<{ label: string; bbox: string }> = [
+  { label: "ACT",     bbox: "-35.9,148.7,-35.1,149.4" },
+  { label: "TAS",     bbox: "-43.6,143.8,-39.5,148.5" },
+  { label: "VIC",     bbox: "-39.2,140.9,-33.9,150.0" },
+  { label: "SA",      bbox: "-38.1,129.0,-25.9,141.0" },
+  { label: "WA",      bbox: "-35.1,113.3,-13.7,129.0" },
+  { label: "NT",      bbox: "-26.0,129.0,-10.7,138.1" },
+  // QLD split north/south at lat -20
+  { label: "QLD-S",   bbox: "-29.2,137.9,-20.0,153.6" },
+  { label: "QLD-N",   bbox: "-20.0,137.9,-10.7,153.6" },
+  // NSW split north/south at lat -33
+  { label: "NSW-S",   bbox: "-37.5,140.9,-33.0,153.6" },
+  { label: "NSW-N",   bbox: "-33.0,140.9,-28.2,153.6" },
+];
+
+async function fetchOverpassData(): Promise<OverpassElement[]> {
+  const allElements = new Map<string, OverpassElement>(); // dedup by "type:id"
+
+  for (const region of FETCH_REGIONS) {
+    process.stdout.write(`  Fetching ${region.label}...`);
+    const elements = await fetchStateElements(region.label, region.bbox);
+    let added = 0;
+    for (const el of elements) {
+      const key = `${el.type}:${el.id}`;
+      if (!allElements.has(key)) {
+        allElements.set(key, el);
+        added++;
+      }
+    }
+    console.log(` ${elements.length} returned, ${added} new`);
+    await new Promise((resolve) => setTimeout(resolve, BETWEEN_REQUESTS_MS));
   }
 
-  const data = (await response.json()) as OverpassResponse;
-  console.log(`  → ${data.elements.length} elements returned`);
-  return data.elements;
+  return Array.from(allElements.values());
 }
 
 function elementToRecord(el: OverpassElement): {
@@ -184,13 +268,8 @@ async function main() {
 
   try {
     // 1. Fetch OSM data
-    let elements: OverpassElement[];
-    try {
-      elements = await fetchOverpassData();
-    } catch (err) {
-      console.error("Failed to fetch from Overpass API:", err);
-      process.exit(1);
-    }
+    console.log("Querying Overpass API (state by state)...");
+    const elements = await fetchOverpassData();
 
     // 2. Map elements to records (skip elements without a usable coordinate)
     const records = elements
