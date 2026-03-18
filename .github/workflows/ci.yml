@@ -104,5 +104,6 @@ jobs:
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/pitchd_test
           NEXTAUTH_SECRET: ci-secret
+          NEXTAUTH_URL: http://localhost:3000
           AUTH_GOOGLE_ID: ci
           AUTH_GOOGLE_SECRET: ci

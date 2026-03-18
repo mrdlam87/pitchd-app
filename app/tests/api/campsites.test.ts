@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { Session } from "next-auth";
+import { UserRole } from "@/lib/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 
 // Mock auth — real OAuth not needed for integration tests
@@ -9,10 +11,16 @@ vi.mock("@/auth", () => ({
 import { auth } from "@/auth";
 import { GET } from "@/app/api/campsites/route";
 
-const mockAuth = vi.mocked(auth);
+// Cast to the session-returning overload — avoids TypeScript picking up the middleware overload
+const mockAuth = vi.mocked(auth as () => Promise<Session | null>);
 
 // Sydney coords used across tests (strings to match makeRequest's expected type)
 const SYDNEY = { lat: "-33.8688", lng: "151.2093", radius: "50" };
+
+const AUTHED_SESSION: Session = {
+  user: { id: "test-user", email: "test@example.com", name: "Test User", role: UserRole.user },
+  expires: new Date(Date.now() + 3600 * 1000).toISOString(),
+};
 
 function makeRequest(params: Record<string, string | string[]>) {
   const url = new URL("http://localhost/api/campsites");
@@ -26,11 +34,12 @@ function makeRequest(params: Record<string, string | string[]>) {
   return new Request(url);
 }
 
-// Seed a minimal campsite within the Sydney bounding box
+// Seed a minimal campsite within the Sydney bounding box.
+// Name prefixed with "!" so it sorts before all real campsite names (alphabetically first).
 async function seedCampsite(overrides: Partial<{ lat: number; lng: number; syncStatus: string }> = {}) {
   return prisma.campsite.create({
     data: {
-      name: "Test Campsite",
+      name: "!Test Campsite",
       slug: `test-campsite-${Date.now()}-${Math.random()}`,
       lat: overrides.lat ?? -33.87,
       lng: overrides.lng ?? 151.21,
@@ -45,7 +54,7 @@ async function seedCampsite(overrides: Partial<{ lat: number; lng: number; syncS
 describe("GET /api/campsites", () => {
   beforeEach(() => {
     // Default: authenticated session
-    mockAuth.mockResolvedValue({ user: { id: "test-user", email: "test@example.com" } } as never);
+    mockAuth.mockResolvedValue(AUTHED_SESSION);
   });
 
   afterEach(async () => {
@@ -56,7 +65,7 @@ describe("GET /api/campsites", () => {
   // --- Auth ---
 
   it("returns 401 when unauthenticated", async () => {
-    mockAuth.mockResolvedValue(null as never);
+    mockAuth.mockResolvedValue(null);
     const res = await GET(makeRequest(SYDNEY));
     expect(res.status).toBe(401);
     const body = await res.json();
@@ -120,12 +129,13 @@ describe("GET /api/campsites", () => {
   });
 
   it("returns campsite with expected fields", async () => {
-    await seedCampsite();
+    const created = await seedCampsite();
     const res = await GET(makeRequest(SYDNEY));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.results.length).toBeGreaterThan(0);
-    const campsite = body.results[0];
+    const ids = body.results.map((c: { id: string }) => c.id);
+    expect(ids).toContain(created.id);
+    const campsite = body.results.find((c: { id: string }) => c.id === created.id);
     expect(campsite).toMatchObject({
       id: expect.any(String),
       name: expect.any(String),
@@ -149,20 +159,29 @@ describe("GET /api/campsites", () => {
   // --- Amenity filter ---
 
   it("ignores empty amenity filter values (?amenities=)", async () => {
-    await seedCampsite();
-    const url = new URL("http://localhost/api/campsites");
-    url.searchParams.set("lat", String(SYDNEY.lat));
-    url.searchParams.set("lng", String(SYDNEY.lng));
-    url.searchParams.set("radius", String(SYDNEY.radius));
-    url.searchParams.set("amenities", ""); // empty value
-    const res = await GET(new Request(url));
+    const created = await seedCampsite();
+    const res = await GET(makeRequest({ ...SYDNEY, amenities: "" }));
     expect(res.status).toBe(200);
     const body = await res.json();
-    // Empty amenity filter should not restrict results
-    expect(body.results.length).toBeGreaterThan(0);
+    // Empty amenity filter should not restrict results — seeded campsite must still appear
+    const ids = body.results.map((c: { id: string }) => c.id);
+    expect(ids).toContain(created.id);
   });
 
   // --- Pagination ---
+
+  it("returns hasMore: true when a full page is returned", async () => {
+    // Seed 21 campsites to exceed PAGE_SIZE (20)
+    await Promise.all(
+      Array.from({ length: 21 }, (_, i) =>
+        seedCampsite({ lat: -33.87 + i * 0.001, lng: 151.21 })
+      )
+    );
+    const res = await GET(makeRequest(SYDNEY));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.hasMore).toBe(true);
+  });
 
   it("respects page param", async () => {
     const res = await GET(makeRequest({ ...SYDNEY, page: "2" }));
