@@ -11,8 +11,8 @@ import { GET } from "@/app/api/campsites/route";
 
 const mockAuth = vi.mocked(auth);
 
-// Sydney coords used across tests
-const SYDNEY = { lat: -33.8688, lng: 151.2093, radius: 50 };
+// Sydney coords used across tests (strings to match makeRequest's expected type)
+const SYDNEY = { lat: "-33.8688", lng: "151.2093", radius: "50" };
 
 function makeRequest(params: Record<string, string | string[]>) {
   const url = new URL("http://localhost/api/campsites");
@@ -138,12 +138,12 @@ describe("GET /api/campsites", () => {
   });
 
   it("excludes campsites with syncStatus removed", async () => {
-    await seedCampsite({ syncStatus: "removed" });
+    const created = await seedCampsite({ syncStatus: "removed" });
     const res = await GET(makeRequest(SYDNEY));
     expect(res.status).toBe(200);
     const body = await res.json();
-    const names = body.results.map((c: { name: string }) => c.name);
-    expect(names).not.toContain("Test Campsite");
+    const ids = body.results.map((c: { id: string }) => c.id);
+    expect(ids).not.toContain(created.id);
   });
 
   // --- Amenity filter ---

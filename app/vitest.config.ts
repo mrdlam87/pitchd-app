@@ -2,7 +2,7 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   resolve: {
-    // Resolve @/ path aliases from tsconfig without needing vite-tsconfig-paths plugin
+    // Resolve @/ path aliases from tsconfig (native alias, no plugin needed)
     alias: {
       "@": new URL(".", import.meta.url).pathname,
     },
