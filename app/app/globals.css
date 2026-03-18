@@ -10,7 +10,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-nunito);
   --font-serif: var(--font-lora);
-  --font-dm-sans: var(--font-dm-sans);
 }
 
 body {

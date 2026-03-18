@@ -193,7 +193,6 @@ export default function MapView() {
           const shortName = campsite.name
             .replace(" National Park", " NP")
             .replace(" Conservation Park", " CP")
-            .replace(" State Park", " SP")
             .split(" – ")[0];
           const pinW = isSel ? 34 : 26;
           const pinH = isSel ? 37 : 28;
@@ -208,10 +207,7 @@ export default function MapView() {
               <div
                 role="button"
                 tabIndex={0}
-                className="flex flex-col items-center cursor-pointer select-none transition-all duration-150"
-                style={{
-                  filter: `drop-shadow(0 2px 6px rgba(0,0,0,${isSel ? 0.45 : 0.28}))`,
-                }}
+                className="flex flex-col items-center cursor-pointer select-none"
                 onClick={(e) => {
                   e.stopPropagation();
                   selectPin(i);
@@ -225,9 +221,14 @@ export default function MapView() {
                 aria-label={`Select campsite ${i + 1}: ${campsite.name}`}
               >
                 {/* Rounder teardrop pin — circle takes ~70% of height, tip is short + soft */}
+                {/* width/height as CSS (not SVG attributes) so transition-all can animate size change */}
                 <svg
-                  width={pinW}
-                  height={pinH}
+                  style={{
+                    width: pinW,
+                    height: pinH,
+                    filter: `drop-shadow(0 2px 6px rgba(0,0,0,${isSel ? 0.45 : 0.28}))`,
+                    transition: "width 150ms, height 150ms",
+                  }}
                   viewBox="0 0 26 28"
                   fill="none"
                   xmlns="http://www.w3.org/2000/svg"
@@ -237,8 +238,8 @@ export default function MapView() {
                     fill={isSel ? FOREST_GREEN : "#fff"}
                     stroke={FOREST_GREEN}
                     strokeWidth="1.5"
-                    strokeLinejoin="round"
                   />
+                  {/* fontFamily hardcoded string — SVG presentation attributes don't support CSS variables */}
                   <text
                     x="13"
                     y="12.5"
@@ -254,7 +255,7 @@ export default function MapView() {
                 </svg>
                 {/* Name label — Google Maps style: text only, white outline for legibility */}
                 <div
-                  className="mt-0.5 whitespace-nowrap font-semibold"
+                  className="mt-0.5 max-w-[100px] truncate font-semibold"
                   style={{
                     color: FOREST_GREEN,
                     fontFamily: "var(--font-dm-sans), sans-serif",
