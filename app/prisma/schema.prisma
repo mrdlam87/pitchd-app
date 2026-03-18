@@ -37,6 +37,8 @@ model Campsite {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
   amenities       CampsiteAmenity[]
+
+  @@unique([source, sourceId])
 }
 
 model AmenityType {
