@@ -204,10 +204,11 @@ export default function MapView() {
               anchor="bottom"
               style={{ zIndex: isSel ? 10 : 1 }}
             >
+              {/* relative container — label is absolute so anchor="bottom" pins the SVG tip to the coordinate */}
               <div
                 role="button"
                 tabIndex={0}
-                className="flex flex-col items-center cursor-pointer select-none"
+                className="relative flex flex-col items-center cursor-pointer select-none"
                 onClick={(e) => {
                   e.stopPropagation();
                   selectPin(i);
@@ -253,9 +254,10 @@ export default function MapView() {
                     {i + 1}
                   </text>
                 </svg>
-                {/* Name label — Google Maps style: text only, white outline for legibility */}
+                {/* Name label — absolute so it doesn't affect the Marker's measured height */}
+                {/* anchor="bottom" then correctly places the SVG tip at the coordinate */}
                 <div
-                  className="mt-0.5 whitespace-nowrap font-semibold"
+                  className={`absolute top-full left-1/2 -translate-x-1/2 mt-0.5 whitespace-nowrap ${isSel ? "font-bold" : "font-semibold"}`}
                   style={{
                     color: FOREST_GREEN,
                     fontFamily: "var(--font-dm-sans), sans-serif",
