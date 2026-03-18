@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Nunito, Lora } from "next/font/google";
+import { Nunito, Lora, DM_Sans } from "next/font/google";
 import "./globals.css";
 
 const nunito = Nunito({
@@ -9,6 +9,11 @@ const nunito = Nunito({
 
 const lora = Lora({
   variable: "--font-lora",
+  subsets: ["latin"],
+});
+
+const dmSans = DM_Sans({
+  variable: "--font-dm-sans",
   subsets: ["latin"],
 });
 
@@ -24,7 +29,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en-AU">
-      <body className={`${nunito.variable} ${lora.variable} antialiased`}>
+      <body className={`${nunito.variable} ${lora.variable} ${dmSans.variable} antialiased`}>
         {children}
       </body>
     </html>

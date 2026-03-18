@@ -190,12 +190,13 @@ export default function MapView() {
         {/* Campsite pins */}
         {campsites.map((campsite, i) => {
           const isSel = selectedIdx === i;
-          // Scale: selected pin is 25% larger
-          const w = isSel ? 35 : 28;
-          const h = isSel ? 47 : 38;
-          const fill = isSel ? FOREST_GREEN : SURFACE;
-          const textColor = isSel ? "#fff" : FOREST_GREEN;
-          const fontSize = isSel ? 13 : 10;
+          const shortName = campsite.name
+            .replace(" National Park", " NP")
+            .replace(" Conservation Park", " CP")
+            .replace(" State Park", " SP")
+            .split(" – ")[0];
+          const pinW = isSel ? 34 : 26;
+          const pinH = isSel ? 37 : 28;
           return (
             <Marker
               key={campsite.id}
@@ -207,7 +208,10 @@ export default function MapView() {
               <div
                 role="button"
                 tabIndex={0}
-                className="cursor-pointer select-none transition-all duration-150 drop-shadow-[0_2px_6px_rgba(0,0,0,0.35)]"
+                className="flex flex-col items-center cursor-pointer select-none transition-all duration-150"
+                style={{
+                  filter: `drop-shadow(0 2px 6px rgba(0,0,0,${isSel ? 0.45 : 0.28}))`,
+                }}
                 onClick={(e) => {
                   e.stopPropagation();
                   selectPin(i);
@@ -220,34 +224,47 @@ export default function MapView() {
                 }}
                 aria-label={`Select campsite ${i + 1}: ${campsite.name}`}
               >
-                {/* Teardrop pin — circle top + point at bottom anchored to coordinate */}
+                {/* Rounder teardrop pin — circle takes ~70% of height, tip is short + soft */}
                 <svg
-                  width={w}
-                  height={h}
-                  viewBox="0 0 28 38"
+                  width={pinW}
+                  height={pinH}
+                  viewBox="0 0 26 28"
                   fill="none"
                   xmlns="http://www.w3.org/2000/svg"
                 >
                   <path
-                    d="M14 1C7.373 1 2 6.373 2 13C2 22 14 37 14 37C14 37 26 22 26 13C26 6.373 20.627 1 14 1Z"
-                    fill={fill}
+                    d="M13 1.5C7.2 1.5 2.5 6.2 2.5 12C2.5 18.5 9 24 13 26C17 24 23.5 18.5 23.5 12C23.5 6.2 18.8 1.5 13 1.5Z"
+                    fill={isSel ? FOREST_GREEN : "#fff"}
                     stroke={FOREST_GREEN}
-                    strokeWidth="2"
+                    strokeWidth="1.5"
                     strokeLinejoin="round"
                   />
                   <text
-                    x="14"
-                    y="14"
+                    x="13"
+                    y="12.5"
                     textAnchor="middle"
                     dominantBaseline="central"
-                    fill={textColor}
-                    fontSize={fontSize}
+                    fill={isSel ? "#fff" : FOREST_GREEN}
+                    fontSize={isSel ? 11 : 9}
                     fontWeight="800"
                     fontFamily="DM Sans, sans-serif"
                   >
                     {i + 1}
                   </text>
                 </svg>
+                {/* Name label — Google Maps style: text only, white outline for legibility */}
+                <div
+                  className="mt-0.5 whitespace-nowrap font-semibold"
+                  style={{
+                    color: FOREST_GREEN,
+                    fontFamily: "var(--font-dm-sans), sans-serif",
+                    fontSize: isSel ? 11 : 10,
+                    textShadow:
+                      "0 0 3px rgba(255,255,255,0.95), 0 0 6px rgba(255,255,255,0.8), 0 1px 2px rgba(0,0,0,0.12)",
+                  }}
+                >
+                  {shortName}
+                </div>
               </div>
             </Marker>
           );
@@ -311,7 +328,7 @@ export default function MapView() {
                         border: `2px solid ${FOREST_GREEN}`,
                         color: isSel ? "#fff" : FOREST_GREEN,
                         fontSize: 10,
-                        fontFamily: "DM Sans, sans-serif",
+                        fontFamily: "var(--font-dm-sans), sans-serif",
                       }}
                     >
                       {i + 1}
