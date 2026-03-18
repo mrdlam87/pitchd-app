@@ -29,6 +29,13 @@ export async function GET(req: Request) {
     );
   }
 
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return Response.json(
+      { error: "lat must be between -90 and 90, lng between -180 and 180" },
+      { status: 400 }
+    );
+  }
+
   if (radius <= 0 || radius > MAX_RADIUS_KM) {
     return Response.json(
       { error: `radius must be between 0 and ${MAX_RADIUS_KM} km` },
@@ -37,60 +44,66 @@ export async function GET(req: Request) {
   }
 
   // Bounding box approximation: 1° lat ≈ 111km, 1° lng ≈ 111km * cos(lat)
-  // radius param is in km
+  // radius param is in km. cos clamped to avoid division by zero at ±90°.
   const latDelta = radius / 111;
-  const lngDelta = radius / (111 * Math.cos((lat * Math.PI) / 180));
+  const lngDelta = radius / (111 * Math.max(Math.cos((lat * Math.PI) / 180), 0.001));
 
-  const campsites = await prisma.campsite.findMany({
-    where: {
-      syncStatus: SyncStatus.active,
-      lat: { gte: lat - latDelta, lte: lat + latDelta },
-      lng: { gte: lng - lngDelta, lte: lng + lngDelta },
-      ...(amenities.length > 0 && {
-        amenities: {
-          some: {
-            amenityType: {
-              key: { in: amenities },
+  try {
+    const campsites = await prisma.campsite.findMany({
+      where: {
+        syncStatus: SyncStatus.active,
+        lat: { gte: lat - latDelta, lte: lat + latDelta },
+        lng: { gte: lng - lngDelta, lte: lng + lngDelta },
+        ...(amenities.length > 0 && {
+          amenities: {
+            some: {
+              amenityType: {
+                key: { in: amenities },
+              },
             },
           },
-        },
-      }),
-    },
-    select: {
-      id: true,
-      name: true,
-      lat: true,
-      lng: true,
-      region: true,
-      blurb: true,
-      // state is intentionally excluded — not required by this endpoint's response spec
-      amenities: {
-        select: {
-          amenityType: {
-            select: {
-              key: true,
-              label: true,
-              icon: true,
-              color: true,
+        }),
+      },
+      select: {
+        id: true,
+        name: true,
+        lat: true,
+        lng: true,
+        region: true,
+        blurb: true,
+        // state is intentionally excluded — not required by this endpoint's response spec
+        amenities: {
+          select: {
+            amenityType: {
+              select: {
+                key: true,
+                label: true,
+                icon: true,
+                color: true,
+              },
             },
           },
         },
       },
-    },
-    orderBy: { name: "asc" },
-    skip: (page - 1) * PAGE_SIZE,
-    take: PAGE_SIZE,
-  });
+      orderBy: { name: "asc" },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    });
 
-  const results = campsites.map((c) => ({
-    ...c,
-    amenities: c.amenities.map((a) => a.amenityType),
-  }));
+    const results = campsites.map((c) => ({
+      ...c,
+      amenities: c.amenities.map((a) => a.amenityType),
+    }));
 
-  return Response.json({
-    results,
-    page,
-    pageSize: PAGE_SIZE,
-    hasMore: campsites.length === PAGE_SIZE,
-  });
+    return Response.json({
+      results,
+      page,
+      pageSize: PAGE_SIZE,
+      // Note: hasMore uses length === PAGE_SIZE as a cheap heuristic (avoids COUNT query).
+      // If exactly PAGE_SIZE records remain, the client will make one extra empty request.
+      hasMore: campsites.length === PAGE_SIZE,
+    });
+  } catch {
+    return Response.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
