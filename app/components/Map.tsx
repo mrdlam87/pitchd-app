@@ -4,9 +4,9 @@ import mapboxgl from "mapbox-gl";
 import MapGL from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
-if (process.env.NODE_ENV === "development" && !process.env.NEXT_PUBLIC_MAPBOX_TOKEN) {
+if (!MAPBOX_TOKEN) {
   console.warn("[MapView] NEXT_PUBLIC_MAPBOX_TOKEN is not set");
 }
 
@@ -19,13 +19,11 @@ const DEFAULT_VIEWPORT = {
 
 export default function MapView() {
   return (
-    <div className="h-full w-full">
-      <MapGL
-        mapLib={mapboxgl}
-        mapboxAccessToken={MAPBOX_TOKEN}
-        initialViewState={DEFAULT_VIEWPORT}
-        mapStyle="mapbox://styles/mapbox/outdoors-v12"
-      />
-    </div>
+    <MapGL
+      mapLib={mapboxgl}
+      mapboxAccessToken={MAPBOX_TOKEN}
+      initialViewState={DEFAULT_VIEWPORT}
+      mapStyle="mapbox://styles/mapbox/outdoors-v12"
+    />
   );
 }
