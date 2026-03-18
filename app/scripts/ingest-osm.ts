@@ -31,7 +31,7 @@ const STATE_BOXES: Array<{
   // ACT first — it sits inside NSW so must be checked first
   { code: "ACT", latMin: -35.9, latMax: -35.1, lngMin: 148.7, lngMax: 149.4 },
   { code: "TAS", latMin: -43.6, latMax: -39.5, lngMin: 143.8, lngMax: 148.5 },
-  { code: "VIC", latMin: -39.2, latMax: -33.9, lngMin: 140.9, lngMax: 150.0 },
+  { code: "VIC", latMin: -39.2, latMax: -36.0, lngMin: 140.9, lngMax: 150.0 },
   { code: "SA",  latMin: -38.1, latMax: -25.9, lngMin: 129.0, lngMax: 141.0 },
   { code: "WA",  latMin: -35.1, latMax: -13.7, lngMin: 113.3, lngMax: 129.0 },
   { code: "NT",  latMin: -26.0, latMax: -10.7, lngMin: 129.0, lngMax: 138.1 },
@@ -96,7 +96,7 @@ async function fetchStateElementsOnce(
   endpointUrl: string
 ): Promise<OverpassElement[]> {
   const query = `
-[out:json][timeout:120];
+[out:json][timeout:115];
 (
   node["tourism"="camp_site"](${bbox});
   way["tourism"="camp_site"](${bbox});
@@ -240,7 +240,7 @@ function elementToRecord(el: OverpassElement): {
   }
 
   const tags = el.tags ?? {};
-  const name = tags.name ?? tags["name:en"] ?? "";
+  const name = tags.name ?? tags["name:en"] ?? "Unnamed campsite";
   const sourceId = `osm:${el.type}:${el.id}`;
   const state = detectState(lat, lng);
   const slug = makeSlug(name, sourceId);
@@ -303,7 +303,7 @@ async function main() {
     let inserted = 0;
     for (let i = 0; i < toInsert.length; i += INSERT_BATCH) {
       const batch = toInsert.slice(i, i + INSERT_BATCH);
-      await prisma.campsite.createMany({ data: batch });
+      await prisma.campsite.createMany({ data: batch, skipDuplicates: true });
       inserted += batch.length;
       process.stdout.write(`\r  → Inserted ${inserted}/${toInsert.length}`);
     }
@@ -321,6 +321,7 @@ async function main() {
             where: { id: dbId },
             data: {
               name: r.name,
+              slug: r.slug,
               lat: r.lat,
               lng: r.lng,
               state: r.state,
