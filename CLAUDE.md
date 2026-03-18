@@ -126,3 +126,16 @@ PitchdLight          ← root, owns all state (screen, results, searchState, etc
 - Branch naming: `feature/`, `chore/`, `fix/` prefixes
 - Claude PR review available on-demand: comment `@claude` on any PR
 - CI: `.github/workflows/claude-review.yml`
+
+---
+
+## Pre-PR self-review
+
+Before opening a PR, re-read every file you changed and ask:
+
+- **Edge cases & failure modes** — are there states not handled? (e.g. records that should be cleaned up, missing null checks, partial failure mid-batch)
+- **Operational concerns** — are there missing timeouts, no guard against concurrent runs, unbounded loops, or silent failure paths?
+- **Data integrity** — does the implementation handle the full lifecycle? (e.g. not just inserting/updating, but also marking stale or removed records)
+- **Scope completeness** — does the implementation match the *intent* of the issue, or just its literal acceptance criteria?
+
+Fix any issues found before raising the PR.
