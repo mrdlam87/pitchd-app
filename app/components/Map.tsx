@@ -255,7 +255,7 @@ export default function MapView() {
                 </svg>
                 {/* Name label — Google Maps style: text only, white outline for legibility */}
                 <div
-                  className="mt-0.5 max-w-[100px] truncate font-semibold"
+                  className="mt-0.5 whitespace-nowrap font-semibold"
                   style={{
                     color: FOREST_GREEN,
                     fontFamily: "var(--font-dm-sans), sans-serif",
