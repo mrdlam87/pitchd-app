@@ -20,7 +20,7 @@ export async function GET(req: Request) {
   const radius = parseFloat(searchParams.get("radius") ?? "");
   // Guard against non-numeric page values (parseInt("abc") = NaN; NaN || 1 = 1)
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
-  const amenities = searchParams.getAll("amenities[]");
+  const amenities = searchParams.getAll("amenities");
 
   if (isNaN(lat) || isNaN(lng) || isNaN(radius)) {
     return Response.json(
@@ -38,7 +38,7 @@ export async function GET(req: Request) {
 
   if (radius <= 0 || radius > MAX_RADIUS_KM) {
     return Response.json(
-      { error: `radius must be between 0 and ${MAX_RADIUS_KM} km` },
+      { error: `radius must be greater than 0 and at most ${MAX_RADIUS_KM} km` },
       { status: 400 }
     );
   }
@@ -103,7 +103,8 @@ export async function GET(req: Request) {
       // If exactly PAGE_SIZE records remain, the client will make one extra empty request.
       hasMore: campsites.length === PAGE_SIZE,
     });
-  } catch {
+  } catch (e) {
+    console.error("[GET /api/campsites]", e);
     return Response.json({ error: "Internal server error" }, { status: 500 });
   }
 }
