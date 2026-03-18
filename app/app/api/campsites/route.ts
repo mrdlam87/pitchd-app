@@ -7,7 +7,7 @@ import { SyncStatus } from "@/lib/generated/prisma/enums";
 const PAGE_SIZE = 20;
 const MAX_RADIUS_KM = 250;
 
-export async function GET(req: Request) {
+export async function GET(req: Request): Promise<Response> {
   const session = await auth();
   if (!session) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -20,7 +20,8 @@ export async function GET(req: Request) {
   const radius = parseFloat(searchParams.get("radius") ?? "");
   // Guard against non-numeric page values (parseInt("abc") = NaN; NaN || 1 = 1)
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
-  const amenities = searchParams.getAll("amenities");
+  // filter(Boolean) drops empty strings from ?amenities= (no value) to avoid matching nothing
+  const amenities = searchParams.getAll("amenities").filter(Boolean);
 
   if (isNaN(lat) || isNaN(lng) || isNaN(radius)) {
     return Response.json(
@@ -47,6 +48,9 @@ export async function GET(req: Request) {
   // radius param is in km. cos clamped to avoid division by zero at ±90°.
   // Note: antimeridian wrapping (lng ± lngDelta overflowing ±180°) is not handled —
   // not a concern for Australian campsites.
+  // Index note: @@index([syncStatus, lat, lng]) — Postgres can range-scan on syncStatus+lat
+  // but not on lng (second range column in a B-tree). lng is included as a covering hint
+  // to avoid heap fetches on some query plans.
   const latDelta = radius / 111;
   const lngDelta = radius / (111 * Math.max(Math.cos((lat * Math.PI) / 180), 0.001));
 
