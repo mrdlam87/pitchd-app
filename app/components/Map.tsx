@@ -254,10 +254,10 @@ export default function MapView() {
                     {i + 1}
                   </text>
                 </svg>
-                {/* Name label — absolute so it doesn't affect the Marker's measured height */}
-                {/* anchor="bottom" then correctly places the SVG tip at the coordinate */}
+                {/* Name label — absolute beside the pin (Google Maps style), wraps at max-w */}
+                {/* absolute so it doesn't affect Marker height; anchor="bottom" pins SVG tip to coordinate */}
                 <div
-                  className={`absolute top-full left-1/2 -translate-x-1/2 mt-0.5 whitespace-nowrap ${isSel ? "font-bold" : "font-semibold"}`}
+                  className={`absolute left-full top-1/2 -translate-y-1/2 ml-1 w-max max-w-[140px] leading-tight ${isSel ? "font-bold" : "font-semibold"}`}
                   style={{
                     color: FOREST_GREEN,
                     fontFamily: "var(--font-dm-sans), sans-serif",
