@@ -48,10 +48,14 @@ async function fetchCampsites(
   });
   try {
     const res = await fetch(`/api/campsites?${params}`);
-    if (!res.ok) return { results: [], hasMore: false };
+    if (!res.ok) {
+      console.warn(`[fetchCampsites] ${res.status} ${res.statusText}`);
+      return { results: [], hasMore: false };
+    }
     const data = await res.json();
     return { results: data.results ?? [], hasMore: data.hasMore ?? false };
-  } catch {
+  } catch (e) {
+    console.warn("[fetchCampsites] fetch failed", e);
     return { results: [], hasMore: false };
   }
 }
@@ -101,12 +105,15 @@ export default function MapView() {
     const id = ++fetchCounterRef.current;
     const center = map.getCenter();
     const radius = computeRadius(map);
-    fetchCampsites(center.lat, center.lng, radius).then(({ results, hasMore }) => {
-      if (id !== fetchCounterRef.current) return; // stale fetch — discard
-      setCampsites(results);
-      setHasMore(hasMore);
-      setSelectedIdx(null);
-    });
+    fetchCampsites(center.lat, center.lng, radius).then(
+      ({ results, hasMore }) => {
+        if (id !== fetchCounterRef.current) return; // stale fetch — discard
+        cardRefs.current = []; // clear stale DOM refs from the previous result set
+        setCampsites(results);
+        setHasMore(hasMore);
+        setSelectedIdx(null);
+      }
+    );
   }, []);
 
   const handleLoad = useCallback(
@@ -125,25 +132,29 @@ export default function MapView() {
     [loadCampsites]
   );
 
-  function selectPin(i: number) {
-    setSelectedIdx(i);
-    // Pan map to the selected campsite — skip the refetch that onMoveEnd would trigger
-    const campsite = campsites[i];
-    if (campsite && mapRef.current) {
-      skipNextFetch.current = true;
-      mapRef.current.easeTo({
-        center: [campsite.lng, campsite.lat],
-        duration: 300,
+  const selectPin = useCallback(
+    (i: number) => {
+      setSelectedIdx(i);
+      const campsite = campsites[i];
+      if (campsite && mapRef.current) {
+        // Known edge case: a manual pan that starts during the 300ms easeTo animation
+        // will have its moveend consumed by this flag (no refetch fires for that gesture).
+        // Low-frequency and acceptable for MVP.
+        skipNextFetch.current = true;
+        mapRef.current.easeTo({
+          center: [campsite.lng, campsite.lat],
+          duration: 300,
+        });
+      }
+      requestAnimationFrame(() => {
+        cardRefs.current[i]?.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+        });
       });
-    }
-    // Scroll the matching card into view after state settles
-    requestAnimationFrame(() => {
-      cardRefs.current[i]?.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-      });
-    });
-  }
+    },
+    [campsites]
+  );
 
   const resultLabel =
     campsites.length === 0
@@ -167,10 +178,8 @@ export default function MapView() {
         {userLocation && (
           <Marker longitude={userLocation.lng} latitude={userLocation.lat}>
             <div
+              className="w-[11px] h-[11px] rounded-full"
               style={{
-                width: 11,
-                height: 11,
-                borderRadius: "50%",
                 background: CORAL,
                 border: "2.5px solid #fff",
                 boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
@@ -196,51 +205,36 @@ export default function MapView() {
               style={{ zIndex: isSel ? 10 : 1 }}
             >
               <div
+                className="flex flex-col items-center cursor-pointer select-none"
                 onClick={(e) => {
                   e.stopPropagation();
                   selectPin(i);
                 }}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  cursor: "pointer",
-                  userSelect: "none",
-                }}
               >
+                {/* Numbered circle */}
                 <div
+                  className="rounded-full flex items-center justify-center transition-all duration-150"
                   style={{
                     width: sz,
                     height: sz,
-                    borderRadius: "50%",
                     background: isSel ? FOREST_GREEN : SURFACE,
                     border: `2.5px solid ${FOREST_GREEN}`,
                     boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
                     fontWeight: 800,
                     fontSize: isSel ? 13 : 10,
                     color: isSel ? "#fff" : FOREST_GREEN,
                     fontFamily: "DM Sans, sans-serif",
-                    transition: "all 0.15s ease",
                   }}
                 >
                   {i + 1}
                 </div>
+                {/* Name label */}
                 <div
+                  className="mt-[3px] rounded-lg px-2 py-[3px] max-w-[110px] overflow-hidden text-ellipsis whitespace-nowrap text-white"
                   style={{
-                    marginTop: 3,
                     background: "rgba(0,0,0,0.72)",
-                    borderRadius: 8,
-                    padding: "3px 8px",
-                    maxWidth: 110,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
                     fontSize: isSel ? 11 : 10,
                     fontWeight: isSel ? 700 : 600,
-                    color: "#fff",
                     fontFamily: "DM Sans, sans-serif",
                   }}
                 >
@@ -252,29 +246,23 @@ export default function MapView() {
         })}
       </MapGL>
 
-      {/* Bottom drawer — z-index must exceed marker z-index (max 10) to prevent bleed-through */}
+      {/* Bottom drawer — z-50 must exceed marker z-index (max 10) to prevent bleed-through */}
       {campsites.length > 0 && (
         <div
-          className="absolute bottom-0 left-0 right-0 rounded-t-2xl shadow-2xl flex flex-col"
+          className="absolute bottom-0 left-0 right-0 rounded-t-2xl shadow-2xl flex flex-col max-h-[40vh] z-50"
           style={{
             background: SURFACE,
-            maxHeight: "40vh",
             borderTop: "1.5px solid #e0dbd0",
-            zIndex: 50,
           }}
         >
           {/* Drag handle */}
           <div className="flex justify-center pt-3 pb-2 flex-shrink-0">
-            <div
-              className="w-10 h-1 rounded-full"
-              style={{ background: "#e0dbd0" }}
-            />
+            <div className="w-10 h-1 rounded-full bg-[#e0dbd0]" />
           </div>
 
           {/* Result count */}
           <div
-            className="px-4 pb-2 text-sm font-semibold flex-shrink-0"
-            style={{ color: FOREST_GREEN }}
+            className="px-4 pb-2 text-sm font-semibold flex-shrink-0 text-[#2d4a2d]"
           >
             {resultLabel}
           </div>
@@ -290,22 +278,19 @@ export default function MapView() {
                     cardRefs.current[i] = el;
                   }}
                   onClick={() => selectPin(i)}
-                  className="rounded-xl p-3 cursor-pointer"
+                  className="rounded-xl p-3 cursor-pointer transition-all duration-150"
                   style={{
                     border: isSel
                       ? `1.5px solid ${CORAL}`
                       : "1.5px solid #e0dbd0",
                     background: isSel ? "#fff" : SURFACE,
-                    transition: "all 0.15s ease",
                   }}
                 >
                   <div className="flex items-center gap-3">
                     {/* Index badge */}
                     <div
-                      className="flex-shrink-0 flex items-center justify-center rounded-full"
+                      className="flex-shrink-0 flex items-center justify-center rounded-full w-6 h-6"
                       style={{
-                        width: 24,
-                        height: 24,
                         background: isSel ? FOREST_GREEN : "transparent",
                         border: `2px solid ${FOREST_GREEN}`,
                         color: isSel ? "#fff" : FOREST_GREEN,
@@ -318,17 +303,11 @@ export default function MapView() {
                     </div>
                     {/* Name + region */}
                     <div className="min-w-0">
-                      <div
-                        className="font-semibold text-sm truncate"
-                        style={{ color: FOREST_GREEN }}
-                      >
+                      <div className="font-semibold text-sm truncate text-[#2d4a2d]">
                         {campsite.name}
                       </div>
                       {campsite.region && (
-                        <div
-                          className="text-xs truncate"
-                          style={{ color: "#5a7a5a" }}
-                        >
+                        <div className="text-xs truncate text-[#5a7a5a]">
                           {campsite.region}
                         </div>
                       )}
