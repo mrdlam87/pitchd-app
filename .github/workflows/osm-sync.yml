@@ -1,0 +1,40 @@
+name: OSM Sync
+
+on:
+  schedule:
+    # Sunday at 14:00 UTC = Monday 00:00 AEST (UTC+10) / 01:00 AEDT (UTC+11, Oct–Apr)
+    - cron: "0 14 * * 0"
+  workflow_dispatch:
+
+concurrency:
+  group: osm-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync campsite data from OSM
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run OSM ingestion
+        run: npm run db:ingest-osm
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
