@@ -15,9 +15,11 @@ export async function GET(req: Request): Promise<Response> {
 
   const { searchParams } = new URL(req.url);
 
-  const lat = parseFloat(searchParams.get("lat") ?? "");
-  const lng = parseFloat(searchParams.get("lng") ?? "");
-  const radius = parseFloat(searchParams.get("radius") ?? "");
+  // Number() is stricter than parseFloat() — rejects partial strings like "123abc".
+  // || NaN handles null/empty-string (missing param) since Number(null) and Number("") both return 0.
+  const lat = Number(searchParams.get("lat") || NaN);
+  const lng = Number(searchParams.get("lng") || NaN);
+  const radius = Number(searchParams.get("radius") || NaN);
   // Guard against non-numeric page values (parseInt("abc") = NaN; NaN || 1 = 1)
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
   // filter(Boolean) drops empty strings from ?amenities= (no value) to avoid matching nothing
@@ -92,7 +94,8 @@ export async function GET(req: Request): Promise<Response> {
           },
         },
       },
-      orderBy: { name: "asc" },
+      // Secondary sort on id ensures deterministic pagination when names are identical
+      orderBy: [{ name: "asc" }, { id: "asc" }],
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     });
