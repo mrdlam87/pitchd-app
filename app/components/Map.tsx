@@ -178,11 +178,10 @@ export default function MapView() {
         {userLocation && (
           <Marker longitude={userLocation.lng} latitude={userLocation.lat}>
             <div
-              className="w-[11px] h-[11px] rounded-full"
+              className="w-[11px] h-[11px] rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
               style={{
                 background: CORAL,
                 border: "2.5px solid #fff",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
               }}
             />
           </Marker>
@@ -205,22 +204,29 @@ export default function MapView() {
               style={{ zIndex: isSel ? 10 : 1 }}
             >
               <div
+                role="button"
+                tabIndex={0}
                 className="flex flex-col items-center cursor-pointer select-none"
                 onClick={(e) => {
                   e.stopPropagation();
                   selectPin(i);
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    selectPin(i);
+                  }
+                }}
+                aria-label={`Select campsite ${i + 1}: ${campsite.name}`}
               >
                 {/* Numbered circle */}
                 <div
-                  className="rounded-full flex items-center justify-center transition-all duration-150"
+                  className="rounded-full flex items-center justify-center font-extrabold transition-all duration-150 shadow-[0_2px_8px_rgba(0,0,0,0.25)]"
                   style={{
                     width: sz,
                     height: sz,
                     background: isSel ? FOREST_GREEN : SURFACE,
                     border: `2.5px solid ${FOREST_GREEN}`,
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
-                    fontWeight: 800,
                     fontSize: isSel ? 13 : 10,
                     color: isSel ? "#fff" : FOREST_GREEN,
                     fontFamily: "DM Sans, sans-serif",
@@ -230,9 +236,8 @@ export default function MapView() {
                 </div>
                 {/* Name label */}
                 <div
-                  className="mt-[3px] rounded-lg px-2 py-[3px] max-w-[110px] overflow-hidden text-ellipsis whitespace-nowrap text-white"
+                  className="mt-[3px] rounded-lg px-2 py-[3px] max-w-[110px] overflow-hidden text-ellipsis whitespace-nowrap text-white bg-black/[72%]"
                   style={{
-                    background: "rgba(0,0,0,0.72)",
                     fontSize: isSel ? 11 : 10,
                     fontWeight: isSel ? 700 : 600,
                     fontFamily: "DM Sans, sans-serif",
@@ -261,9 +266,7 @@ export default function MapView() {
           </div>
 
           {/* Result count */}
-          <div
-            className="px-4 pb-2 text-sm font-semibold flex-shrink-0 text-[#2d4a2d]"
-          >
+          <div className="px-4 pb-2 text-sm font-semibold flex-shrink-0 text-[#2d4a2d]">
             {resultLabel}
           </div>
 
@@ -277,7 +280,17 @@ export default function MapView() {
                   ref={(el) => {
                     cardRefs.current[i] = el;
                   }}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => selectPin(i)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      selectPin(i);
+                    }
+                  }}
+                  aria-label={`Select campsite ${i + 1}: ${campsite.name}`}
+                  aria-pressed={isSel}
                   className="rounded-xl p-3 cursor-pointer transition-all duration-150"
                   style={{
                     border: isSel
@@ -289,13 +302,12 @@ export default function MapView() {
                   <div className="flex items-center gap-3">
                     {/* Index badge */}
                     <div
-                      className="flex-shrink-0 flex items-center justify-center rounded-full w-6 h-6"
+                      className="flex-shrink-0 flex items-center justify-center rounded-full w-6 h-6 font-extrabold"
                       style={{
                         background: isSel ? FOREST_GREEN : "transparent",
                         border: `2px solid ${FOREST_GREEN}`,
                         color: isSel ? "#fff" : FOREST_GREEN,
                         fontSize: 10,
-                        fontWeight: 800,
                         fontFamily: "DM Sans, sans-serif",
                       }}
                     >
