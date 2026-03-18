@@ -45,6 +45,8 @@ export async function GET(req: Request) {
 
   // Bounding box approximation: 1° lat ≈ 111km, 1° lng ≈ 111km * cos(lat)
   // radius param is in km. cos clamped to avoid division by zero at ±90°.
+  // Note: antimeridian wrapping (lng ± lngDelta overflowing ±180°) is not handled —
+  // not a concern for Australian campsites.
   const latDelta = radius / 111;
   const lngDelta = radius / (111 * Math.max(Math.cos((lat * Math.PI) / 180), 0.001));
 
@@ -80,6 +82,7 @@ export async function GET(req: Request) {
                 label: true,
                 icon: true,
                 color: true,
+                // category is intentionally excluded — not required by this endpoint's response spec
               },
             },
           },

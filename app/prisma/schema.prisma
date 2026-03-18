@@ -39,6 +39,7 @@ model Campsite {
   amenities       CampsiteAmenity[]
 
   @@unique([source, sourceId])
+  @@index([syncStatus, lat, lng])
 }
 
 model AmenityType {
