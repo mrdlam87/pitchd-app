@@ -190,11 +190,12 @@ export default function MapView() {
         {/* Campsite pins */}
         {campsites.map((campsite, i) => {
           const isSel = selectedIdx === i;
-          const sz = isSel ? 38 : 28;
-          const shortName = campsite.name
-            .replace(" National Park", " NP")
-            .replace(" Conservation Park", " CP")
-            .split(" – ")[0];
+          // Scale: selected pin is 25% larger
+          const w = isSel ? 35 : 28;
+          const h = isSel ? 47 : 38;
+          const fill = isSel ? FOREST_GREEN : SURFACE;
+          const textColor = isSel ? "#fff" : FOREST_GREEN;
+          const fontSize = isSel ? 13 : 10;
           return (
             <Marker
               key={campsite.id}
@@ -206,7 +207,7 @@ export default function MapView() {
               <div
                 role="button"
                 tabIndex={0}
-                className="flex flex-col items-center cursor-pointer select-none"
+                className="cursor-pointer select-none transition-all duration-150 drop-shadow-[0_2px_6px_rgba(0,0,0,0.35)]"
                 onClick={(e) => {
                   e.stopPropagation();
                   selectPin(i);
@@ -219,32 +220,34 @@ export default function MapView() {
                 }}
                 aria-label={`Select campsite ${i + 1}: ${campsite.name}`}
               >
-                {/* Numbered circle */}
-                <div
-                  className="rounded-full flex items-center justify-center font-extrabold transition-all duration-150 shadow-[0_2px_8px_rgba(0,0,0,0.25)]"
-                  style={{
-                    width: sz,
-                    height: sz,
-                    background: isSel ? FOREST_GREEN : SURFACE,
-                    border: `2.5px solid ${FOREST_GREEN}`,
-                    fontSize: isSel ? 13 : 10,
-                    color: isSel ? "#fff" : FOREST_GREEN,
-                    fontFamily: "DM Sans, sans-serif",
-                  }}
+                {/* Teardrop pin — circle top + point at bottom anchored to coordinate */}
+                <svg
+                  width={w}
+                  height={h}
+                  viewBox="0 0 28 38"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
                 >
-                  {i + 1}
-                </div>
-                {/* Name label */}
-                <div
-                  className="mt-[3px] rounded-lg px-2 py-[3px] max-w-[110px] overflow-hidden text-ellipsis whitespace-nowrap text-white bg-black/[72%]"
-                  style={{
-                    fontSize: isSel ? 11 : 10,
-                    fontWeight: isSel ? 700 : 600,
-                    fontFamily: "DM Sans, sans-serif",
-                  }}
-                >
-                  {shortName}
-                </div>
+                  <path
+                    d="M14 1C7.373 1 2 6.373 2 13C2 22 14 37 14 37C14 37 26 22 26 13C26 6.373 20.627 1 14 1Z"
+                    fill={fill}
+                    stroke={FOREST_GREEN}
+                    strokeWidth="2"
+                    strokeLinejoin="round"
+                  />
+                  <text
+                    x="14"
+                    y="14"
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fill={textColor}
+                    fontSize={fontSize}
+                    fontWeight="800"
+                    fontFamily="DM Sans, sans-serif"
+                  >
+                    {i + 1}
+                  </text>
+                </svg>
               </div>
             </Marker>
           );
