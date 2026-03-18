@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Core differentiator:** Natural language search with live weather-awareness.
 **Target market:** Australian campers (primary), architecture should allow future expansion.
-**Current stage:** Phase 5 — M1 complete. App live at https://pitchd-app.vercel.app. Starting M2 (campsite data pipeline).
+**Current stage:** Phase 5 — M3 in progress. M1 (foundation) and M2 (campsite pipeline, DB seeded) complete. App live at https://pitchd-app.vercel.app.
 **GitHub:** github.com/mrdlam87/pitchd-app
 
 ---
@@ -75,7 +75,7 @@ PitchdLight          ← root, owns all state (screen, results, searchState, etc
 | Weather | Open-Meteo (free, no API key) |
 | Database | PostgreSQL via Prisma ORM |
 | Hosted DB | Supabase |
-| Map | Mapbox (tentative — confirm at Phase 5 start) |
+| Map | Mapbox |
 | Deployment | Vercel |
 
 ### Conventions
@@ -97,6 +97,18 @@ PitchdLight          ← root, owns all state (screen, results, searchState, etc
   - Coral (CTA / accent): `#e8674a`
   - Warm border: `1.5px solid #e0dbd0`
   - Wordmark: "Pitch" in forest green + "d" in coral, Lora serif, bold
+
+### Testing
+- Integration tests live in `app/tests/api/<route>.test.ts` — run with `npm test`
+- Auth is mocked: `vi.mock("@/auth")` + cast `auth as () => Promise<Session | null>` to avoid middleware overload
+- Seed test records with `source: "test"` — cleaned up in `afterEach` via `prisma.X.deleteMany({ where: { source: "test" } })`
+- Prefix seeded record names with `"!"` so they sort first alphabetically (guaranteed on page 1)
+- `tests/global-setup.ts` loads `.env.local` before Prisma singleton initialises — required for local test runs
+- Custom `Session` type in `types/next-auth.d.ts` requires `role: UserRole` in the user object
+
+### Data notes
+- `CampsiteAmenity` join table is empty — campsites have no linked amenities until M4
+- Amenity filter uses standard query param style: `?amenities=toilet&amenities=bbq` (not PHP-style `amenities[]`)
 
 ### Auth
 - Google OAuth only — no passwords stored

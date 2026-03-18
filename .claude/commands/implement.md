@@ -109,6 +109,14 @@ cd app && npx prisma generate
 cd app && npx prisma migrate status
 ```
 
+**If the issue adds or modifies an API route:**
+- Write or update tests in `tests/api/<route>.test.ts` covering the new/changed behaviour before opening the PR
+- Use the API route checklist from Step 9 to drive test cases — every validation rule should have a corresponding test
+```bash
+cd app && npm test
+```
+All tests must pass before opening the PR.
+
 **Issue-type smoke tests** — run the most relevant check(s) for the issue:
 | Issue type | Manual check |
 |---|---|
@@ -142,6 +150,16 @@ Re-read every file you changed. Answer each question below out loud before marki
 - [ ] Scope matches intent of the issue, not just its literal acceptance criteria
 
 For **Complex** issues, spend extra time on the adversarial questions and TOCTOU/transaction checks.
+
+**If the issue is an API route, also check:**
+- [ ] All query params validated: missing (null), empty string, non-numeric, and out-of-range values
+- [ ] Use `Number()` not `parseFloat()` — `parseFloat("123abc")` silently returns `123`; `Number("123abc")` returns `NaN`. Use `|| NaN` to handle null/empty: `Number(param || NaN)`
+- [ ] `try/catch` wraps all DB calls; catch block logs with `console.error` before returning 500
+- [ ] `orderBy` includes a unique tiebreaker (e.g. `{ id: "asc" }`) for stable pagination across pages
+- [ ] Columns used in `where` filters have indexes in `schema.prisma`
+- [ ] Paginated responses include metadata: `page`, `pageSize`, `hasMore`
+- [ ] Array params use `.filter(Boolean)` to drop empty string values (e.g. `?amenities=`)
+- [ ] Return type annotation on the handler: `Promise<Response>`
 
 Do not open the PR until all items are addressed.
 
@@ -178,13 +196,3 @@ EOF
 ```
 
 Return the PR URL.
-
-## Step 11 — Monitor CI
-After the PR is opened, wait for the Claude code review to post its findings.
-
-When the review appears:
-1. Read every finding — do not skip low-severity items
-2. For each finding: either fix it and push a follow-up commit, or reply explaining why it's a false positive
-3. Never declare the PR ready while CI is still pending or findings are unaddressed
-
-Use `gh pr checks <pr-number>` to monitor status. Use `gh pr view <pr-number> --comments` to read review output.
