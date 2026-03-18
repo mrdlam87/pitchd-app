@@ -1,9 +1,9 @@
-import Map from "@/components/Map";
+import MapView from "@/components/Map";
 
 export default function MapPage() {
   return (
     <main className="h-dvh w-screen">
-      <Map />
+      <MapView />
     </main>
   );
 }
