@@ -292,11 +292,13 @@ async function main() {
 
     console.log(`  → ${existingMap.size} existing OSM records in DB`);
 
-    // 4. Split into inserts and updates
+    // 4. Split into inserts, updates, and removals
+    const fetchedSourceIds = new Set(records.map((r) => r.sourceId));
     const toInsert = records.filter((r) => !existingMap.has(r.sourceId));
     const toUpdate = records.filter((r) => existingMap.has(r.sourceId));
+    const toRemove = Array.from(existingMap.keys()).filter((id) => !fetchedSourceIds.has(id));
 
-    console.log(`Processing: ${toInsert.length} to insert, ${toUpdate.length} to update...`);
+    console.log(`Processing: ${toInsert.length} to insert, ${toUpdate.length} to update, ${toRemove.length} to mark removed...`);
 
     // 5. Insert new records in batches
     const INSERT_BATCH = 500;
@@ -339,10 +341,26 @@ async function main() {
     }
     if (toUpdate.length > 0) console.log();
 
+    // 7. Mark stale OSM records as removed in batches
+    const REMOVE_BATCH = 500;
+    let removed = 0;
+    for (let i = 0; i < toRemove.length; i += REMOVE_BATCH) {
+      const batch = toRemove.slice(i, i + REMOVE_BATCH);
+      const ids = batch.map((sourceId) => existingMap.get(sourceId)!);
+      await prisma.campsite.updateMany({
+        where: { id: { in: ids } },
+        data: { syncStatus: SyncStatus.removed },
+      });
+      removed += batch.length;
+      process.stdout.write(`\r  → Marked removed ${removed}/${toRemove.length}`);
+    }
+    if (toRemove.length > 0) console.log();
+
     const skipped = elements.length - records.length;
     console.log("\nDone.");
     console.log(`  Inserted : ${inserted}`);
     console.log(`  Updated  : ${updated}`);
+    console.log(`  Removed  : ${removed}`);
     console.log(`  Skipped  : ${skipped} (no coordinate)`);
   } finally {
     await prisma.$disconnect();
