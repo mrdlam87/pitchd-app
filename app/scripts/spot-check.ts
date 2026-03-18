@@ -17,7 +17,6 @@ async function main() {
   const wilsons = await prisma.campsite.findMany({ where: { lat: { gte: -39.2, lte: -38.8 }, lng: { gte: 146.2, lte: 146.6 } }, select: { name: true, lat: true, lng: true }, take: 5 });
   console.log("Near Wilsons Prom:", JSON.stringify(wilsons));
 
-  await prisma.$disconnect();
 }
 
-main().catch(console.error);
+main().catch(console.error).finally(() => prisma.$disconnect());
