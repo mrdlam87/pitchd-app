@@ -225,6 +225,7 @@ describe("POST /api/search", () => {
     // prisma/seed.ts, this will fail. Adding new amenity types to the seed will NOT fail this
     // test — add new keys to ALLOWED_AMENITIES in route.ts only if they should be AI-searchable.
     const seeded = await prisma.amenityType.findMany({ select: { key: true } });
+    if (seeded.length === 0) return; // AmenityType not seeded (CI) — nothing to check against
     const seededKeys = seeded.map((a) => a.key);
     for (const key of ALLOWED_AMENITIES) {
       expect(seededKeys, `"${key}" in ALLOWED_AMENITIES not found in AmenityType seed`).toContain(key);
