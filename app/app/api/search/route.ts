@@ -157,28 +157,32 @@ export async function POST(req: Request): Promise<Response> {
     if (cached && cached.expiresAt > now) {
       // Cache hit — reuse stored intent.
       // Sanitise on read: a tampered or pre-migration cache entry could have bad values.
-      parsedIntent = cached.parsedIntentJson as unknown as ParsedIntent;
-      if (typeof parsedIntent.radiusKm !== "number" || parsedIntent.radiusKm <= 0) {
-        parsedIntent.radiusKm = DEFAULT_RADIUS_KM;
-      }
-      // Cap radiusKm to prevent a large cached value from causing a table scan
-      parsedIntent.radiusKm = Math.min(parsedIntent.radiusKm, MAX_RADIUS_KM);
-      // Re-filter amenities in case the cache entry predates the ALLOWED_AMENITIES list
-      if (Array.isArray(parsedIntent.amenities)) {
-        parsedIntent.amenities = parsedIntent.amenities.filter(
-          (a): a is string => typeof a === "string" && ALLOWED_AMENITIES.includes(a)
-        );
-      } else {
-        parsedIntent.amenities = [];
-      }
+      // Use a spread to avoid mutating the Prisma result object directly.
+      const raw = cached.parsedIntentJson as unknown as ParsedIntent;
+      const rawRadius = typeof raw.radiusKm === "number" && raw.radiusKm > 0
+        ? raw.radiusKm
+        : DEFAULT_RADIUS_KM;
+      parsedIntent = {
+        ...raw,
+        // Cap radiusKm to prevent a large cached value from causing a table scan
+        radiusKm: Math.min(rawRadius, MAX_RADIUS_KM),
+        // Re-filter amenities in case the cache entry predates the ALLOWED_AMENITIES list
+        amenities: Array.isArray(raw.amenities)
+          ? raw.amenities.filter((a): a is string => typeof a === "string" && ALLOWED_AMENITIES.includes(a))
+          : [],
+        // Sanitise date fields — pass through only strings
+        dateFrom: typeof raw.dateFrom === "string" ? raw.dateFrom : null,
+        dateTo: typeof raw.dateTo === "string" ? raw.dateTo : null,
+      };
     } else {
       // Cache miss — call Claude Haiku to parse intent
       parsedIntent = await parseIntentWithClaude(query.trim());
 
       // Store in SearchCache with 2-hour TTL.
       // Upsert handles the case where an expired record already exists for this hash.
+      // Fire-and-forget — a transient DB failure here shouldn't fail the request.
       const expiresAt = new Date(now.getTime() + CACHE_TTL_MS);
-      await prisma.searchCache.upsert({
+      prisma.searchCache.upsert({
         where: { queryHash },
         create: {
           queryHash,
@@ -191,7 +195,7 @@ export async function POST(req: Request): Promise<Response> {
           parsedIntentJson: parsedIntent as object,
           expiresAt,
         },
-      });
+      }).catch((err) => console.error("[search] cache write failed", err));
     }
 
     // Build a bounding box around the user's location using the intent-derived radius.
