@@ -11,11 +11,11 @@ if (!MAPBOX_TOKEN) {
   console.warn("[MapView] NEXT_PUBLIC_MAPBOX_TOKEN is not set");
 }
 
-// Default centre: roughly the middle of Australia
+// Default centre: Sydney — used when location is denied or unavailable
 const DEFAULT_VIEWPORT = {
-  longitude: 134.0,
-  latitude: -25.5,
-  zoom: 4,
+  longitude: 151.2093,
+  latitude: -33.8688,
+  zoom: 10,
 };
 
 // Design tokens
@@ -96,10 +96,21 @@ export default function MapView() {
           lng: pos.coords.longitude,
         }),
       () => {
-        /* denied or unavailable — no-op */
-      }
+        /* denied or unavailable — map stays at DEFAULT_VIEWPORT (Sydney) */
+      },
+      { timeout: 10_000 }
     );
   }, []);
+
+  // Fly to user location when it resolves — onMoveEnd will reload campsites at the new centre
+  useEffect(() => {
+    if (!userLocation || !mapRef.current) return;
+    mapRef.current.flyTo({
+      center: [userLocation.lng, userLocation.lat],
+      zoom: 11,
+      duration: 1200,
+    });
+  }, [userLocation]);
 
   const loadCampsites = useCallback((map: mapboxgl.Map) => {
     const id = ++fetchCounterRef.current;
@@ -117,8 +128,21 @@ export default function MapView() {
   }, []);
 
   const handleLoad = useCallback(
-    (e: { target: mapboxgl.Map }) => loadCampsites(e.target),
-    [loadCampsites]
+    (_e: { target: mapboxgl.Map }) => {
+      // If geolocation resolved before the map finished loading, fly there now.
+      // onMoveEnd will handle the campsite load after the fly completes.
+      // Otherwise load campsites at the default viewport immediately.
+      if (userLocation) {
+        mapRef.current?.flyTo({
+          center: [userLocation.lng, userLocation.lat],
+          zoom: 11,
+          duration: 1200,
+        });
+      } else {
+        loadCampsites(_e.target);
+      }
+    },
+    [loadCampsites, userLocation]
   );
 
   const handleMoveEnd = useCallback(
