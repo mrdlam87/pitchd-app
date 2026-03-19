@@ -77,8 +77,16 @@ function computeVisibleBounds(map: mapboxgl.Map, drawerBottomPx: number): Bounds
   };
 }
 
-// Height of the visible peek strip (drag handle + result count)
+// Height of the visible peek strip (drag handle + result count).
+// Intentionally a few px larger than the ~52px rendered height so the
+// translateY never clips content and computeVisibleBounds stays conservative.
 const PEEK_HEIGHT = 64;
+
+// Drawer open height in px — mirrors the CSS `height: "40vh"`.
+// Note: window.innerHeight is the visual viewport on mobile (shrinks when the
+// address bar is visible) while 40vh is the layout viewport; difference is
+// typically < 60px and acceptable for MVP.
+const drawerOpenPx = (): number => Math.round(window.innerHeight * 0.4);
 
 export default function MapView() {
   const [campsites, setCampsites] = useState<Campsite[]>([]);
@@ -102,6 +110,9 @@ export default function MapView() {
   const fetchCounterRef = useRef(0);
   // Mirrors drawerOpen so loadCampsites (a stable useCallback) always reads the latest value
   const drawerOpenRef = useRef(true);
+  // Tracks the previous fetch's result count so loadCampsites can detect 0 → results
+  // transitions without calling a state setter inside another setter's updater function.
+  const prevCampsitesLengthRef = useRef(0);
 
   // Request user geolocation on mount
   useEffect(() => {
@@ -120,7 +131,7 @@ export default function MapView() {
             center: [loc.lng, loc.lat],
             zoom: 11,
             duration: 1200,
-            padding: { top: 0, right: 0, bottom: Math.round(window.innerHeight * 0.4), left: 0 },
+            padding: { top: 0, right: 0, bottom: drawerOpenPx(), left: 0 },
           });
         }
       },
@@ -137,21 +148,21 @@ export default function MapView() {
     // browser address bar is visible), while the CSS "40vh" is relative to the layout
     // viewport. The difference is typically < 60px and acceptable for MVP.
     const drawerBottomPx = drawerOpenRef.current
-      ? Math.round(window.innerHeight * 0.4)
+      ? drawerOpenPx()
       : PEEK_HEIGHT;
     const bounds = computeVisibleBounds(map, drawerBottomPx);
     fetchCampsites(bounds).then(
       ({ results, hasMore }) => {
         if (id !== fetchCounterRef.current) return; // stale fetch — discard
         cardRefs.current = []; // clear stale DOM refs from the previous result set
-        // Use functional updater to read current campsites count without adding
-        // campsites as a dependency (which would re-create the callback on every result).
         // Re-open the drawer only on 0 → results transition so it doesn't spring
-        // back open immediately after every drag.
-        setCampsites((prev) => {
-          if (results.length > 0 && prev.length === 0) setDrawerOpen(true);
-          return results;
-        });
+        // back open immediately after every drag. Uses a ref instead of a functional
+        // updater to avoid calling a state setter inside another setter (anti-pattern).
+        if (results.length > 0 && prevCampsitesLengthRef.current === 0) {
+          setDrawerOpen(true);
+        }
+        prevCampsitesLengthRef.current = results.length;
+        setCampsites(results);
         setHasMore(hasMore);
         setSelectedIdx(null);
       }
@@ -173,7 +184,7 @@ export default function MapView() {
           center: [loc.lng, loc.lat],
           zoom: 11,
           duration: 1200,
-          padding: { top: 0, right: 0, bottom: Math.round(window.innerHeight * 0.4), left: 0 },
+          padding: { top: 0, right: 0, bottom: drawerOpenPx(), left: 0 },
         });
       } else {
         loadCampsites(_e.target);
@@ -206,7 +217,7 @@ export default function MapView() {
         mapRef.current.easeTo({
           center: [campsite.lng, campsite.lat],
           duration: 300,
-          padding: { top: 0, right: 0, bottom: Math.round(window.innerHeight * 0.4), left: 0 },
+          padding: { top: 0, right: 0, bottom: drawerOpenPx(), left: 0 },
         });
       }
       requestAnimationFrame(() => {
