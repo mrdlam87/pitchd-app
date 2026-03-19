@@ -39,6 +39,27 @@ const STATE_BOXES: Array<{
   { code: "NSW", latMin: -37.5, latMax: -28.2, lngMin: 140.9, lngMax: 153.6 },
 ];
 
+// OSM tag → AmenityType key mapping.
+// Each entry matches if ANY of the [tag, value] pairs is present on the element.
+const OSM_AMENITY_TAGS: Array<{ match: [string, string][]; key: string }> = [
+  { match: [["dog", "yes"], ["dog", "leashed"]], key: "dog_friendly" },
+  { match: [["fishing", "yes"], ["sport", "fishing"]], key: "fishing" },
+  { match: [["swimming", "yes"], ["sport", "swimming"]], key: "swimming" },
+  { match: [["sanitary_dump_station", "yes"]], key: "dump_point" },
+  { match: [["drinking_water", "yes"]], key: "water_fill" },
+  { match: [["toilets", "yes"], ["toilets:indoor", "yes"], ["toilets:outdoor", "yes"]], key: "toilets" },
+];
+
+function extractAmenityKeys(tags: Record<string, string>): string[] {
+  const result: string[] = [];
+  for (const { match, key } of OSM_AMENITY_TAGS) {
+    if (match.some(([k, v]) => tags[k] === v)) {
+      result.push(key);
+    }
+  }
+  return result;
+}
+
 interface OverpassNode {
   type: "node";
   id: number;
@@ -225,6 +246,7 @@ function elementToRecord(el: OverpassElement): {
   slug: string;
   syncStatus: SyncStatus;
   lastSyncedAt: Date;
+  amenityKeys: string[];
 } | null {
   let lat: number;
   let lng: number;
@@ -256,6 +278,7 @@ function elementToRecord(el: OverpassElement): {
     slug,
     syncStatus: SyncStatus.active,
     lastSyncedAt: now,
+    amenityKeys: extractAmenityKeys(tags),
   };
 }
 
@@ -277,6 +300,10 @@ async function main() {
       .filter((r): r is NonNullable<typeof r> => r !== null);
 
     console.log(`  → ${records.length} records to process (${elements.length - records.length} skipped — no center coordinate)`);
+
+    // 3a. Load AmenityType key → id map (needed for CampsiteAmenity inserts)
+    const amenityTypes = await prisma.amenityType.findMany({ select: { id: true, key: true } });
+    const amenityTypeMap = new Map(amenityTypes.map((a) => [a.key, a.id]));
 
     // 3. Load existing OSM sourceIds from DB in one query
     console.log("Loading existing OSM records from DB...");
@@ -304,24 +331,54 @@ async function main() {
 
     console.log(`Processing: ${toInsert.length} to insert, ${toUpdate.length} to update, ${toRemove.length} to mark removed...`);
 
-    // 5. Insert new records in batches
+    // 5. Insert new records in batches, then link their amenities
     const INSERT_BATCH = 500;
     let inserted = 0;
+    let amenityLinksCreated = 0;
     for (let i = 0; i < toInsert.length; i += INSERT_BATCH) {
       const batch = toInsert.slice(i, i + INSERT_BATCH);
-      await prisma.campsite.createMany({ data: batch, skipDuplicates: true });
+      // createMany doesn't return IDs — look up the inserted records by sourceId afterwards
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      await prisma.campsite.createMany({ data: batch.map(({ amenityKeys: _amenityKeys, ...rest }) => rest), skipDuplicates: true });
+
+      // Sync amenities for newly inserted campsites
+      const batchWithAmenities = batch.filter((r) => r.amenityKeys.length > 0);
+      if (batchWithAmenities.length > 0) {
+        const sourceIds = batchWithAmenities.map((r) => r.sourceId);
+        const dbRecords = await prisma.campsite.findMany({
+          where: { sourceId: { in: sourceIds } },
+          select: { id: true, sourceId: true },
+        });
+        const dbIdBySourceId = new Map(dbRecords.map((r) => [r.sourceId, r.id]));
+        const amenityRows: { campsiteId: string; amenityTypeId: string }[] = [];
+        for (const r of batchWithAmenities) {
+          const dbId = dbIdBySourceId.get(r.sourceId);
+          if (!dbId) continue;
+          for (const key of r.amenityKeys) {
+            const typeId = amenityTypeMap.get(key);
+            if (typeId) amenityRows.push({ campsiteId: dbId, amenityTypeId: typeId });
+          }
+        }
+        if (amenityRows.length > 0) {
+          await prisma.campsiteAmenity.createMany({ data: amenityRows, skipDuplicates: true });
+          amenityLinksCreated += amenityRows.length;
+        }
+      }
+
       inserted += batch.length;
       process.stdout.write(`\r  → Inserted ${inserted}/${toInsert.length}`);
     }
     if (toInsert.length > 0) console.log(); // newline after progress
 
-    // 6. Update existing records in batches using transactions
+    // 6. Update existing records in batches using transactions (also syncs amenities)
     const UPDATE_BATCH = 100;
     let updated = 0;
+    let amenityLinksUpdated = 0;
     for (let i = 0; i < toUpdate.length; i += UPDATE_BATCH) {
       const batch = toUpdate.slice(i, i + UPDATE_BATCH);
-      await prisma.$transaction(
+      const batchAmenityCount = await prisma.$transaction(
         async (tx) => {
+          let count = 0;
           for (const r of batch) {
             const dbId = existingMap.get(r.sourceId)!.id;
             await tx.campsite.update({
@@ -336,10 +393,22 @@ async function main() {
                 lastSyncedAt: r.lastSyncedAt,
               },
             });
+            // Sync amenities: delete all existing links then re-insert from current OSM tags.
+            // This ensures stale amenity data is removed when OSM tags change.
+            await tx.campsiteAmenity.deleteMany({ where: { campsiteId: dbId } });
+            for (const key of r.amenityKeys) {
+              const typeId = amenityTypeMap.get(key);
+              if (typeId) {
+                await tx.campsiteAmenity.create({ data: { campsiteId: dbId, amenityTypeId: typeId } });
+                count++;
+              }
+            }
           }
+          return count;
         },
         { timeout: 60_000 }
       );
+      amenityLinksUpdated += batchAmenityCount;
       updated += batch.length;
       process.stdout.write(`\r  → Updated ${updated}/${toUpdate.length}`);
     }
@@ -367,6 +436,7 @@ async function main() {
     console.log(`  Reactivated  : ${reactivatedCount}`);
     console.log(`  Removed      : ${removed}`);
     console.log(`  Skipped      : ${skipped} (no coordinate)`);
+    console.log(`  Amenity links: ${amenityLinksCreated} created (new), ${amenityLinksUpdated} synced (updated)`);
   } finally {
     await prisma.$disconnect();
   }
