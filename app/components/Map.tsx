@@ -31,6 +31,22 @@ type Campsite = {
   amenities: { key: string; label: string; icon: string; color: string }[];
 };
 
+type AmenityPOI = {
+  id: string;
+  name: string | null;
+  lat: number;
+  lng: number;
+  amenityType: { key: string };
+};
+
+// Local metadata for each POI type — matches FilterPanel POI_OPTIONS and AmenityType seed data.
+const POI_META: Record<string, { emoji: string; label: string; color: string }> = {
+  dump_point: { emoji: "🚐", label: "Dump point", color: "#6b7280" },
+  water_fill: { emoji: "💧", label: "Water fill", color: "#3b82f6" },
+  laundromat: { emoji: "🧺", label: "Laundromat", color: "#8b5cf6" },
+  toilets:    { emoji: "🚻", label: "Toilets",    color: "#10b981" },
+};
+
 type FetchResult = { results: Campsite[]; hasMore: boolean };
 
 type Bounds = { north: number; south: number; east: number; west: number };
@@ -55,6 +71,44 @@ async function fetchCampsites(bounds: Bounds, amenities: string[] = []): Promise
     console.warn("[fetchCampsites] fetch failed", e);
     return { results: [], hasMore: false };
   }
+}
+
+// Fetches AmenityPOIs for all active POI types in parallel.
+// Converts viewport bounds to a centre + radius so the amenities API can use its
+// existing bounding-box filter.
+async function fetchAmenities(bounds: Bounds, poiTypes: string[]): Promise<AmenityPOI[]> {
+  if (poiTypes.length === 0) return [];
+
+  const centerLat = (bounds.north + bounds.south) / 2;
+  const centerLng = (bounds.east  + bounds.west)  / 2;
+  // Half-diagonal of the bounding box in km — ensures the circle covers the full viewport.
+  const latKm = ((bounds.north - bounds.south) / 2) * 111.32;
+  const lngKm = ((bounds.east  - bounds.west)  / 2) * 111.32 * Math.cos((centerLat * Math.PI) / 180);
+  const radius = Math.ceil(Math.sqrt(latKm * latKm + lngKm * lngKm));
+
+  const fetches = poiTypes.map(async (type) => {
+    const params = new URLSearchParams({
+      lat:    String(centerLat),
+      lng:    String(centerLng),
+      radius: String(radius),
+      type,
+    });
+    try {
+      const res = await fetch(`/api/amenities?${params}`);
+      if (!res.ok) {
+        console.warn(`[fetchAmenities] ${res.status} for type=${type}`);
+        return [] as AmenityPOI[];
+      }
+      const data = await res.json();
+      return (data.results ?? []) as AmenityPOI[];
+    } catch (e) {
+      console.warn(`[fetchAmenities] fetch failed for type=${type}`, e);
+      return [] as AmenityPOI[];
+    }
+  });
+
+  const groups = await Promise.all(fetches);
+  return groups.flat();
 }
 
 // Returns the exact lat/lng bounding box of the visible area above the drawer.
@@ -96,6 +150,8 @@ export default function MapView() {
   const [campsites, setCampsites] = useState<Campsite[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const [amenityPois, setAmenityPois] = useState<AmenityPOI[]>([]);
+  const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [activeFilters, setActiveFilters] = useState<FilterState>(EMPTY_FILTERS);
@@ -117,6 +173,8 @@ export default function MapView() {
   const skipNextFetch = useRef(false);
   // Monotonic counter — discard results from stale in-flight requests
   const fetchCounterRef = useRef(0);
+  // Separate counter for amenity fetches — same stale-discard pattern
+  const amenityFetchCounterRef = useRef(0);
   // Mirrors drawerOpen so loadCampsites (a stable useCallback) always reads the latest value
   const drawerOpenRef = useRef(true);
   // Tracks the previous fetch's result count so loadCampsites can detect 0 → results
@@ -191,6 +249,21 @@ export default function MapView() {
     );
   }, []);
 
+  const loadAmenities = useCallback((map: mapboxgl.Map) => {
+    const id = ++amenityFetchCounterRef.current;
+    const drawerBottomPx = drawerOpenRef.current ? drawerOpenPx() : PEEK_HEIGHT;
+    const bounds = computeVisibleBounds(map, drawerBottomPx);
+    const poiTypes = activeFiltersRef.current.pois;
+    fetchAmenities(bounds, poiTypes).then((results) => {
+      if (id !== amenityFetchCounterRef.current) return; // stale — discard
+      setAmenityPois(results);
+      // Clear POI selection if the selected POI is no longer in the result set
+      setSelectedPoiId((prev) =>
+        prev && results.some((p) => p.id === prev) ? prev : null
+      );
+    });
+  }, []);
+
   useEffect(() => {
     drawerOpenRef.current = drawerOpen;
   }, [drawerOpen]);
@@ -230,9 +303,10 @@ export default function MapView() {
         skipNextFetch.current = true;
         _e.target.setPadding({ top: 0, right: 0, bottom: drawerOpenPx(), left: 0 });
         loadCampsites(_e.target);
+        loadAmenities(_e.target);
       }
     },
-    [loadCampsites]
+    [loadCampsites, loadAmenities]
   );
 
   const handleMoveEnd = useCallback(
@@ -242,14 +316,34 @@ export default function MapView() {
         return;
       }
       loadCampsites(e.target);
+      loadAmenities(e.target);
     },
-    [loadCampsites]
+    [loadCampsites, loadAmenities]
+  );
+
+  const selectPoi = useCallback(
+    (poi: AmenityPOI, animate = true) => {
+      setDrawerOpen(true);
+      setSelectedPoiId(poi.id);
+      setSelectedIdx(null);
+      selectedIdRef.current = null;
+      if (animate && mapRef.current) {
+        skipNextFetch.current = true;
+        mapRef.current.easeTo({
+          center: [poi.lng, poi.lat],
+          duration: 300,
+          padding: { top: 0, right: 0, bottom: drawerOpenPx(), left: 0 },
+        });
+      }
+    },
+    []
   );
 
   const selectPin = useCallback(
     (i: number, animate = true) => {
       setDrawerOpen(true);
       setSelectedIdx(i);
+      setSelectedPoiId(null);
       const campsite = campsites[i];
       selectedIdRef.current = campsite?.id ?? null;
       if (animate && campsite && mapRef.current) {
@@ -299,10 +393,12 @@ export default function MapView() {
       setShowFilters(false);
       // Re-run the search immediately with the new filters applied
       if (mapRef.current) {
-        loadCampsites(mapRef.current.getMap());
+        const map = mapRef.current.getMap();
+        loadCampsites(map);
+        loadAmenities(map);
       }
     },
-    [loadCampsites],
+    [loadCampsites, loadAmenities],
   );
 
   const resultLabel =
@@ -468,10 +564,85 @@ export default function MapView() {
             </Marker>
           );
         })}
+
+        {/* AmenityPOI pins — same teardrop shape as campsite pins, POI colour fill, emoji glyph */}
+        {amenityPois.map((poi) => {
+          const isSel = selectedPoiId === poi.id;
+          const meta = POI_META[poi.amenityType.key] ?? { emoji: "📍", label: poi.amenityType.key, color: FOREST_GREEN };
+          const pinW = isSel ? 34 : 26;
+          const pinH = isSel ? 37 : 28;
+          return (
+            <Marker
+              key={poi.id}
+              longitude={poi.lng}
+              latitude={poi.lat}
+              anchor="bottom"
+              style={{ zIndex: isSel ? 10 : 1 }}
+            >
+              <div
+                role="button"
+                tabIndex={0}
+                className="relative flex flex-col items-center cursor-pointer select-none"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  selectPoi(poi, false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    selectPoi(poi, false);
+                  }
+                }}
+                aria-label={`Select ${meta.label}${poi.name ? `: ${poi.name}` : ""}`}
+              >
+                <svg
+                  style={{
+                    width: pinW,
+                    height: pinH,
+                    filter: `drop-shadow(0 2px 6px rgba(0,0,0,${isSel ? 0.45 : 0.28}))`,
+                    transition: "width 150ms, height 150ms",
+                  }}
+                  viewBox="0 0 26 28"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M13 1.5C7.2 1.5 2.5 6.2 2.5 12C2.5 18.5 9 24 13 26C17 24 23.5 18.5 23.5 12C23.5 6.2 18.8 1.5 13 1.5Z"
+                    fill={meta.color}
+                    stroke={meta.color}
+                    strokeWidth="1.5"
+                  />
+                  <text
+                    x="13"
+                    y="12.5"
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fontSize={isSel ? 12 : 10}
+                  >
+                    {meta.emoji}
+                  </text>
+                </svg>
+                {/* Name label */}
+                <div
+                  className={`absolute left-full top-1/2 -translate-y-1/2 ml-1 w-max max-w-[140px] leading-tight ${isSel ? "font-bold" : "font-semibold"}`}
+                  style={{
+                    color: meta.color,
+                    fontFamily: "var(--font-dm-sans), sans-serif",
+                    fontSize: isSel ? 11 : 10,
+                    textShadow:
+                      "0 0 3px rgba(255,255,255,0.95), 0 0 6px rgba(255,255,255,0.8), 0 1px 2px rgba(0,0,0,0.12)",
+                  }}
+                >
+                  {poi.name ?? meta.label}
+                </div>
+              </div>
+            </Marker>
+          );
+        })}
       </MapGL>
 
       {/* Bottom drawer — z-50 must exceed marker z-index (max 10) to prevent bleed-through */}
-      {campsites.length > 0 && (
+      {(campsites.length > 0 || selectedPoiId !== null) && (
         <div
           className="absolute bottom-0 left-0 right-0 rounded-t-2xl shadow-2xl flex flex-col z-50"
           style={{
@@ -501,6 +672,43 @@ export default function MapView() {
 
           {/* Scrollable card list */}
           <div className="overflow-y-auto flex-1 px-4 pb-4 space-y-2">
+            {/* POI detail card — shown when an amenity pin is selected */}
+            {selectedPoiId && (() => {
+              const poi = amenityPois.find((p) => p.id === selectedPoiId);
+              if (!poi) return null;
+              const meta = POI_META[poi.amenityType.key] ?? { emoji: "📍", label: poi.amenityType.key, color: FOREST_GREEN };
+              return (
+                <div
+                  className="relative rounded-xl p-3"
+                  style={{ border: `1.5px solid ${meta.color}`, background: "#fff" }}
+                >
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${poi.lat},${poi.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="absolute top-2.5 right-2.5 flex items-center justify-center w-7 h-7 rounded-full transition-opacity hover:opacity-70 active:opacity-50"
+                    style={{ background: "rgba(232,103,74,0.12)" }}
+                    aria-label={`Navigate to ${poi.name ?? meta.label} in Google Maps`}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill={CORAL} />
+                    </svg>
+                  </a>
+                  <div className="flex items-center gap-3 pr-8">
+                    <span className="text-xl leading-none flex-shrink-0">{meta.emoji}</span>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-sm truncate" style={{ color: FOREST_GREEN }}>
+                        {poi.name ?? meta.label}
+                      </div>
+                      <div className="text-xs" style={{ color: meta.color }}>
+                        {meta.label}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
             {campsites.map((campsite, i) => {
               const isSel = selectedIdx === i;
               return (
