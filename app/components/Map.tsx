@@ -125,6 +125,9 @@ export default function MapView() {
 
   const loadCampsites = useCallback((map: mapboxgl.Map) => {
     const id = ++fetchCounterRef.current;
+    // Note: window.innerHeight reflects the visual viewport on mobile (shrinks when the
+    // browser address bar is visible), while the CSS "40vh" is relative to the layout
+    // viewport. The difference is typically < 60px and acceptable for MVP.
     const drawerBottomPx = drawerOpenRef.current
       ? Math.round(window.innerHeight * 0.4)
       : PEEK_HEIGHT;
@@ -136,6 +139,9 @@ export default function MapView() {
         setCampsites(results);
         setHasMore(hasMore);
         setSelectedIdx(null);
+        // Re-open the drawer whenever fresh results arrive so it doesn't stay
+        // collapsed after a zero-result → result cycle.
+        if (results.length > 0) setDrawerOpen(true);
       }
     );
   }, []);
@@ -231,6 +237,7 @@ export default function MapView() {
         mapboxAccessToken={MAPBOX_TOKEN}
         initialViewState={DEFAULT_VIEWPORT}
         mapStyle="mapbox://styles/mapbox/outdoors-v12"
+        minZoom={7}
         onLoad={handleLoad}
         onMoveEnd={handleMoveEnd}
         onDragStart={() => setDrawerOpen(false)}
