@@ -361,7 +361,7 @@ export default function MapView() {
                       {i + 1}
                     </div>
                     {/* Name + region */}
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="font-semibold text-sm truncate text-[#2d4a2d]">
                         {campsite.name}
                       </div>
@@ -371,6 +371,22 @@ export default function MapView() {
                         </div>
                       )}
                     </div>
+                    {/* Navigate button */}
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${campsite.lat},${campsite.lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-semibold transition-opacity hover:opacity-80 active:opacity-60"
+                      style={{
+                        background: CORAL,
+                        color: "#fff",
+                        fontFamily: "var(--font-dm-sans), sans-serif",
+                      }}
+                      aria-label={`Navigate to ${campsite.name} in Google Maps`}
+                    >
+                      Navigate
+                    </a>
                   </div>
                 </div>
               );
