@@ -86,7 +86,8 @@ const PEEK_HEIGHT = 64;
 // typically < 60px and acceptable for MVP.
 const drawerOpenPx = (): number => Math.round(window.innerHeight * 0.4);
 
-// Must match the Tailwind `transition-transform duration-300` on the drawer div.
+// Must match the inline `transition: transform ${DRAWER_TRANSITION_MS}ms ease-in-out`
+// style on the drawer div.
 const DRAWER_TRANSITION_MS = 300;
 
 const EMPTY_FILTERS: FilterState = { activities: [], pois: [] };
@@ -124,6 +125,9 @@ export default function MapView() {
   // Mirrors the selected campsite's ID so loadCampsites (stable callback) can
   // re-resolve the selection index after a fetch without needing selectedIdx as a dep.
   const selectedIdRef = useRef<string | null>(null);
+  // Tracks the deferred scrollIntoView timeout so rapid pin clicks cancel the
+  // previous pending scroll, and so it can be cleaned up on unmount.
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Request user geolocation on mount
   useEffect(() => {
@@ -191,6 +195,13 @@ export default function MapView() {
     drawerOpenRef.current = drawerOpen;
   }, [drawerOpen]);
 
+  // Clear any pending deferred scroll on unmount to avoid a setState-after-unmount warning.
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current !== null) clearTimeout(scrollTimeoutRef.current);
+    };
+  }, []);
+
   useEffect(() => {
     activeFiltersRef.current = activeFilters;
   }, [activeFilters]);
@@ -236,12 +247,12 @@ export default function MapView() {
   );
 
   const selectPin = useCallback(
-    (i: number, fly = true) => {
+    (i: number, animate = true) => {
       setDrawerOpen(true);
       setSelectedIdx(i);
       const campsite = campsites[i];
       selectedIdRef.current = campsite?.id ?? null;
-      if (fly && campsite && mapRef.current) {
+      if (animate && campsite && mapRef.current) {
         // Known edge case: a manual pan that starts during the 300ms easeTo animation
         // will have its moveend consumed by this flag (no refetch fires for that gesture).
         // Low-frequency and acceptable for MVP.
@@ -252,7 +263,7 @@ export default function MapView() {
           padding: { top: 0, right: 0, bottom: drawerOpenPx(), left: 0 },
         });
       }
-      if (fly) {
+      if (animate) {
         // Card click — drawer is already open, scroll immediately
         requestAnimationFrame(() => {
           cardRefs.current[i]?.scrollIntoView({
@@ -261,10 +272,12 @@ export default function MapView() {
           });
         });
       } else {
-        // Pin click — drawer is animating open (300ms). Delaying scrollIntoView
-        // until after the transition prevents the browser from trying to scroll
-        // the card into view mid-animation, which was causing the map to shift.
-        setTimeout(() => {
+        // Pin click — drawer is animating open. Delaying scrollIntoView until
+        // after the transition prevents a mid-animation scroll from shifting the
+        // map. Cancel any pending scroll from a previous rapid pin click first.
+        if (scrollTimeoutRef.current !== null) clearTimeout(scrollTimeoutRef.current);
+        scrollTimeoutRef.current = setTimeout(() => {
+          scrollTimeoutRef.current = null;
           cardRefs.current[i]?.scrollIntoView({
             behavior: "smooth",
             block: "nearest",
