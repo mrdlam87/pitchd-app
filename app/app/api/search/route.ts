@@ -19,8 +19,11 @@ const RESULT_LIMIT = 20;
 const DEFAULT_RADIUS_KM = 300;
 // Hard cap on radius — prevents a hallucinated large value causing a near-full-table scan
 const MAX_RADIUS_KM = 1000;
-// Amenity keys Claude is allowed to return — filter out hallucinated values
+// Amenity keys Claude is allowed to return — filter out hallucinated values.
+// Must match the keys seeded in prisma/seed.ts — keep in sync if the seed changes.
 const ALLOWED_AMENITIES = ["dog_friendly", "fishing", "hiking", "swimming"];
+// ISO date format guard — rejects free-text like "next Tuesday" from Claude or tampered cache
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 interface ParsedIntent {
   amenities: string[];
@@ -54,6 +57,9 @@ function distanceKm(
 async function parseIntentWithClaude(query: string): Promise<ParsedIntent> {
   const today = new Date().toISOString().split("T")[0];
 
+  // Escape angle brackets to prevent prompt injection via </query> tag breakout
+  const safeQuery = query.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
   // 10-second timeout — prevents the request hanging if the Anthropic API is slow
   const message = await anthropic.messages.create({
     model: HAIKU_MODEL,
@@ -63,7 +69,7 @@ async function parseIntentWithClaude(query: string): Promise<ParsedIntent> {
       {
         role: "user",
         content: `Parse this Australian camping search query and extract structured intent.
-<query>${query}</query>
+<query>${safeQuery}</query>
 Today: ${today}
 
 Return ONLY this JSON shape:
@@ -92,8 +98,8 @@ Rules:
     amenities: Array.isArray(parsed.amenities)
       ? (parsed.amenities as unknown[]).filter((a): a is string => typeof a === "string" && ALLOWED_AMENITIES.includes(a))
       : [],
-    dateFrom: typeof parsed.dateFrom === "string" ? parsed.dateFrom : null,
-    dateTo: typeof parsed.dateTo === "string" ? parsed.dateTo : null,
+    dateFrom: typeof parsed.dateFrom === "string" && ISO_DATE_RE.test(parsed.dateFrom) ? parsed.dateFrom : null,
+    dateTo: typeof parsed.dateTo === "string" && ISO_DATE_RE.test(parsed.dateTo) ? parsed.dateTo : null,
     radiusKm: Math.min(
       typeof parsed.radiusKm === "number" && parsed.radiusKm > 0
         ? parsed.radiusKm
@@ -170,9 +176,9 @@ export async function POST(req: Request): Promise<Response> {
         amenities: Array.isArray(raw.amenities)
           ? raw.amenities.filter((a): a is string => typeof a === "string" && ALLOWED_AMENITIES.includes(a))
           : [],
-        // Sanitise date fields — pass through only strings
-        dateFrom: typeof raw.dateFrom === "string" ? raw.dateFrom : null,
-        dateTo: typeof raw.dateTo === "string" ? raw.dateTo : null,
+        // Sanitise date fields — must be ISO format (YYYY-MM-DD), not free-text
+        dateFrom: typeof raw.dateFrom === "string" && ISO_DATE_RE.test(raw.dateFrom) ? raw.dateFrom : null,
+        dateTo: typeof raw.dateTo === "string" && ISO_DATE_RE.test(raw.dateTo) ? raw.dateTo : null,
       };
     } else {
       // Cache miss — call Claude Haiku to parse intent
@@ -180,9 +186,10 @@ export async function POST(req: Request): Promise<Response> {
 
       // Store in SearchCache with 2-hour TTL.
       // Upsert handles the case where an expired record already exists for this hash.
-      // Fire-and-forget — a transient DB failure here shouldn't fail the request.
+      // Awaited so the write completes before the response returns (prevents test races).
+      // .catch() swallows transient DB failures — a failed write still returns a 200.
       const expiresAt = new Date(now.getTime() + CACHE_TTL_MS);
-      prisma.searchCache.upsert({
+      await prisma.searchCache.upsert({
         where: { queryHash },
         create: {
           queryHash,
