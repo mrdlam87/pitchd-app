@@ -481,6 +481,11 @@ export default function MapView() {
         onLoad={handleLoad}
         onMoveEnd={handleMoveEnd}
         onDragStart={() => setDrawerOpen(false)}
+        onClick={() => {
+          setSelectedIdx(null);
+          selectedIdRef.current = null;
+          setSelectedPoiId(null);
+        }}
       >
         {/* User location dot — zIndex must exceed selected pin (10) */}
         {userLocation && (
@@ -601,12 +606,12 @@ export default function MapView() {
                 className="relative flex flex-col items-center cursor-pointer select-none"
                 onClick={(e) => {
                   e.stopPropagation();
-                  selectPoi(poi, false);
+                  selectPoi(poi);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
-                    selectPoi(poi, false);
+                    selectPoi(poi);
                   }
                 }}
                 aria-label={`Select ${meta.label}${poi.name ? `: ${poi.name}` : ""}`}

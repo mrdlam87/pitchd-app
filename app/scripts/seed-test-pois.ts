@@ -45,6 +45,8 @@ async function main() {
       continue;
     }
     await prisma.amenityPOI.create({
+      // sourceId uses the display name here as a stable dedup key for test records.
+      // Real ingested records use provider IDs (e.g. "osm:node:12345").
       data: { name, lat, lng, amenityTypeId: amenityType.id, source: "test", sourceId: name },
     });
     console.log(`  ✓ ${name}`);
