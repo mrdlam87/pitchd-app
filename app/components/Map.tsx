@@ -4,6 +4,7 @@ import mapboxgl from "mapbox-gl";
 import MapGL, { Marker, type MapRef } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useCallback, useEffect, useRef, useState } from "react";
+import FilterPanel, { type FilterState } from "./FilterPanel";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -38,13 +39,14 @@ type FetchResult = { results: Campsite[]; hasMore: boolean };
 
 type Bounds = { north: number; south: number; east: number; west: number };
 
-async function fetchCampsites(bounds: Bounds): Promise<FetchResult> {
+async function fetchCampsites(bounds: Bounds, amenities: string[] = []): Promise<FetchResult> {
   const params = new URLSearchParams({
     north: String(bounds.north),
     south: String(bounds.south),
     east:  String(bounds.east),
     west:  String(bounds.west),
   });
+  amenities.forEach((key) => params.append("amenities", key));
   try {
     const res = await fetch(`/api/campsites?${params}`);
     if (!res.ok) {
@@ -88,11 +90,18 @@ const PEEK_HEIGHT = 64;
 // typically < 60px and acceptable for MVP.
 const drawerOpenPx = (): number => Math.round(window.innerHeight * 0.4);
 
+const EMPTY_FILTERS: FilterState = { activities: [], pois: [] };
+
 export default function MapView() {
   const [campsites, setCampsites] = useState<Campsite[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<FilterState>(EMPTY_FILTERS);
+  // Ref mirrors state so loadCampsites always reads the latest filters without
+  // needing activeFilters as a dependency (the callback is stable).
+  const activeFiltersRef = useRef<FilterState>(EMPTY_FILTERS);
   const [userLocation, setUserLocation] = useState<{
     lat: number;
     lng: number;
@@ -151,7 +160,9 @@ export default function MapView() {
       ? drawerOpenPx()
       : PEEK_HEIGHT;
     const bounds = computeVisibleBounds(map, drawerBottomPx);
-    fetchCampsites(bounds).then(
+    const filters = activeFiltersRef.current;
+    const amenities = [...filters.activities, ...filters.pois];
+    fetchCampsites(bounds, amenities).then(
       ({ results, hasMore }) => {
         if (id !== fetchCounterRef.current) return; // stale fetch — discard
         cardRefs.current = []; // clear stale DOM refs from the previous result set
@@ -172,6 +183,10 @@ export default function MapView() {
   useEffect(() => {
     drawerOpenRef.current = drawerOpen;
   }, [drawerOpen]);
+
+  useEffect(() => {
+    activeFiltersRef.current = activeFilters;
+  }, [activeFilters]);
 
   const handleLoad = useCallback(
     (_e: { target: mapboxgl.Map }) => {
@@ -230,6 +245,19 @@ export default function MapView() {
     [campsites]
   );
 
+  const handleApplyFilters = useCallback(
+    (filters: FilterState) => {
+      setActiveFilters(filters);
+      activeFiltersRef.current = filters;
+      setShowFilters(false);
+      // Re-run the search immediately with the new filters applied
+      if (mapRef.current) {
+        loadCampsites(mapRef.current.getMap());
+      }
+    },
+    [loadCampsites],
+  );
+
   const resultLabel =
     campsites.length === 0
       ? ""
@@ -237,8 +265,53 @@ export default function MapView() {
       ? `${campsites.length}+ campsites nearby`
       : `${campsites.length} campsites nearby`;
 
+  const filterCount = activeFilters.activities.length + activeFilters.pois.length;
+
   return (
     <div className="relative h-full w-full">
+      {/* Filter panel overlay */}
+      {showFilters && (
+        <FilterPanel
+          initialFilters={activeFilters}
+          onApply={handleApplyFilters}
+          onClose={() => setShowFilters(false)}
+        />
+      )}
+
+      {/* Floating Filters button */}
+      <div className="absolute top-3 right-3 z-40">
+        <button
+          type="button"
+          onClick={() => setShowFilters(true)}
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold shadow-md transition-opacity hover:opacity-90 active:opacity-70"
+          style={{
+            background: filterCount > 0 ? CORAL : "#fff",
+            color: filterCount > 0 ? "#fff" : FOREST_GREEN,
+            border: `1.5px solid ${filterCount > 0 ? CORAL : "#e0dbd0"}`,
+            fontFamily: "var(--font-dm-sans), sans-serif",
+          }}
+          aria-label={`Filters${filterCount > 0 ? ` (${filterCount} active)` : ""}`}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M3 6h18M7 12h10M11 18h2"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+          Filters
+          {filterCount > 0 && (
+            <span
+              className="flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold"
+              style={{ background: "rgba(255,255,255,0.3)" }}
+            >
+              {filterCount}
+            </span>
+          )}
+        </button>
+      </div>
+
       <MapGL
         ref={mapRef}
         mapLib={mapboxgl}
