@@ -258,23 +258,34 @@ async function main() {
       `  → ${validRecords.length} valid records (${records.length - validRecords.length} skipped — missing AmenityType)`
     );
 
-    // 4. Load existing OSM AmenityPOI sourceIds from DB
+    // 4. Load existing OSM AmenityPOI records from DB (including current field values for change detection)
     console.log("Loading existing OSM POI records from DB...");
     const existing = await prisma.amenityPOI.findMany({
       where: { source: "osm" },
-      select: { id: true, sourceId: true },
+      select: { id: true, sourceId: true, name: true, lat: true, lng: true, amenityTypeId: true },
     });
 
-    const existingMap = new Map<string, string>(); // sourceId → db id
+    interface ExistingRow { id: string; name: string | null; lat: number; lng: number; amenityTypeId: string }
+    const existingMap = new Map<string, ExistingRow>(); // sourceId → db row
     for (const row of existing) {
-      if (row.sourceId) existingMap.set(row.sourceId, row.id);
+      if (row.sourceId) existingMap.set(row.sourceId, row);
     }
     console.log(`  → ${existingMap.size} existing OSM POI records in DB`);
 
-    // 5. Split into inserts, updates, and deletions
+    // 5. Split into inserts, changed updates, and deletions
     const fetchedSourceIds = new Set(validRecords.map((r) => r.sourceId));
     const toInsert = validRecords.filter((r) => !existingMap.has(r.sourceId));
-    const toUpdate = validRecords.filter((r) => existingMap.has(r.sourceId));
+    const toUpdate = validRecords.filter((r) => {
+      const existing = existingMap.get(r.sourceId);
+      if (!existing) return false;
+      const newTypeId = amenityTypeMap.get(r.amenityKey)!;
+      return (
+        r.name !== existing.name ||
+        r.lat !== existing.lat ||
+        r.lng !== existing.lng ||
+        newTypeId !== existing.amenityTypeId
+      );
+    });
     const toDelete = Array.from(existingMap.keys()).filter(
       (id) => !fetchedSourceIds.has(id)
     );
@@ -284,10 +295,10 @@ async function main() {
     );
 
     // 6. Insert new records in batches
-    const BATCH = 500;
+    const INSERT_BATCH = 500;
     let inserted = 0;
-    for (let i = 0; i < toInsert.length; i += BATCH) {
-      const batch = toInsert.slice(i, i + BATCH);
+    for (let i = 0; i < toInsert.length; i += INSERT_BATCH) {
+      const batch = toInsert.slice(i, i + INSERT_BATCH);
       await prisma.amenityPOI.createMany({
         data: batch.map((r) => ({
           name: r.name,
@@ -304,22 +315,26 @@ async function main() {
     }
     if (toInsert.length > 0) console.log();
 
-    // 7. Update existing records in batches
+    // 7. Update changed records using interactive $transaction with explicit timeout
+    const UPDATE_BATCH = 100;
     let updated = 0;
-    for (let i = 0; i < toUpdate.length; i += BATCH) {
-      const batch = toUpdate.slice(i, i + BATCH);
+    for (let i = 0; i < toUpdate.length; i += UPDATE_BATCH) {
+      const batch = toUpdate.slice(i, i + UPDATE_BATCH);
       await prisma.$transaction(
-        batch.map((r) =>
-          prisma.amenityPOI.update({
-            where: { id: existingMap.get(r.sourceId)! },
-            data: {
-              name: r.name,
-              lat: r.lat,
-              lng: r.lng,
-              amenityTypeId: amenityTypeMap.get(r.amenityKey)!,
-            },
-          })
-        )
+        async (tx) => {
+          for (const r of batch) {
+            await tx.amenityPOI.update({
+              where: { id: existingMap.get(r.sourceId)!.id },
+              data: {
+                name: r.name,
+                lat: r.lat,
+                lng: r.lng,
+                amenityTypeId: amenityTypeMap.get(r.amenityKey)!,
+              },
+            });
+          }
+        },
+        { timeout: 60_000 }
       );
       updated += batch.length;
       process.stdout.write(`\r  → Updated ${updated}/${toUpdate.length}`);
@@ -327,21 +342,24 @@ async function main() {
     if (toUpdate.length > 0) console.log();
 
     // 8. Delete stale OSM records in batches
+    const DELETE_BATCH = 500;
     let deleted = 0;
-    for (let i = 0; i < toDelete.length; i += BATCH) {
-      const batch = toDelete.slice(i, i + BATCH);
-      const ids = batch.map((sourceId) => existingMap.get(sourceId)!);
+    for (let i = 0; i < toDelete.length; i += DELETE_BATCH) {
+      const batch = toDelete.slice(i, i + DELETE_BATCH);
+      const ids = batch.map((sourceId) => existingMap.get(sourceId)!.id);
       await prisma.amenityPOI.deleteMany({ where: { id: { in: ids } } });
       deleted += batch.length;
       process.stdout.write(`\r  → Deleted ${deleted}/${toDelete.length}`);
     }
     if (toDelete.length > 0) console.log();
 
+    const unchanged = validRecords.filter((r) => existingMap.has(r.sourceId)).length - toUpdate.length;
     console.log("\nDone.");
-    console.log(`  Inserted : ${inserted}`);
-    console.log(`  Updated  : ${updated}`);
-    console.log(`  Deleted  : ${deleted}`);
-    console.log(`  Skipped  : ${skipped} (no coordinate or unrecognised tag)`);
+    console.log(`  Inserted  : ${inserted}`);
+    console.log(`  Updated   : ${updated}`);
+    console.log(`  Unchanged : ${unchanged}`);
+    console.log(`  Deleted   : ${deleted}`);
+    console.log(`  Skipped   : ${skipped} (no coordinate or unrecognised tag)`);
   } finally {
     await prisma.$disconnect();
   }
