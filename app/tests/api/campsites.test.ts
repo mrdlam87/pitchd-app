@@ -14,8 +14,8 @@ import { GET } from "@/app/api/campsites/route";
 // Cast to the session-returning overload — avoids TypeScript picking up the middleware overload
 const mockAuth = vi.mocked(auth as () => Promise<Session | null>);
 
-// Sydney coords used across tests (strings to match makeRequest's expected type)
-const SYDNEY = { lat: "-33.8688", lng: "151.2093", radius: "50" };
+// Sydney bounding box — ~50 km around (-33.8688, 151.2093)
+const SYDNEY = { north: "-33.42", south: "-34.32", east: "151.75", west: "150.67" };
 
 const AUTHED_SESSION: Session = {
   user: { id: "test-user", email: "test@example.com", name: "Test User", role: UserRole.user },
@@ -74,43 +74,48 @@ describe("GET /api/campsites", () => {
 
   // --- Input validation ---
 
-  it("returns 400 when lat is missing", async () => {
-    const res = await GET(makeRequest({ lng: "151.2", radius: "50" }));
+  it("returns 400 when north is missing", async () => {
+    const res = await GET(makeRequest({ south: "-34.32", east: "151.75", west: "150.67" }));
     expect(res.status).toBe(400);
   });
 
-  it("returns 400 when lng is missing", async () => {
-    const res = await GET(makeRequest({ lat: "-33.8", radius: "50" }));
+  it("returns 400 when south is missing", async () => {
+    const res = await GET(makeRequest({ north: "-33.42", east: "151.75", west: "150.67" }));
     expect(res.status).toBe(400);
   });
 
-  it("returns 400 when radius is missing", async () => {
-    const res = await GET(makeRequest({ lat: "-33.8", lng: "151.2" }));
+  it("returns 400 when east is missing", async () => {
+    const res = await GET(makeRequest({ north: "-33.42", south: "-34.32", west: "150.67" }));
     expect(res.status).toBe(400);
   });
 
-  it("returns 400 for partial string lat (e.g. 123abc)", async () => {
-    const res = await GET(makeRequest({ lat: "123abc", lng: "151.2", radius: "50" }));
+  it("returns 400 when west is missing", async () => {
+    const res = await GET(makeRequest({ north: "-33.42", south: "-34.32", east: "151.75" }));
     expect(res.status).toBe(400);
   });
 
-  it("returns 400 for lat out of range", async () => {
-    const res = await GET(makeRequest({ lat: "999", lng: "151.2", radius: "50" }));
+  it("returns 400 for partial string north (e.g. 123abc)", async () => {
+    const res = await GET(makeRequest({ north: "123abc", south: "-34.32", east: "151.75", west: "150.67" }));
     expect(res.status).toBe(400);
   });
 
-  it("returns 400 for lng out of range", async () => {
-    const res = await GET(makeRequest({ lat: "-33.8", lng: "999", radius: "50" }));
+  it("returns 400 for north out of range", async () => {
+    const res = await GET(makeRequest({ north: "999", south: "-34.32", east: "151.75", west: "150.67" }));
     expect(res.status).toBe(400);
   });
 
-  it("returns 400 for radius of 0", async () => {
-    const res = await GET(makeRequest({ lat: "-33.8", lng: "151.2", radius: "0" }));
+  it("returns 400 for east out of range", async () => {
+    const res = await GET(makeRequest({ north: "-33.42", south: "-34.32", east: "999", west: "150.67" }));
     expect(res.status).toBe(400);
   });
 
-  it("returns 400 for radius over MAX_RADIUS_KM (250)", async () => {
-    const res = await GET(makeRequest({ lat: "-33.8", lng: "151.2", radius: "500" }));
+  it("returns 400 when south >= north", async () => {
+    const res = await GET(makeRequest({ north: "-34.32", south: "-33.42", east: "151.75", west: "150.67" }));
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when west >= east", async () => {
+    const res = await GET(makeRequest({ north: "-33.42", south: "-34.32", east: "150.67", west: "151.75" }));
     expect(res.status).toBe(400);
   });
 

@@ -36,15 +36,14 @@ type Campsite = {
 
 type FetchResult = { results: Campsite[]; hasMore: boolean };
 
-async function fetchCampsites(
-  lat: number,
-  lng: number,
-  radiusKm: number
-): Promise<FetchResult> {
+type Bounds = { north: number; south: number; east: number; west: number };
+
+async function fetchCampsites(bounds: Bounds): Promise<FetchResult> {
   const params = new URLSearchParams({
-    lat: String(lat),
-    lng: String(lng),
-    radius: String(Math.min(Math.max(radiusKm, 1), 250)),
+    north: String(bounds.north),
+    south: String(bounds.south),
+    east:  String(bounds.east),
+    west:  String(bounds.west),
   });
   try {
     const res = await fetch(`/api/campsites?${params}`);
@@ -60,22 +59,32 @@ async function fetchCampsites(
   }
 }
 
-function computeRadius(map: mapboxgl.Map): number {
-  const bounds = map.getBounds();
-  if (!bounds) return 250;
-  const latSpan = (bounds.getNorth() - bounds.getSouth()) / 2;
-  const lngSpan = (bounds.getEast() - bounds.getWest()) / 2;
-  // Apply cos(lat) correction — at ~30°S, 1° lng ≈ 96 km not 111 km
-  const centerLat = (bounds.getNorth() + bounds.getSouth()) / 2;
-  const latSpanKm = latSpan * 111;
-  const lngSpanKm = lngSpan * 111 * Math.cos((centerLat * Math.PI) / 180);
-  return Math.sqrt(latSpanKm ** 2 + lngSpanKm ** 2);
+// Returns the exact lat/lng bounding box of the visible area above the drawer.
+// Uses unproject on canvas pixel coordinates so the drawer-covered area is excluded.
+function computeVisibleBounds(map: mapboxgl.Map, drawerBottomPx: number): Bounds {
+  const w = map.getCanvas().clientWidth;
+  const h = map.getCanvas().clientHeight;
+  const visH = Math.max(h - drawerBottomPx, 1);
+
+  const nw = map.unproject([0, 0]);
+  const se = map.unproject([w, visH]);
+
+  return {
+    north: nw.lat,
+    south: se.lat,
+    east:  se.lng,
+    west:  nw.lng,
+  };
 }
+
+// Height of the visible peek strip (drag handle + result count)
+const PEEK_HEIGHT = 64;
 
 export default function MapView() {
   const [campsites, setCampsites] = useState<Campsite[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(true);
   const [userLocation, setUserLocation] = useState<{
     lat: number;
     lng: number;
@@ -88,6 +97,8 @@ export default function MapView() {
   const skipNextFetch = useRef(false);
   // Monotonic counter — discard results from stale in-flight requests
   const fetchCounterRef = useRef(0);
+  // Mirrors drawerOpen so loadCampsites (a stable useCallback) always reads the latest value
+  const drawerOpenRef = useRef(true);
 
   // Request user geolocation on mount
   useEffect(() => {
@@ -114,9 +125,11 @@ export default function MapView() {
 
   const loadCampsites = useCallback((map: mapboxgl.Map) => {
     const id = ++fetchCounterRef.current;
-    const center = map.getCenter();
-    const radius = computeRadius(map);
-    fetchCampsites(center.lat, center.lng, radius).then(
+    const drawerBottomPx = drawerOpenRef.current
+      ? Math.round(window.innerHeight * 0.4)
+      : PEEK_HEIGHT;
+    const bounds = computeVisibleBounds(map, drawerBottomPx);
+    fetchCampsites(bounds).then(
       ({ results, hasMore }) => {
         if (id !== fetchCounterRef.current) return; // stale fetch — discard
         cardRefs.current = []; // clear stale DOM refs from the previous result set
@@ -127,8 +140,30 @@ export default function MapView() {
     );
   }, []);
 
+  // Keep map padding in sync with drawer state so camera operations (easeTo, flyTo,
+  // getCenter) all treat the visible area above the drawer as the effective viewport.
+  // 40vh when open, PEEK_HEIGHT when collapsed.
+  const applyDrawerPadding = useCallback(
+    (map: mapboxgl.Map, open: boolean) => {
+      const bottomPx = open
+        ? Math.round(window.innerHeight * 0.4)
+        : PEEK_HEIGHT;
+      map.setPadding({ top: 0, right: 0, bottom: bottomPx, left: 0 });
+    },
+    []
+  );
+
+  useEffect(() => {
+    drawerOpenRef.current = drawerOpen;
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+    applyDrawerPadding(map, drawerOpen);
+  }, [drawerOpen, applyDrawerPadding]);
+
   const handleLoad = useCallback(
     (_e: { target: mapboxgl.Map }) => {
+      // Set initial padding so the first flyTo / loadCampsites respects the open drawer.
+      applyDrawerPadding(_e.target, true);
       // Read from ref so we always see the latest geolocation value regardless
       // of when the geolocation promise resolved vs when the map finished loading.
       const loc = userLocationRef.current;
@@ -142,7 +177,7 @@ export default function MapView() {
         loadCampsites(_e.target);
       }
     },
-    [loadCampsites]
+    [loadCampsites, applyDrawerPadding]
   );
 
   const handleMoveEnd = useCallback(
@@ -158,6 +193,7 @@ export default function MapView() {
 
   const selectPin = useCallback(
     (i: number) => {
+      setDrawerOpen(true);
       setSelectedIdx(i);
       const campsite = campsites[i];
       if (campsite && mapRef.current) {
@@ -197,6 +233,8 @@ export default function MapView() {
         mapStyle="mapbox://styles/mapbox/outdoors-v12"
         onLoad={handleLoad}
         onMoveEnd={handleMoveEnd}
+        onDragStart={() => setDrawerOpen(false)}
+        onZoomStart={() => setDrawerOpen(false)}
       >
         {/* User location dot — zIndex must exceed selected pin (10) */}
         {userLocation && (
@@ -301,20 +339,29 @@ export default function MapView() {
       {/* Bottom drawer — z-50 must exceed marker z-index (max 10) to prevent bleed-through */}
       {campsites.length > 0 && (
         <div
-          className="absolute bottom-0 left-0 right-0 rounded-t-2xl shadow-2xl flex flex-col max-h-[40vh] z-50"
+          className="absolute bottom-0 left-0 right-0 rounded-t-2xl shadow-2xl flex flex-col z-50 transition-transform duration-300 ease-in-out"
           style={{
+            height: "40vh",
+            transform: drawerOpen
+              ? "translateY(0)"
+              : `translateY(calc(100% - ${PEEK_HEIGHT}px))`,
             background: SURFACE,
             borderTop: "1.5px solid #e0dbd0",
           }}
         >
-          {/* Drag handle */}
-          <div className="flex justify-center pt-3 pb-2 flex-shrink-0">
-            <div className="w-10 h-1 rounded-full bg-[#e0dbd0]" />
-          </div>
-
-          {/* Result count */}
-          <div className="px-4 pb-2 text-sm font-semibold flex-shrink-0 text-[#2d4a2d]">
-            {resultLabel}
+          {/* Peek strip — always visible, tapping reopens the drawer */}
+          <div
+            className="flex-shrink-0 cursor-pointer"
+            onClick={() => setDrawerOpen(true)}
+          >
+            {/* Drag handle */}
+            <div className="flex justify-center pt-3 pb-2">
+              <div className="w-10 h-1 rounded-full bg-[#e0dbd0]" />
+            </div>
+            {/* Result count */}
+            <div className="px-4 pb-2 text-sm font-semibold text-[#2d4a2d]">
+              {resultLabel}
+            </div>
           </div>
 
           {/* Scrollable card list */}

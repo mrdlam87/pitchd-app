@@ -1,11 +1,10 @@
 // GET /api/campsites
-// Browse mode — returns campsites within a viewport (lat, lng, radius in km)
+// Browse mode — returns campsites within an exact viewport bounding box (north/south/east/west).
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { SyncStatus } from "@/lib/generated/prisma/enums";
 
 const PAGE_SIZE = 20;
-const MAX_RADIUS_KM = 250;
 
 export async function GET(req: Request): Promise<Response> {
   const session = await auth();
@@ -17,51 +16,51 @@ export async function GET(req: Request): Promise<Response> {
 
   // Number() is stricter than parseFloat() — rejects partial strings like "123abc".
   // || NaN handles null/empty-string (missing param) since Number(null) and Number("") both return 0.
-  const lat = Number(searchParams.get("lat") || NaN);
-  const lng = Number(searchParams.get("lng") || NaN);
-  const radius = Number(searchParams.get("radius") || NaN);
+  const north = Number(searchParams.get("north") || NaN);
+  const south = Number(searchParams.get("south") || NaN);
+  const east  = Number(searchParams.get("east")  || NaN);
+  const west  = Number(searchParams.get("west")  || NaN);
   // Guard against non-numeric page values (parseInt("abc") = NaN; NaN || 1 = 1)
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
   // filter(Boolean) drops empty strings from ?amenities= (no value) to avoid matching nothing
   const amenities = searchParams.getAll("amenities").filter(Boolean);
 
-  if (isNaN(lat) || isNaN(lng) || isNaN(radius)) {
+  if (isNaN(north) || isNaN(south) || isNaN(east) || isNaN(west)) {
     return Response.json(
-      { error: "lat, lng, and radius are required" },
+      { error: "north, south, east, and west are required" },
       { status: 400 }
     );
   }
 
-  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+  if (
+    north < -90 || north > 90 ||
+    south < -90 || south > 90 ||
+    east  < -180 || east  > 180 ||
+    west  < -180 || west  > 180
+  ) {
     return Response.json(
-      { error: "lat must be between -90 and 90, lng between -180 and 180" },
+      { error: "coordinates out of range" },
       { status: 400 }
     );
   }
 
-  if (radius <= 0 || radius > MAX_RADIUS_KM) {
+  if (south >= north || west >= east) {
     return Response.json(
-      { error: `radius must be greater than 0 and at most ${MAX_RADIUS_KM} km` },
+      { error: "south must be less than north, west must be less than east" },
       { status: 400 }
     );
   }
-
-  // Bounding box approximation: 1° lat ≈ 111km, 1° lng ≈ 111km * cos(lat)
-  // radius param is in km. cos clamped to avoid division by zero at ±90°.
-  // Note: antimeridian wrapping (lng ± lngDelta overflowing ±180°) is not handled —
-  // not a concern for Australian campsites.
-  // Index note: @@index([syncStatus, lat, lng]) — Postgres can range-scan on syncStatus+lat
-  // but not on lng (second range column in a B-tree). lng is included as a covering hint
-  // to avoid heap fetches on some query plans.
-  const latDelta = radius / 111;
-  const lngDelta = radius / (111 * Math.max(Math.cos((lat * Math.PI) / 180), 0.001));
 
   try {
+    // Index note: @@index([syncStatus, lat, lng]) — Postgres can range-scan on syncStatus+lat
+    // but not on lng (second range column in a B-tree). lng is included as a covering hint
+    // to avoid heap fetches on some query plans.
+    // Note: antimeridian wrapping (east < west) is not handled — not a concern for Australian campsites.
     const campsites = await prisma.campsite.findMany({
       where: {
         syncStatus: SyncStatus.active,
-        lat: { gte: lat - latDelta, lte: lat + latDelta },
-        lng: { gte: lng - lngDelta, lte: lng + lngDelta },
+        lat: { gte: south, lte: north },
+        lng: { gte: west,  lte: east  },
         ...(amenities.length > 0 && {
           amenities: {
             some: {
