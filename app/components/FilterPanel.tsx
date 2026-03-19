@@ -25,7 +25,7 @@ const POI_OPTIONS = [
   { key: "dump_point", label: "Dump points", emoji: "🚐" },
   { key: "water_fill", label: "Water fill", emoji: "💧" },
   { key: "laundromat", label: "Laundromat", emoji: "🧺" },
-  { key: "toilet", label: "Toilets", emoji: "🚻" },
+  { key: "toilets", label: "Toilets", emoji: "🚻" },
 ];
 
 function ToggleChip({
