@@ -216,6 +216,9 @@ function elementToPOIRecord(el: OverpassElement): POIRecord | null {
 }
 
 async function main() {
+  const dryRun = process.argv.includes("--dry-run");
+  if (dryRun) console.log("DRY RUN — no database writes will be made\n");
+
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not set");
 
@@ -290,9 +293,20 @@ async function main() {
       (id) => !fetchedSourceIds.has(id)
     );
 
+    const unchanged = validRecords.filter((r) => existingMap.has(r.sourceId)).length - toUpdate.length;
     console.log(
-      `Processing: ${toInsert.length} to insert, ${toUpdate.length} to update, ${toDelete.length} to delete...`
+      `Would process: ${toInsert.length} to insert, ${toUpdate.length} to update, ${unchanged} unchanged, ${toDelete.length} to delete`
     );
+
+    if (dryRun) {
+      console.log("\nDry run complete — no changes written.");
+      console.log(`  Would insert  : ${toInsert.length}`);
+      console.log(`  Would update  : ${toUpdate.length}`);
+      console.log(`  Would skip    : ${unchanged} (unchanged)`);
+      console.log(`  Would delete  : ${toDelete.length}`);
+      console.log(`  Skipped       : ${skipped} (no coordinate or unrecognised tag)`);
+      return;
+    }
 
     // 6. Insert new records in batches
     const INSERT_BATCH = 500;
@@ -353,7 +367,6 @@ async function main() {
     }
     if (toDelete.length > 0) console.log();
 
-    const unchanged = validRecords.filter((r) => existingMap.has(r.sourceId)).length - toUpdate.length;
     console.log("\nDone.");
     console.log(`  Inserted  : ${inserted}`);
     console.log(`  Updated   : ${updated}`);
