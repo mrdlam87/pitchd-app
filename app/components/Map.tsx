@@ -128,8 +128,21 @@ export default function MapView() {
   }, []);
 
   const handleLoad = useCallback(
-    (e: { target: mapboxgl.Map }) => loadCampsites(e.target),
-    [loadCampsites]
+    (_e: { target: mapboxgl.Map }) => {
+      // If geolocation resolved before the map finished loading, fly there now.
+      // onMoveEnd will handle the campsite load after the fly completes.
+      // Otherwise load campsites at the default viewport immediately.
+      if (userLocation) {
+        mapRef.current?.flyTo({
+          center: [userLocation.lng, userLocation.lat],
+          zoom: 11,
+          duration: 1200,
+        });
+      } else {
+        loadCampsites(_e.target);
+      }
+    },
+    [loadCampsites, userLocation]
   );
 
   const handleMoveEnd = useCallback(
