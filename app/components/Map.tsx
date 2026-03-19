@@ -419,7 +419,7 @@ export default function MapView() {
         minZoom={7}
         onLoad={handleLoad}
         onMoveEnd={handleMoveEnd}
-        onDragStart={() => handleDrawerStateChange("peek")}
+        onDragStart={() => setDrawerState("peek")}
         onClick={() => {
           setSelectedIdx(null);
           selectedIdRef.current = null;
