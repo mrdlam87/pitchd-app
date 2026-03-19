@@ -104,8 +104,24 @@ describe("GET /api/campsites", () => {
     expect(res.status).toBe(400);
   });
 
+  it("returns 400 for south out of range", async () => {
+    const res = await GET(makeRequest({ north: "-33.42", south: "-999", east: "151.75", west: "150.67" }));
+    expect(res.status).toBe(400);
+  });
+
   it("returns 400 for east out of range", async () => {
     const res = await GET(makeRequest({ north: "-33.42", south: "-34.32", east: "999", west: "150.67" }));
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for west out of range", async () => {
+    const res = await GET(makeRequest({ north: "-33.42", south: "-34.32", east: "151.75", west: "-999" }));
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when bounding box is too large", async () => {
+    // lat span > MAX_LAT_SPAN (10°)
+    const res = await GET(makeRequest({ north: "0", south: "-11", east: "151.75", west: "150.67" }));
     expect(res.status).toBe(400);
   });
 

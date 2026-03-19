@@ -92,6 +92,9 @@ export default function MapView() {
   // Ref mirrors state so handleLoad always reads the latest value without
   // needing userLocation as a dependency (onLoad fires only once).
   const userLocationRef = useRef<{ lat: number; lng: number } | null>(null);
+  // True after onLoad fires — guards the geo callback from calling flyTo before
+  // the map is ready (mapRef.current is set at render time, before onLoad).
+  const mapLoadedRef = useRef(false);
   const mapRef = useRef<MapRef>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const skipNextFetch = useRef(false);
@@ -108,13 +111,18 @@ export default function MapView() {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         userLocationRef.current = loc;
         setUserLocation(loc);
-        // If the map is already loaded, fly there now.
-        // If not yet loaded, handleLoad will pick it up from userLocationRef.
-        mapRef.current?.flyTo({
-          center: [loc.lng, loc.lat],
-          zoom: 11,
-          duration: 1200,
-        });
+        // Only fly if the map has fired onLoad — mapRef.current is set at render
+        // time (before onLoad), so without this guard both the geo callback and
+        // handleLoad would each fire a flyTo, causing a spurious cancelled-animation
+        // moveend that triggers a stale loadCampsites call.
+        if (mapLoadedRef.current) {
+          mapRef.current?.flyTo({
+            center: [loc.lng, loc.lat],
+            zoom: 11,
+            duration: 1200,
+            padding: { top: 0, right: 0, bottom: Math.round(window.innerHeight * 0.4), left: 0 },
+          });
+        }
       },
       () => {
         /* denied or unavailable — map stays at DEFAULT_VIEWPORT (Sydney) */
@@ -136,40 +144,27 @@ export default function MapView() {
       ({ results, hasMore }) => {
         if (id !== fetchCounterRef.current) return; // stale fetch — discard
         cardRefs.current = []; // clear stale DOM refs from the previous result set
-        setCampsites(results);
+        // Use functional updater to read current campsites count without adding
+        // campsites as a dependency (which would re-create the callback on every result).
+        // Re-open the drawer only on 0 → results transition so it doesn't spring
+        // back open immediately after every drag.
+        setCampsites((prev) => {
+          if (results.length > 0 && prev.length === 0) setDrawerOpen(true);
+          return results;
+        });
         setHasMore(hasMore);
         setSelectedIdx(null);
-        // Re-open the drawer whenever fresh results arrive so it doesn't stay
-        // collapsed after a zero-result → result cycle.
-        if (results.length > 0) setDrawerOpen(true);
       }
     );
   }, []);
 
-  // Keep map padding in sync with drawer state so camera operations (easeTo, flyTo,
-  // getCenter) all treat the visible area above the drawer as the effective viewport.
-  // 40vh when open, PEEK_HEIGHT when collapsed.
-  const applyDrawerPadding = useCallback(
-    (map: mapboxgl.Map, open: boolean) => {
-      const bottomPx = open
-        ? Math.round(window.innerHeight * 0.4)
-        : PEEK_HEIGHT;
-      map.setPadding({ top: 0, right: 0, bottom: bottomPx, left: 0 });
-    },
-    []
-  );
-
   useEffect(() => {
     drawerOpenRef.current = drawerOpen;
-    const map = mapRef.current?.getMap();
-    if (!map) return;
-    applyDrawerPadding(map, drawerOpen);
-  }, [drawerOpen, applyDrawerPadding]);
+  }, [drawerOpen]);
 
   const handleLoad = useCallback(
     (_e: { target: mapboxgl.Map }) => {
-      // Set initial padding so the first flyTo / loadCampsites respects the open drawer.
-      applyDrawerPadding(_e.target, true);
+      mapLoadedRef.current = true;
       // Read from ref so we always see the latest geolocation value regardless
       // of when the geolocation promise resolved vs when the map finished loading.
       const loc = userLocationRef.current;
@@ -178,12 +173,13 @@ export default function MapView() {
           center: [loc.lng, loc.lat],
           zoom: 11,
           duration: 1200,
+          padding: { top: 0, right: 0, bottom: Math.round(window.innerHeight * 0.4), left: 0 },
         });
       } else {
         loadCampsites(_e.target);
       }
     },
-    [loadCampsites, applyDrawerPadding]
+    [loadCampsites]
   );
 
   const handleMoveEnd = useCallback(
@@ -210,6 +206,7 @@ export default function MapView() {
         mapRef.current.easeTo({
           center: [campsite.lng, campsite.lat],
           duration: 300,
+          padding: { top: 0, right: 0, bottom: Math.round(window.innerHeight * 0.4), left: 0 },
         });
       }
       requestAnimationFrame(() => {
@@ -241,7 +238,6 @@ export default function MapView() {
         onLoad={handleLoad}
         onMoveEnd={handleMoveEnd}
         onDragStart={() => setDrawerOpen(false)}
-        onZoomStart={() => setDrawerOpen(false)}
       >
         {/* User location dot — zIndex must exceed selected pin (10) */}
         {userLocation && (
