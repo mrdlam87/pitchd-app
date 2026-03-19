@@ -74,6 +74,9 @@ model AmenityPOI {
   verified      Boolean     @default(false)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+
+  @@unique([source, sourceId])
+  @@index([amenityTypeId, lat, lng])
 }
 
 model WeatherCache {
