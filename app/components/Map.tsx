@@ -86,6 +86,10 @@ const PEEK_HEIGHT = 64;
 // typically < 60px and acceptable for MVP.
 const drawerOpenPx = (): number => Math.round(window.innerHeight * 0.4);
 
+// Must match the inline `transition: transform ${DRAWER_TRANSITION_MS}ms ease-in-out`
+// style on the drawer div.
+const DRAWER_TRANSITION_MS = 300;
+
 const EMPTY_FILTERS: FilterState = { activities: [], pois: [] };
 
 export default function MapView() {
@@ -118,6 +122,12 @@ export default function MapView() {
   // Tracks the previous fetch's result count so loadCampsites can detect 0 → results
   // transitions without calling a state setter inside another setter's updater function.
   const prevCampsitesLengthRef = useRef(0);
+  // Mirrors the selected campsite's ID so loadCampsites (stable callback) can
+  // re-resolve the selection index after a fetch without needing selectedIdx as a dep.
+  const selectedIdRef = useRef<string | null>(null);
+  // Tracks the deferred scrollIntoView timeout so rapid pin clicks cancel the
+  // previous pending scroll, and so it can be cleaned up on unmount.
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Request user geolocation on mount
   useEffect(() => {
@@ -171,7 +181,12 @@ export default function MapView() {
         prevCampsitesLengthRef.current = results.length;
         setCampsites(results);
         setHasMore(hasMore);
-        setSelectedIdx(null);
+        // Preserve selection if the campsite is still in the new result set
+        const newIdx = selectedIdRef.current
+          ? results.findIndex((c) => c.id === selectedIdRef.current)
+          : -1;
+        setSelectedIdx(newIdx >= 0 ? newIdx : null);
+        if (newIdx < 0) selectedIdRef.current = null;
       }
     );
   }, []);
@@ -179,6 +194,13 @@ export default function MapView() {
   useEffect(() => {
     drawerOpenRef.current = drawerOpen;
   }, [drawerOpen]);
+
+  // Clear any pending deferred scroll on unmount to avoid a setState-after-unmount warning.
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current !== null) clearTimeout(scrollTimeoutRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     activeFiltersRef.current = activeFilters;
@@ -198,6 +220,15 @@ export default function MapView() {
           padding: { top: 0, right: 0, bottom: drawerOpenPx(), left: 0 },
         });
       } else {
+        // No user location — set the initial camera padding to match the open
+        // drawer so the first pin click doesn't also animate a 0→40vh padding
+        // change (which would shift the camera upward at the same time the
+        // drawer CSS transition slides up, causing a double-focus bounce).
+        // setPadding internally calls easeTo(duration:0) which fires moveend —
+        // suppress the resulting handleMoveEnd fetch since loadCampsites is
+        // called explicitly right after.
+        skipNextFetch.current = true;
+        _e.target.setPadding({ top: 0, right: 0, bottom: drawerOpenPx(), left: 0 });
         loadCampsites(_e.target);
       }
     },
@@ -216,11 +247,12 @@ export default function MapView() {
   );
 
   const selectPin = useCallback(
-    (i: number) => {
+    (i: number, animate = true) => {
       setDrawerOpen(true);
       setSelectedIdx(i);
       const campsite = campsites[i];
-      if (campsite && mapRef.current) {
+      selectedIdRef.current = campsite?.id ?? null;
+      if (animate && campsite && mapRef.current) {
         // Known edge case: a manual pan that starts during the 300ms easeTo animation
         // will have its moveend consumed by this flag (no refetch fires for that gesture).
         // Low-frequency and acceptable for MVP.
@@ -231,12 +263,27 @@ export default function MapView() {
           padding: { top: 0, right: 0, bottom: drawerOpenPx(), left: 0 },
         });
       }
-      requestAnimationFrame(() => {
-        cardRefs.current[i]?.scrollIntoView({
-          behavior: "smooth",
-          block: "nearest",
+      if (animate) {
+        // Card click — drawer is already open, scroll immediately
+        requestAnimationFrame(() => {
+          cardRefs.current[i]?.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+          });
         });
-      });
+      } else {
+        // Pin click — drawer is animating open. Delaying scrollIntoView until
+        // after the transition prevents a mid-animation scroll from shifting the
+        // map. Cancel any pending scroll from a previous rapid pin click first.
+        if (scrollTimeoutRef.current !== null) clearTimeout(scrollTimeoutRef.current);
+        scrollTimeoutRef.current = setTimeout(() => {
+          scrollTimeoutRef.current = null;
+          cardRefs.current[i]?.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+          });
+        }, DRAWER_TRANSITION_MS);
+      }
     },
     [campsites]
   );
@@ -268,7 +315,7 @@ export default function MapView() {
   const filterCount = activeFilters.activities.length + activeFilters.pois.length;
 
   return (
-    <div className="relative h-full w-full">
+    <div className="relative h-full w-full overflow-hidden">
       {/* Filter panel overlay */}
       {showFilters && (
         <FilterPanel
@@ -360,12 +407,12 @@ export default function MapView() {
                 className="relative flex flex-col items-center cursor-pointer select-none"
                 onClick={(e) => {
                   e.stopPropagation();
-                  selectPin(i);
+                  selectPin(i, false);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
-                    selectPin(i);
+                    selectPin(i, false);
                   }
                 }}
                 aria-label={`Select campsite ${i + 1}: ${campsite.name}`}
@@ -426,12 +473,13 @@ export default function MapView() {
       {/* Bottom drawer — z-50 must exceed marker z-index (max 10) to prevent bleed-through */}
       {campsites.length > 0 && (
         <div
-          className="absolute bottom-0 left-0 right-0 rounded-t-2xl shadow-2xl flex flex-col z-50 transition-transform duration-300 ease-in-out"
+          className="absolute bottom-0 left-0 right-0 rounded-t-2xl shadow-2xl flex flex-col z-50"
           style={{
             height: "40vh",
             transform: drawerOpen
               ? "translateY(0)"
               : `translateY(calc(100% - ${PEEK_HEIGHT}px))`,
+            transition: `transform ${DRAWER_TRANSITION_MS}ms ease-in-out`,
             background: SURFACE,
             borderTop: "1.5px solid #e0dbd0",
           }}
