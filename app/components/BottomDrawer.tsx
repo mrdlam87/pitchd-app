@@ -4,7 +4,6 @@ import { useRef, useState } from "react";
 import { CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
 import type { AmenityPOI, Campsite, POIMeta } from "@/types/map";
 
-export type { AmenityPOI, Campsite, POIMeta };
 export type DrawerState = "peek" | "half" | "full";
 
 // ── Heights ────────────────────────────────────────────────────────────────────
@@ -15,14 +14,19 @@ export const PEEK_HEIGHT_PX = 64;
 // can use it to delay scrollIntoView until the animation has settled.
 export const DRAWER_TRANSITION_MS = 300;
 
+// Viewport-height fractions for half and full states — single source of truth
+// shared by both the CSS height string and the Mapbox px calculation below.
+const HALF_VH = 0.52;
+const FULL_VH = 0.82;
+
 /**
  * Returns the drawer height in px for a given state.
  * Client-only — reads window.innerHeight. Do not call during SSR or in render.
  */
 export function getDrawerHeightPx(state: DrawerState): number {
   if (state === "peek") return PEEK_HEIGHT_PX;
-  if (state === "half") return Math.round(window.innerHeight * 0.52);
-  return Math.round(window.innerHeight * 0.82);
+  if (state === "half") return Math.round(window.innerHeight * HALF_VH);
+  return Math.round(window.innerHeight * FULL_VH);
 }
 
 // ── Drive time estimate ────────────────────────────────────────────────────────
@@ -212,26 +216,21 @@ function POICard({ poi, meta }: { poi: AmenityPOI; meta: POIMeta }) {
 
 function DrawerContentList({
   campsites,
-  amenityPois,
+  selectedPoi,
   poiMeta,
   selectedIdx,
-  selectedPoiId,
   userLocation,
   cardRefs,
   onSelectPin,
 }: {
   campsites: Campsite[];
-  amenityPois: AmenityPOI[];
+  selectedPoi: AmenityPOI | null;
   poiMeta: Record<string, POIMeta>;
   selectedIdx: number | null;
-  selectedPoiId: string | null;
   userLocation: { lat: number; lng: number } | null;
   cardRefs: React.MutableRefObject<(HTMLDivElement | null)[]>;
   onSelectPin: (i: number) => void;
 }) {
-  const selectedPoi = selectedPoiId
-    ? amenityPois.find((p) => p.id === selectedPoiId) ?? null
-    : null;
   const selectedPoiMeta = selectedPoi
     ? (poiMeta[selectedPoi.amenityType.key] ?? { emoji: "📍", label: selectedPoi.amenityType.key, color: FOREST_GREEN })
     : null;
@@ -328,6 +327,12 @@ export default function BottomDrawer({
     setIsDragging(true);
     // Constrain: don't drag past drawer's natural height
     setDragOffsetY(Math.max(0, dy));
+    // Prevent the page from scrolling while the user is dragging the drawer.
+    // Note: React registers touch handlers as passive by default in some environments,
+    // which means preventDefault() may be silently ignored in mobile WebViews. If
+    // scroll-bleed becomes an issue, switch to a native addEventListener with
+    // { passive: false } via useEffect.
+    e.preventDefault();
   }
 
   function handleTouchEnd(e: React.TouchEvent) {
@@ -344,7 +349,11 @@ export default function BottomDrawer({
   }
 
   const drawerHeightStyle =
-    drawerState === "peek" ? "64px" : drawerState === "half" ? "52vh" : "82vh";
+    drawerState === "peek"
+      ? `${PEEK_HEIGHT_PX}px`
+      : drawerState === "half"
+      ? `${HALF_VH * 100}vh`
+      : `${FULL_VH * 100}vh`;
 
   // Peek state: show selected card (or first card) without scrolling
   const peekIdx = selectedIdx ?? 0;
@@ -367,10 +376,11 @@ export default function BottomDrawer({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Peek strip — drag handle + summary row. Tapping toggles between peek and half. */}
+      {/* Peek strip — drag handle + summary row.
+          Tapping steps down (full→half, half→peek) or expands from peek to half. */}
       <div
         className="flex-shrink-0 cursor-pointer select-none"
-        onClick={() => onDrawerStateChange(drawerState === "peek" ? "half" : "peek")}
+        onClick={() => onDrawerStateChange(drawerState === "peek" ? "half" : cycleDown(drawerState))}
       >
         {/* Drag handle */}
         <div className="flex justify-center pt-3 pb-2">
@@ -407,10 +417,9 @@ export default function BottomDrawer({
       {drawerState !== "peek" && (
         <DrawerContentList
           campsites={campsites}
-          amenityPois={amenityPois}
+          selectedPoi={selectedPoi}
           poiMeta={poiMeta}
           selectedIdx={selectedIdx}
-          selectedPoiId={selectedPoiId}
           userLocation={userLocation}
           cardRefs={cardRefs}
           onSelectPin={onSelectPin}
