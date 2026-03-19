@@ -58,7 +58,7 @@ async function parseIntentWithClaude(query: string): Promise<ParsedIntent> {
       {
         role: "user",
         content: `Parse this Australian camping search query and extract structured intent.
-Query: "${query}"
+<query>${query}</query>
 Today: ${today}
 
 Return ONLY this JSON shape:
@@ -113,13 +113,22 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: "query is required" }, { status: 400 });
   }
 
+  if (query.trim().length > 500) {
+    return Response.json({ error: "query is too long" }, { status: 400 });
+  }
+
   // Number() is stricter than parseFloat() — rejects partial strings like "123abc".
   // || NaN handles null/undefined/empty since Number(null) and Number("") both return 0.
-  const userLat = Number(lat ?? NaN);
-  const userLng = Number(lng ?? NaN);
+  // Note: ?? would NOT handle empty string ("" ?? NaN === ""), so || is required here.
+  const userLat = Number(lat || NaN);
+  const userLng = Number(lng || NaN);
 
   if (isNaN(userLat) || isNaN(userLng)) {
     return Response.json({ error: "lat and lng are required" }, { status: 400 });
+  }
+
+  if (userLat < -90 || userLat > 90 || userLng < -180 || userLng > 180) {
+    return Response.json({ error: "lat/lng out of range" }, { status: 400 });
   }
 
   try {

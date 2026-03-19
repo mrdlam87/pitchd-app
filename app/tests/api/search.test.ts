@@ -136,8 +136,22 @@ describe("POST /api/search", () => {
     expect(body.error).toMatch(/query/i);
   });
 
+  it("returns 400 when query exceeds 500 characters", async () => {
+    const res = await POST(makeRequest({ query: "a".repeat(501), lat: SYDNEY_LAT, lng: SYDNEY_LNG }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/too long/i);
+  });
+
   it("returns 400 when lat is missing", async () => {
     const res = await POST(makeRequest({ query: "camping near Sydney", lng: SYDNEY_LNG }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/lat/i);
+  });
+
+  it("returns 400 when lat is an empty string", async () => {
+    const res = await POST(makeRequest({ query: "camping near Sydney", lat: "", lng: SYDNEY_LNG }));
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toMatch(/lat/i);
@@ -148,6 +162,20 @@ describe("POST /api/search", () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toMatch(/lng/i);
+  });
+
+  it("returns 400 when lat is out of range", async () => {
+    const res = await POST(makeRequest({ query: "camping", lat: 9999, lng: SYDNEY_LNG }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/out of range/i);
+  });
+
+  it("returns 400 when lng is out of range", async () => {
+    const res = await POST(makeRequest({ query: "camping", lat: SYDNEY_LAT, lng: 9999 }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/out of range/i);
   });
 
   it("returns 400 for invalid JSON body", async () => {
