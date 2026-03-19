@@ -45,7 +45,8 @@ export async function GET(req: Request): Promise<Response> {
     );
   }
 
-  if (lat < -90 || lat > 90) {
+  // Exclude poles: Math.cos(±π/2) ≈ 6e-17, which makes deltaLng effectively infinite.
+  if (lat <= -90 || lat >= 90) {
     return Response.json({ error: "lat out of range" }, { status: 400 });
   }
 
@@ -55,7 +56,7 @@ export async function GET(req: Request): Promise<Response> {
 
   if (radius <= 0 || radius > MAX_RADIUS_KM) {
     return Response.json(
-      { error: `radius must be between 0 and ${MAX_RADIUS_KM}` },
+      { error: `radius must be > 0 and ≤ ${MAX_RADIUS_KM}` },
       { status: 400 }
     );
   }

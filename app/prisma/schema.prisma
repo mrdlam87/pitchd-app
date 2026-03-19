@@ -75,6 +75,7 @@ model AmenityPOI {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
+  @@unique([source, sourceId])
   @@index([amenityTypeId, lat, lng])
 }
 

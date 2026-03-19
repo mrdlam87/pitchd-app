@@ -162,13 +162,12 @@ describe("GET /api/amenities", () => {
 
     const found = results.find((p: { id: string }) => p.id === poi.id);
     expect(found).toBeDefined();
-    expect(found).toMatchObject({
-      id: expect.any(String),
-      name: expect.any(String),
-      lat: expect.any(Number),
-      lng: expect.any(Number),
-      amenityType: { key: dumpPointTypeKey },
-    });
+    // name is String? in schema — can be null for unnamed POIs
+    expect(found.id).toEqual(expect.any(String));
+    expect(found.name === null || typeof found.name === "string").toBe(true);
+    expect(found.lat).toEqual(expect.any(Number));
+    expect(found.lng).toEqual(expect.any(Number));
+    expect(found.amenityType).toEqual({ key: dumpPointTypeKey });
     // amenityTypeId (opaque UUID) is not included — amenityType.key makes it redundant
     expect(found.amenityTypeId).toBeUndefined();
   });
