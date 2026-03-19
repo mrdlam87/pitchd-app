@@ -40,11 +40,12 @@ type AmenityPOI = {
 };
 
 // Local metadata for each POI type — matches FilterPanel POI_OPTIONS and AmenityType seed data.
+// Colors and icons must stay in sync with the AmenityType seed data in prisma/seed.ts.
 const POI_META: Record<string, { emoji: string; label: string; color: string }> = {
-  dump_point: { emoji: "🚐", label: "Dump point", color: "#6b7280" },
-  water_fill: { emoji: "💧", label: "Water fill", color: "#3b82f6" },
-  laundromat: { emoji: "🧺", label: "Laundromat", color: "#8b5cf6" },
-  toilets:    { emoji: "🚻", label: "Toilets",    color: "#10b981" },
+  dump_point: { emoji: "🚐", label: "Dump point", color: "#c8870a" },
+  water_fill: { emoji: "💧", label: "Water fill", color: "#2a8ab0" },
+  laundromat: { emoji: "🧺", label: "Laundromat", color: "#7a6ab0" },
+  toilets:    { emoji: "🚻", label: "Toilets",    color: "#4a9e6a" },
 };
 
 type FetchResult = { results: Campsite[]; hasMore: boolean };
@@ -595,6 +596,7 @@ export default function MapView() {
                 }}
                 aria-label={`Select ${meta.label}${poi.name ? `: ${poi.name}` : ""}`}
               >
+                {/* Same teardrop SVG as campsite pins — white fill, coloured border */}
                 <svg
                   style={{
                     width: pinW,
@@ -608,25 +610,33 @@ export default function MapView() {
                 >
                   <path
                     d="M13 1.5C7.2 1.5 2.5 6.2 2.5 12C2.5 18.5 9 24 13 26C17 24 23.5 18.5 23.5 12C23.5 6.2 18.8 1.5 13 1.5Z"
-                    fill={meta.color}
+                    fill="#fff"
                     stroke={meta.color}
-                    strokeWidth="1.5"
+                    strokeWidth={isSel ? "2.5" : "1.5"}
                   />
-                  <text
-                    x="13"
-                    y="12.5"
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fontSize={isSel ? 12 : 10}
-                  >
-                    {meta.emoji}
-                  </text>
                 </svg>
-                {/* Name label */}
+                {/* Emoji rendered as HTML so it uses the system emoji font — SVG <text> renders poorly */}
+                <div
+                  className="absolute pointer-events-none"
+                  style={{
+                    fontSize: isSel ? 12 : 10,
+                    lineHeight: 1,
+                    // Centre over the circle (top ~70% of pinH)
+                    top: 0,
+                    width: pinW,
+                    height: Math.round(pinH * 0.72),
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {meta.emoji}
+                </div>
+                {/* Name label — FOREST_GREEN matches campsite labels for consistent readability */}
                 <div
                   className={`absolute left-full top-1/2 -translate-y-1/2 ml-1 w-max max-w-[140px] leading-tight ${isSel ? "font-bold" : "font-semibold"}`}
                   style={{
-                    color: meta.color,
+                    color: FOREST_GREEN,
                     fontFamily: "var(--font-dm-sans), sans-serif",
                     fontSize: isSel ? 11 : 10,
                     textShadow:
