@@ -12,6 +12,11 @@
   --font-serif: var(--font-lora);
 }
 
+html,
+body {
+  overflow: hidden;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

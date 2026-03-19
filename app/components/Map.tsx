@@ -198,6 +198,11 @@ export default function MapView() {
           padding: { top: 0, right: 0, bottom: drawerOpenPx(), left: 0 },
         });
       } else {
+        // No user location — set the initial camera padding to match the open
+        // drawer so the first pin click doesn't also animate a 0→40vh padding
+        // change (which would shift the camera upward at the same time the
+        // drawer CSS transition slides up, causing a double-focus bounce).
+        _e.target.setPadding({ top: 0, right: 0, bottom: drawerOpenPx(), left: 0 });
         loadCampsites(_e.target);
       }
     },
@@ -216,11 +221,11 @@ export default function MapView() {
   );
 
   const selectPin = useCallback(
-    (i: number) => {
+    (i: number, fly = true) => {
       setDrawerOpen(true);
       setSelectedIdx(i);
       const campsite = campsites[i];
-      if (campsite && mapRef.current) {
+      if (fly && campsite && mapRef.current) {
         // Known edge case: a manual pan that starts during the 300ms easeTo animation
         // will have its moveend consumed by this flag (no refetch fires for that gesture).
         // Low-frequency and acceptable for MVP.
@@ -231,12 +236,25 @@ export default function MapView() {
           padding: { top: 0, right: 0, bottom: drawerOpenPx(), left: 0 },
         });
       }
-      requestAnimationFrame(() => {
-        cardRefs.current[i]?.scrollIntoView({
-          behavior: "smooth",
-          block: "nearest",
+      if (fly) {
+        // Card click — drawer is already open, scroll immediately
+        requestAnimationFrame(() => {
+          cardRefs.current[i]?.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+          });
         });
-      });
+      } else {
+        // Pin click — drawer is animating open (300ms). Delaying scrollIntoView
+        // until after the transition prevents the browser from trying to scroll
+        // the card into view mid-animation, which was causing the map to shift.
+        setTimeout(() => {
+          cardRefs.current[i]?.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+          });
+        }, 300);
+      }
     },
     [campsites]
   );
@@ -360,12 +378,12 @@ export default function MapView() {
                 className="relative flex flex-col items-center cursor-pointer select-none"
                 onClick={(e) => {
                   e.stopPropagation();
-                  selectPin(i);
+                  selectPin(i, false);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
-                    selectPin(i);
+                    selectPin(i, false);
                   }
                 }}
                 aria-label={`Select campsite ${i + 1}: ${campsite.name}`}
