@@ -5,7 +5,14 @@ import MapGL, { Marker, type MapRef } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import FilterPanel, { type FilterState } from "./FilterPanel";
-import { CORAL, FOREST_GREEN, SURFACE } from "@/lib/tokens";
+import BottomDrawer, {
+  type DrawerState,
+  PEEK_HEIGHT_PX,
+  DRAWER_TRANSITION_MS,
+  getDrawerHeightPx,
+} from "./BottomDrawer";
+import type { AmenityPOI, Campsite } from "@/types/map";
+import { CORAL, FOREST_GREEN } from "@/lib/tokens";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -18,25 +25,6 @@ const DEFAULT_VIEWPORT = {
   longitude: 151.2093,
   latitude: -33.8688,
   zoom: 10,
-};
-
-type Campsite = {
-  id: string;
-  name: string;
-  lat: number;
-  lng: number;
-  region: string | null;
-  blurb: string | null;
-  // amenities populated in M4 — always returned by the API but not yet used in UI
-  amenities: { key: string; label: string; icon: string; color: string }[];
-};
-
-type AmenityPOI = {
-  id: string;
-  name: string | null;
-  lat: number;
-  lng: number;
-  amenityType: { key: string };
 };
 
 // Local metadata for each POI type — matches FilterPanel POI_OPTIONS and AmenityType seed data.
@@ -82,10 +70,8 @@ async function fetchAmenities(bounds: Bounds, poiTypes: string[]): Promise<Ameni
 
   const centerLat = (bounds.north + bounds.south) / 2;
   const centerLng = (bounds.east  + bounds.west)  / 2;
-  // Half-diagonal of the bounding box in km — ensures the circle covers the full viewport.
   const latKm = ((bounds.north - bounds.south) / 2) * 111.32;
   const lngKm = ((bounds.east  - bounds.west)  / 2) * 111.32 * Math.cos((centerLat * Math.PI) / 180);
-  // Clamp to the API's MAX_RADIUS_KM limit — exceeding it returns a 400 and silently drops pins.
   const radius = Math.min(Math.ceil(Math.sqrt(latKm * latKm + lngKm * lngKm)), 500);
 
   const fetches = poiTypes.map(async (type) => {
@@ -115,11 +101,10 @@ async function fetchAmenities(bounds: Bounds, poiTypes: string[]): Promise<Ameni
 }
 
 // Returns the exact lat/lng bounding box of the visible area above the drawer.
-// Uses unproject on canvas pixel coordinates so the drawer-covered area is excluded.
-function computeVisibleBounds(map: mapboxgl.Map, drawerBottomPx: number): Bounds {
+function computeVisibleBounds(map: mapboxgl.Map, drawerHeightPx: number): Bounds {
   const w = map.getCanvas().clientWidth;
   const h = map.getCanvas().clientHeight;
-  const visH = Math.max(h - drawerBottomPx, 1);
+  const visH = Math.max(h - drawerHeightPx, 1);
 
   const nw = map.unproject([0, 0]);
   const se = map.unproject([w, visH]);
@@ -132,20 +117,6 @@ function computeVisibleBounds(map: mapboxgl.Map, drawerBottomPx: number): Bounds
   };
 }
 
-// Height of the visible peek strip (drag handle + result count).
-// Intentionally a few px larger than the ~52px rendered height so the
-// translateY never clips content and computeVisibleBounds stays conservative.
-const PEEK_HEIGHT = 64;
-
-// Drawer open height in px — mirrors the CSS `height: "40vh"`.
-// Note: window.innerHeight is the visual viewport on mobile (shrinks when the
-// address bar is visible) while 40vh is the layout viewport; difference is
-// typically < 60px and acceptable for MVP.
-const drawerOpenPx = (): number => Math.round(window.innerHeight * 0.4);
-
-// Must match the inline `transition: transform ${DRAWER_TRANSITION_MS}ms ease-in-out`
-// style on the drawer div.
-const DRAWER_TRANSITION_MS = 300;
 
 const EMPTY_FILTERS: FilterState = { activities: [], pois: [] };
 
@@ -155,16 +126,13 @@ export default function MapView() {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [amenityPois, setAmenityPois] = useState<AmenityPOI[]>([]);
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(true);
+  const [drawerState, setDrawerState] = useState<DrawerState>("peek");
   const [showFilters, setShowFilters] = useState(false);
   const [activeFilters, setActiveFilters] = useState<FilterState>(EMPTY_FILTERS);
   // Ref mirrors state so loadCampsites always reads the latest filters without
   // needing activeFilters as a dependency (the callback is stable).
   const activeFiltersRef = useRef<FilterState>(EMPTY_FILTERS);
-  const [userLocation, setUserLocation] = useState<{
-    lat: number;
-    lng: number;
-  } | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   // Ref mirrors state so handleLoad always reads the latest value without
   // needing userLocation as a dependency (onLoad fires only once).
   const userLocationRef = useRef<{ lat: number; lng: number } | null>(null);
@@ -173,13 +141,15 @@ export default function MapView() {
   const mapLoadedRef = useRef(false);
   const mapRef = useRef<MapRef>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+  // skipNextFetch suppresses the moveend handler for one event — used when code
+  // calls easeTo/setPadding programmatically to avoid triggering a redundant fetch.
   const skipNextFetch = useRef(false);
   // Monotonic counter — discard results from stale in-flight requests
   const fetchCounterRef = useRef(0);
   // Separate counter for amenity fetches — same stale-discard pattern
   const amenityFetchCounterRef = useRef(0);
-  // Mirrors drawerOpen so loadCampsites (a stable useCallback) always reads the latest value
-  const drawerOpenRef = useRef(true);
+  // Mirrors drawerState so loadCampsites (a stable useCallback) always reads the latest value
+  const drawerStateRef = useRef<DrawerState>("peek");
   // Tracks the previous fetch's result count so loadCampsites can detect 0 → results
   // transitions without calling a state setter inside another setter's updater function.
   const prevCampsitesLengthRef = useRef(0);
@@ -198,76 +168,61 @@ export default function MapView() {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         userLocationRef.current = loc;
         setUserLocation(loc);
-        // Only fly if the map has fired onLoad — mapRef.current is set at render
-        // time (before onLoad), so without this guard both the geo callback and
-        // handleLoad would each fire a flyTo, causing a spurious cancelled-animation
-        // moveend that triggers a stale loadCampsites call.
         if (mapLoadedRef.current) {
           mapRef.current?.flyTo({
             center: [loc.lng, loc.lat],
             zoom: 11,
             duration: 1200,
-            padding: { top: 0, right: 0, bottom: drawerOpenPx(), left: 0 },
+            padding: { top: 0, right: 0, bottom: getDrawerHeightPx(drawerStateRef.current), left: 0 },
           });
         }
       },
-      () => {
-        /* denied or unavailable — map stays at DEFAULT_VIEWPORT (Sydney) */
-      },
+      () => { /* denied or unavailable — map stays at DEFAULT_VIEWPORT (Sydney) */ },
       { timeout: 10_000 }
     );
   }, []);
 
   const loadCampsites = useCallback((map: mapboxgl.Map) => {
     const id = ++fetchCounterRef.current;
-    // Note: window.innerHeight reflects the visual viewport on mobile (shrinks when the
-    // browser address bar is visible), while the CSS "40vh" is relative to the layout
-    // viewport. The difference is typically < 60px and acceptable for MVP.
-    const drawerBottomPx = drawerOpenRef.current
-      ? drawerOpenPx()
-      : PEEK_HEIGHT;
-    const bounds = computeVisibleBounds(map, drawerBottomPx);
+    const bounds = computeVisibleBounds(map, getDrawerHeightPx(drawerStateRef.current));
     const filters = activeFiltersRef.current;
     const amenities = [...filters.activities, ...filters.pois];
-    fetchCampsites(bounds, amenities).then(
-      ({ results, hasMore }) => {
-        if (id !== fetchCounterRef.current) return; // stale fetch — discard
-        cardRefs.current = []; // clear stale DOM refs from the previous result set
-        // Re-open the drawer only on 0 → results transition so it doesn't spring
-        // back open immediately after every drag. Uses a ref instead of a functional
-        // updater to avoid calling a state setter inside another setter (anti-pattern).
-        if (results.length > 0 && prevCampsitesLengthRef.current === 0) {
-          setDrawerOpen(true);
-        }
-        prevCampsitesLengthRef.current = results.length;
-        setCampsites(results);
-        setHasMore(hasMore);
-        // Preserve selection if the campsite is still in the new result set
-        const newIdx = selectedIdRef.current
-          ? results.findIndex((c) => c.id === selectedIdRef.current)
-          : -1;
-        setSelectedIdx(newIdx >= 0 ? newIdx : null);
-        if (newIdx < 0) selectedIdRef.current = null;
+    fetchCampsites(bounds, amenities).then(({ results, hasMore }) => {
+      if (id !== fetchCounterRef.current) return; // stale fetch — discard
+      cardRefs.current = [];
+      // Re-open to half only on 0 → results transition.
+      // Also sync map padding so Mapbox knows the drawer now covers ~52vh —
+      // without this, pin centering and bounds computation stay at PEEK_HEIGHT_PX
+      // until the next user-triggered easeTo. skipNextFetch suppresses the
+      // moveend that setPadding's internal easeTo(duration:0) fires.
+      if (results.length > 0 && prevCampsitesLengthRef.current === 0) {
+        setDrawerState("half");
+        skipNextFetch.current = true;
+        map.setPadding({ top: 0, right: 0, bottom: getDrawerHeightPx("half"), left: 0 });
       }
-    );
+      prevCampsitesLengthRef.current = results.length;
+      setCampsites(results);
+      setHasMore(hasMore);
+      const newIdx = selectedIdRef.current
+        ? results.findIndex((c) => c.id === selectedIdRef.current)
+        : -1;
+      setSelectedIdx(newIdx >= 0 ? newIdx : null);
+      if (newIdx < 0) selectedIdRef.current = null;
+    });
   }, []);
 
   const loadAmenities = useCallback((map: mapboxgl.Map) => {
     const poiTypes = activeFiltersRef.current.pois;
-    // Early-return before touching the counter — no HTTP will be made and no
-    // stale-discard is needed. Also clears any lingering pins from a previous filter state.
     if (poiTypes.length === 0) {
       setAmenityPois([]);
       setSelectedPoiId(null);
       return;
     }
     const id = ++amenityFetchCounterRef.current;
-    const drawerBottomPx = drawerOpenRef.current ? drawerOpenPx() : PEEK_HEIGHT;
-    const bounds = computeVisibleBounds(map, drawerBottomPx);
+    const bounds = computeVisibleBounds(map, getDrawerHeightPx(drawerStateRef.current));
     fetchAmenities(bounds, poiTypes).then((results) => {
-      if (id !== amenityFetchCounterRef.current) return; // stale — discard
+      if (id !== amenityFetchCounterRef.current) return;
       setAmenityPois(results);
-      // Clear POI selection if the selected POI is no longer in the result set
       setSelectedPoiId((prev) =>
         prev && results.some((p) => p.id === prev) ? prev : null
       );
@@ -275,10 +230,24 @@ export default function MapView() {
   }, []);
 
   useEffect(() => {
-    drawerOpenRef.current = drawerOpen;
-  }, [drawerOpen]);
+    drawerStateRef.current = drawerState;
+  }, [drawerState]);
 
-  // Clear any pending deferred scroll on unmount to avoid a setState-after-unmount warning.
+  // Passed to BottomDrawer as onDrawerStateChange. Syncs Mapbox camera padding
+  // alongside the React state so that subsequent easeTo/flyTo calls correctly
+  // account for the new drawer height when centering pins. This handles state
+  // changes triggered by the More/Less button and touch drag snaps.
+  // Note: selectPin/selectPoi set drawerState directly and pass padding
+  // explicitly in their easeTo calls — they do not go through this callback.
+  const handleDrawerStateChange = useCallback((state: DrawerState) => {
+    setDrawerState(state);
+    if (mapRef.current && mapLoadedRef.current) {
+      // skipNextFetch suppresses the moveend that setPadding fires internally
+      skipNextFetch.current = true;
+      mapRef.current.getMap().setPadding({ top: 0, right: 0, bottom: getDrawerHeightPx(state), left: 0 });
+    }
+  }, []);
+
   useEffect(() => {
     return () => {
       if (scrollTimeoutRef.current !== null) clearTimeout(scrollTimeoutRef.current);
@@ -292,26 +261,21 @@ export default function MapView() {
   const handleLoad = useCallback(
     (_e: { target: mapboxgl.Map }) => {
       mapLoadedRef.current = true;
-      // Read from ref so we always see the latest geolocation value regardless
-      // of when the geolocation promise resolved vs when the map finished loading.
       const loc = userLocationRef.current;
       if (loc) {
         mapRef.current?.flyTo({
           center: [loc.lng, loc.lat],
           zoom: 11,
           duration: 1200,
-          padding: { top: 0, right: 0, bottom: drawerOpenPx(), left: 0 },
+          padding: { top: 0, right: 0, bottom: getDrawerHeightPx(drawerStateRef.current), left: 0 },
         });
       } else {
-        // No user location — set the initial camera padding to match the open
-        // drawer so the first pin click doesn't also animate a 0→40vh padding
-        // change (which would shift the camera upward at the same time the
-        // drawer CSS transition slides up, causing a double-focus bounce).
-        // setPadding internally calls easeTo(duration:0) which fires moveend —
-        // suppress the resulting handleMoveEnd fetch since loadCampsites is
-        // called explicitly right after.
+        // No user location — set the initial camera padding to match the peek
+        // drawer height so computeVisibleBounds starts from a consistent baseline.
+        // setPadding fires moveend internally (easeTo duration:0) — skipNextFetch
+        // suppresses that so loadCampsites below isn't called a second time.
         skipNextFetch.current = true;
-        _e.target.setPadding({ top: 0, right: 0, bottom: drawerOpenPx(), left: 0 });
+        _e.target.setPadding({ top: 0, right: 0, bottom: PEEK_HEIGHT_PX, left: 0 });
         loadCampsites(_e.target);
         loadAmenities(_e.target);
       }
@@ -333,7 +297,7 @@ export default function MapView() {
 
   const selectPoi = useCallback(
     (poi: AmenityPOI, animate = true) => {
-      setDrawerOpen(true);
+      setDrawerState("half");
       setSelectedPoiId(poi.id);
       setSelectedIdx(null);
       selectedIdRef.current = null;
@@ -342,7 +306,7 @@ export default function MapView() {
         mapRef.current.easeTo({
           center: [poi.lng, poi.lat],
           duration: 300,
-          padding: { top: 0, right: 0, bottom: drawerOpenPx(), left: 0 },
+          padding: { top: 0, right: 0, bottom: getDrawerHeightPx("half"), left: 0 },
         });
       }
     },
@@ -351,41 +315,28 @@ export default function MapView() {
 
   const selectPin = useCallback(
     (i: number, animate = true) => {
-      setDrawerOpen(true);
+      setDrawerState("half");
       setSelectedIdx(i);
       setSelectedPoiId(null);
       const campsite = campsites[i];
       selectedIdRef.current = campsite?.id ?? null;
       if (animate && campsite && mapRef.current) {
-        // Known edge case: a manual pan that starts during the 300ms easeTo animation
-        // will have its moveend consumed by this flag (no refetch fires for that gesture).
-        // Low-frequency and acceptable for MVP.
         skipNextFetch.current = true;
         mapRef.current.easeTo({
           center: [campsite.lng, campsite.lat],
           duration: 300,
-          padding: { top: 0, right: 0, bottom: drawerOpenPx(), left: 0 },
+          padding: { top: 0, right: 0, bottom: getDrawerHeightPx("half"), left: 0 },
         });
       }
       if (animate) {
-        // Card click — drawer is already open, scroll immediately
         requestAnimationFrame(() => {
-          cardRefs.current[i]?.scrollIntoView({
-            behavior: "smooth",
-            block: "nearest",
-          });
+          cardRefs.current[i]?.scrollIntoView({ behavior: "smooth", block: "nearest" });
         });
       } else {
-        // Pin click — drawer is animating open. Delaying scrollIntoView until
-        // after the transition prevents a mid-animation scroll from shifting the
-        // map. Cancel any pending scroll from a previous rapid pin click first.
         if (scrollTimeoutRef.current !== null) clearTimeout(scrollTimeoutRef.current);
         scrollTimeoutRef.current = setTimeout(() => {
           scrollTimeoutRef.current = null;
-          cardRefs.current[i]?.scrollIntoView({
-            behavior: "smooth",
-            block: "nearest",
-          });
+          cardRefs.current[i]?.scrollIntoView({ behavior: "smooth", block: "nearest" });
         }, DRAWER_TRANSITION_MS);
       }
     },
@@ -401,7 +352,6 @@ export default function MapView() {
       // still use the previous filter values.
       activeFiltersRef.current = filters;
       setShowFilters(false);
-      // Re-run the search immediately with the new filters applied
       if (mapRef.current) {
         const map = mapRef.current.getMap();
         loadCampsites(map);
@@ -411,20 +361,9 @@ export default function MapView() {
     [loadCampsites, loadAmenities],
   );
 
-  const resultLabel =
-    campsites.length > 0
-      ? hasMore
-        ? `${campsites.length}+ campsites nearby`
-        : `${campsites.length} campsites nearby`
-      : selectedPoiId
-      ? (() => {
-          const poi = amenityPois.find((p) => p.id === selectedPoiId);
-          const meta = poi ? (POI_META[poi.amenityType.key] ?? { label: poi.amenityType.key }) : null;
-          return meta ? meta.label : "POI selected";
-        })()
-      : "";
-
   const filterCount = activeFilters.activities.length + activeFilters.pois.length;
+
+  const showDrawer = campsites.length > 0 || selectedPoiId !== null;
 
   return (
     <div className="relative h-full w-full overflow-hidden">
@@ -480,7 +419,10 @@ export default function MapView() {
         minZoom={7}
         onLoad={handleLoad}
         onMoveEnd={handleMoveEnd}
-        onDragStart={() => setDrawerOpen(false)}
+        // Use setDrawerState directly (not handleDrawerStateChange) — calling
+        // map.setPadding inside an active drag gesture cancels the gesture via
+        // its internal easeTo(duration:0) and makes the map stutter.
+        onDragStart={() => setDrawerState("peek")}
         onClick={() => {
           setSelectedIdx(null);
           selectedIdRef.current = null;
@@ -492,10 +434,7 @@ export default function MapView() {
           <Marker longitude={userLocation.lng} latitude={userLocation.lat} style={{ zIndex: 20 }}>
             <div
               className="w-[11px] h-[11px] rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
-              style={{
-                background: CORAL,
-                border: "2.5px solid #fff",
-              }}
+              style={{ background: CORAL, border: "2.5px solid #fff" }}
             />
           </Marker>
         )}
@@ -517,25 +456,16 @@ export default function MapView() {
               anchor="bottom"
               style={{ zIndex: isSel ? 10 : 1 }}
             >
-              {/* relative container — label is absolute so anchor="bottom" pins the SVG tip to the coordinate */}
               <div
                 role="button"
                 tabIndex={0}
                 className="relative flex flex-col items-center cursor-pointer select-none"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  selectPin(i, false);
-                }}
+                onClick={(e) => { e.stopPropagation(); selectPin(i, false); }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    selectPin(i, false);
-                  }
+                  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectPin(i, false); }
                 }}
                 aria-label={`Select campsite ${i + 1}: ${campsite.name}`}
               >
-                {/* Rounder teardrop pin — circle takes ~70% of height, tip is short + soft */}
-                {/* width/height as CSS (not SVG attributes) so transition-all can animate size change */}
                 <svg
                   style={{
                     width: pinW,
@@ -545,7 +475,6 @@ export default function MapView() {
                   }}
                   viewBox="0 0 26 28"
                   fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
                 >
                   <path
                     d="M13 1.5C7.2 1.5 2.5 6.2 2.5 12C2.5 18.5 9 24 13 26C17 24 23.5 18.5 23.5 12C23.5 6.2 18.8 1.5 13 1.5Z"
@@ -553,10 +482,8 @@ export default function MapView() {
                     stroke={FOREST_GREEN}
                     strokeWidth="1.5"
                   />
-                  {/* fontFamily hardcoded string — SVG presentation attributes don't support CSS variables */}
                   <text
-                    x="13"
-                    y="12.5"
+                    x="13" y="12.5"
                     textAnchor="middle"
                     dominantBaseline="central"
                     fill={isSel ? "#fff" : FOREST_GREEN}
@@ -567,16 +494,13 @@ export default function MapView() {
                     {i + 1}
                   </text>
                 </svg>
-                {/* Name label — absolute beside the pin (Google Maps style), wraps at max-w */}
-                {/* absolute so it doesn't affect Marker height; anchor="bottom" pins SVG tip to coordinate */}
                 <div
                   className={`absolute left-full top-1/2 -translate-y-1/2 ml-1 w-max max-w-[140px] leading-tight ${isSel ? "font-bold" : "font-semibold"}`}
                   style={{
                     color: FOREST_GREEN,
                     fontFamily: "var(--font-dm-sans), sans-serif",
                     fontSize: isSel ? 11 : 10,
-                    textShadow:
-                      "0 0 3px rgba(255,255,255,0.95), 0 0 6px rgba(255,255,255,0.8), 0 1px 2px rgba(0,0,0,0.12)",
+                    textShadow: "0 0 3px rgba(255,255,255,0.95), 0 0 6px rgba(255,255,255,0.8), 0 1px 2px rgba(0,0,0,0.12)",
                   }}
                 >
                   {shortName}
@@ -586,7 +510,7 @@ export default function MapView() {
           );
         })}
 
-        {/* AmenityPOI pins — same teardrop shape as campsite pins, POI colour fill, emoji glyph */}
+        {/* AmenityPOI pins */}
         {amenityPois.map((poi) => {
           const isSel = selectedPoiId === poi.id;
           const meta = POI_META[poi.amenityType.key] ?? { emoji: "📍", label: poi.amenityType.key, color: FOREST_GREEN };
@@ -604,19 +528,12 @@ export default function MapView() {
                 role="button"
                 tabIndex={0}
                 className="relative flex flex-col items-center cursor-pointer select-none"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  selectPoi(poi);
-                }}
+                onClick={(e) => { e.stopPropagation(); selectPoi(poi); }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    selectPoi(poi);
-                  }
+                  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectPoi(poi); }
                 }}
                 aria-label={`Select ${meta.label}${poi.name ? `: ${poi.name}` : ""}`}
               >
-                {/* Same teardrop SVG as campsite pins — white fill, coloured border */}
                 <svg
                   style={{
                     width: pinW,
@@ -626,7 +543,6 @@ export default function MapView() {
                   }}
                   viewBox="0 0 26 28"
                   fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
                 >
                   <path
                     d="M13 1.5C7.2 1.5 2.5 6.2 2.5 12C2.5 18.5 9 24 13 26C17 24 23.5 18.5 23.5 12C23.5 6.2 18.8 1.5 13 1.5Z"
@@ -635,13 +551,11 @@ export default function MapView() {
                     strokeWidth={isSel ? "2.5" : "1.5"}
                   />
                 </svg>
-                {/* Emoji rendered as HTML so it uses the system emoji font — SVG <text> renders poorly */}
                 <div
                   className="absolute pointer-events-none"
                   style={{
                     fontSize: isSel ? 12 : 10,
                     lineHeight: 1,
-                    // Centre over the circle (top ~70% of pinH)
                     top: 0,
                     width: pinW,
                     height: Math.round(pinH * 0.72),
@@ -652,15 +566,13 @@ export default function MapView() {
                 >
                   {meta.emoji}
                 </div>
-                {/* Name label — FOREST_GREEN matches campsite labels for consistent readability */}
                 <div
                   className={`absolute left-full top-1/2 -translate-y-1/2 ml-1 w-max max-w-[140px] leading-tight ${isSel ? "font-bold" : "font-semibold"}`}
                   style={{
                     color: FOREST_GREEN,
                     fontFamily: "var(--font-dm-sans), sans-serif",
                     fontSize: isSel ? 11 : 10,
-                    textShadow:
-                      "0 0 3px rgba(255,255,255,0.95), 0 0 6px rgba(255,255,255,0.8), 0 1px 2px rgba(0,0,0,0.12)",
+                    textShadow: "0 0 3px rgba(255,255,255,0.95), 0 0 6px rgba(255,255,255,0.8), 0 1px 2px rgba(0,0,0,0.12)",
                   }}
                 >
                   {poi.name ?? meta.label}
@@ -671,147 +583,21 @@ export default function MapView() {
         })}
       </MapGL>
 
-      {/* Bottom drawer — z-50 must exceed marker z-index (max 10) to prevent bleed-through */}
-      {(campsites.length > 0 || selectedPoiId !== null) && (
-        <div
-          className="absolute bottom-0 left-0 right-0 rounded-t-2xl shadow-2xl flex flex-col z-50"
-          style={{
-            height: "40vh",
-            transform: drawerOpen
-              ? "translateY(0)"
-              : `translateY(calc(100% - ${PEEK_HEIGHT}px))`,
-            transition: `transform ${DRAWER_TRANSITION_MS}ms ease-in-out`,
-            background: SURFACE,
-            borderTop: "1.5px solid #e0dbd0",
-          }}
-        >
-          {/* Peek strip — always visible, tapping reopens the drawer */}
-          <div
-            className="flex-shrink-0 cursor-pointer"
-            onClick={() => setDrawerOpen(true)}
-          >
-            {/* Drag handle */}
-            <div className="flex justify-center pt-3 pb-2">
-              <div className="w-10 h-1 rounded-full bg-[#e0dbd0]" />
-            </div>
-            {/* Result count */}
-            <div className="px-4 pb-2 text-sm font-semibold text-[#2d4a2d]">
-              {resultLabel}
-            </div>
-          </div>
-
-          {/* Scrollable card list */}
-          <div className="overflow-y-auto flex-1 px-4 pb-4 space-y-2">
-            {/* POI detail card — shown when an amenity pin is selected */}
-            {selectedPoiId && (() => {
-              const poi = amenityPois.find((p) => p.id === selectedPoiId);
-              if (!poi) return null;
-              const meta = POI_META[poi.amenityType.key] ?? { emoji: "📍", label: poi.amenityType.key, color: FOREST_GREEN };
-              return (
-                <div
-                  className="relative rounded-xl p-3"
-                  style={{ border: `1.5px solid ${meta.color}`, background: "#fff" }}
-                >
-                  <a
-                    href={`https://www.google.com/maps/dir/?api=1&destination=${poi.lat},${poi.lng}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="absolute top-2.5 right-2.5 flex items-center justify-center w-7 h-7 rounded-full transition-opacity hover:opacity-70 active:opacity-50"
-                    style={{ background: "rgba(232,103,74,0.12)" }}
-                    aria-label={`Navigate to ${poi.name ?? meta.label} in Google Maps`}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill={CORAL} />
-                    </svg>
-                  </a>
-                  <div className="flex items-center gap-3 pr-8">
-                    <span className="text-xl leading-none flex-shrink-0">{meta.emoji}</span>
-                    <div className="min-w-0">
-                      <div className="font-semibold text-sm truncate" style={{ color: FOREST_GREEN }}>
-                        {poi.name ?? meta.label}
-                      </div>
-                      <div className="text-xs" style={{ color: meta.color }}>
-                        {meta.label}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-            {campsites.map((campsite, i) => {
-              const isSel = selectedIdx === i;
-              return (
-                <div
-                  key={campsite.id}
-                  ref={(el) => {
-                    cardRefs.current[i] = el;
-                  }}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => selectPin(i)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      selectPin(i);
-                    }
-                  }}
-                  aria-label={`Select campsite ${i + 1}: ${campsite.name}`}
-                  aria-pressed={isSel}
-                  className="relative rounded-xl p-3 cursor-pointer transition-all duration-150"
-                  style={{
-                    border: isSel
-                      ? `1.5px solid ${CORAL}`
-                      : "1.5px solid #e0dbd0",
-                    background: isSel ? "#fff" : SURFACE,
-                  }}
-                >
-                  {/* Navigate icon button — top-right, doesn't interfere with card content */}
-                  <a
-                    href={`https://www.google.com/maps/dir/?api=1&destination=${campsite.lat},${campsite.lng}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="absolute top-2.5 right-2.5 flex items-center justify-center w-7 h-7 rounded-full transition-opacity hover:opacity-70 active:opacity-50"
-                    style={{ background: "rgba(232,103,74,0.12)" }}
-                    aria-label={`Navigate to ${campsite.name} in Google Maps`}
-                  >
-                    {/* Navigation send icon */}
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill={CORAL} />
-                    </svg>
-                  </a>
-                  <div className="flex items-center gap-3 pr-8">
-                    {/* Index badge */}
-                    <div
-                      className="flex-shrink-0 flex items-center justify-center rounded-full w-6 h-6 font-extrabold"
-                      style={{
-                        background: isSel ? FOREST_GREEN : "transparent",
-                        border: `2px solid ${FOREST_GREEN}`,
-                        color: isSel ? "#fff" : FOREST_GREEN,
-                        fontSize: 10,
-                        fontFamily: "var(--font-dm-sans), sans-serif",
-                      }}
-                    >
-                      {i + 1}
-                    </div>
-                    {/* Name + region */}
-                    <div className="min-w-0">
-                      <div className="font-semibold text-sm truncate text-[#2d4a2d]">
-                        {campsite.name}
-                      </div>
-                      {campsite.region && (
-                        <div className="text-xs truncate text-[#5a7a5a]">
-                          {campsite.region}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+      {/* Bottom drawer — z-50 must exceed marker z-index (max 10) */}
+      {showDrawer && (
+        <BottomDrawer
+          campsites={campsites}
+          hasMore={hasMore}
+          amenityPois={amenityPois}
+          poiMeta={POI_META}
+          selectedIdx={selectedIdx}
+          selectedPoiId={selectedPoiId}
+          userLocation={userLocation}
+          cardRefs={cardRefs}
+          drawerState={drawerState}
+          onDrawerStateChange={handleDrawerStateChange}
+          onSelectPin={selectPin}
+        />
       )}
     </div>
   );
