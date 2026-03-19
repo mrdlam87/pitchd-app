@@ -10,6 +10,7 @@ import BottomDrawer, {
   type Campsite,
   type DrawerState,
   PEEK_HEIGHT_PX,
+  DRAWER_TRANSITION_MS,
   getDrawerHeightPx,
 } from "./BottomDrawer";
 import { CORAL, FOREST_GREEN } from "@/lib/tokens";
@@ -63,6 +64,8 @@ async function fetchCampsites(bounds: Bounds, amenities: string[] = []): Promise
 }
 
 // Fetches AmenityPOIs for all active POI types in parallel.
+// Converts viewport bounds to a centre + radius so the amenities API can use its
+// existing bounding-box filter.
 async function fetchAmenities(bounds: Bounds, poiTypes: string[]): Promise<AmenityPOI[]> {
   if (poiTypes.length === 0) return [];
 
@@ -115,8 +118,6 @@ function computeVisibleBounds(map: mapboxgl.Map, drawerHeightPx: number): Bounds
   };
 }
 
-// Must match the `transition` duration in BottomDrawer's height transition.
-const DRAWER_TRANSITION_MS = 300;
 
 const EMPTY_FILTERS: FilterState = { activities: [], pois: [] };
 
@@ -141,6 +142,8 @@ export default function MapView() {
   const mapLoadedRef = useRef(false);
   const mapRef = useRef<MapRef>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+  // skipNextFetch suppresses the moveend handler for one event — used when code
+  // calls easeTo/setPadding programmatically to avoid triggering a redundant fetch.
   const skipNextFetch = useRef(false);
   // Monotonic counter — discard results from stale in-flight requests
   const fetchCounterRef = useRef(0);
@@ -188,9 +191,15 @@ export default function MapView() {
     fetchCampsites(bounds, amenities).then(({ results, hasMore }) => {
       if (id !== fetchCounterRef.current) return; // stale fetch — discard
       cardRefs.current = [];
-      // Re-open to half only on 0 → results transition
+      // Re-open to half only on 0 → results transition.
+      // Also sync map padding so Mapbox knows the drawer now covers ~52vh —
+      // without this, pin centering and bounds computation stay at PEEK_HEIGHT_PX
+      // until the next user-triggered easeTo. skipNextFetch suppresses the
+      // moveend that setPadding's internal easeTo(duration:0) fires.
       if (results.length > 0 && prevCampsitesLengthRef.current === 0) {
         setDrawerState("half");
+        skipNextFetch.current = true;
+        map.setPadding({ top: 0, right: 0, bottom: getDrawerHeightPx("half"), left: 0 });
       }
       prevCampsitesLengthRef.current = results.length;
       setCampsites(results);

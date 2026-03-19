@@ -45,6 +45,14 @@ type Props = {
 
 export const PEEK_HEIGHT_PX = 64;
 
+// Duration of the CSS height transition on the drawer div — exported so Map.tsx
+// can use it to delay scrollIntoView until the animation has settled.
+export const DRAWER_TRANSITION_MS = 300;
+
+/**
+ * Returns the drawer height in px for a given state.
+ * Client-only — reads window.innerHeight. Do not call during SSR or in render.
+ */
 export function getDrawerHeightPx(state: DrawerState): number {
   if (state === "peek") return PEEK_HEIGHT_PX;
   if (state === "half") return Math.round(window.innerHeight * 0.52);
@@ -90,6 +98,8 @@ function AmenityTags({ amenities }: { amenities: Campsite["amenities"] }) {
           className="inline-flex items-center gap-[3px] text-[10px] font-semibold rounded-full px-2 py-[3px]"
           style={{
             color: a.color,
+            // hex-alpha suffix requires a.color to be a 6-digit #rrggbb string —
+            // guaranteed by the AmenityType seed data in prisma/seed.ts
             background: a.color + "15",
             border: `1px solid ${a.color}30`,
           }}
@@ -241,10 +251,9 @@ function POICard({
 // ── BottomDrawer ───────────────────────────────────────────────────────────────
 
 const DRAG_THRESHOLD_PX = 40;
-const DRAWER_TRANSITION_MS = 300;
 
 function cycleUp(s: DrawerState): DrawerState {
-  return s === "peek" ? "half" : s === "half" ? "full" : "full";
+  return s === "peek" ? "half" : "full";
 }
 function cycleDown(s: DrawerState): DrawerState {
   return s === "full" ? "half" : s === "half" ? "peek" : "peek";
@@ -380,42 +389,35 @@ export default function BottomDrawer({
       </div>
 
       {/* Scrollable content — hidden in peek state */}
-      {drawerState !== "peek" && (
-        <div className="overflow-y-auto flex-1 px-4 pb-4 space-y-2">
-          {/* POI detail card — shown when an amenity pin is selected */}
-          {selectedPoi && (() => {
-            const meta = poiMeta[selectedPoi.amenityType.key] ?? {
-              emoji: "📍",
-              label: selectedPoi.amenityType.key,
-              color: FOREST_GREEN,
-            };
-            return <POICard key={selectedPoi.id} poi={selectedPoi} meta={meta} />;
-          })()}
-
-          {campsites.map((campsite, i) => (
-            <CampsiteCard
-              key={campsite.id}
-              campsite={campsite}
-              index={i}
-              isSelected={selectedIdx === i}
-              userLocation={userLocation}
-              cardRef={(el) => {
-                cardRefs.current[i] = el;
-              }}
-              onSelect={() => onSelectPin(i)}
-            />
-          ))}
-        </div>
-      )}
+      {drawerState !== "peek" && (() => {
+        const selectedPoiMeta = selectedPoi
+          ? (poiMeta[selectedPoi.amenityType.key] ?? { emoji: "📍", label: selectedPoi.amenityType.key, color: FOREST_GREEN })
+          : null;
+        return (
+          <div className="overflow-y-auto flex-1 px-4 pb-4 space-y-2">
+            {/* POI detail card — shown when an amenity pin is selected */}
+            {selectedPoi && selectedPoiMeta && (
+              <POICard key={selectedPoi.id} poi={selectedPoi} meta={selectedPoiMeta} />
+            )}
+            {campsites.map((campsite, i) => (
+              <CampsiteCard
+                key={campsite.id}
+                campsite={campsite}
+                index={i}
+                isSelected={selectedIdx === i}
+                userLocation={userLocation}
+                cardRef={(el) => { cardRefs.current[i] = el; }}
+                onSelect={() => onSelectPin(i)}
+              />
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Peek state — show selected card (or first card) */}
       {drawerState === "peek" && (() => {
         if (selectedPoi) {
-          const meta = poiMeta[selectedPoi.amenityType.key] ?? {
-            emoji: "📍",
-            label: selectedPoi.amenityType.key,
-            color: FOREST_GREEN,
-          };
+          const meta = poiMeta[selectedPoi.amenityType.key] ?? { emoji: "📍", label: selectedPoi.amenityType.key, color: FOREST_GREEN };
           return (
             <div className="px-4 pb-4 overflow-hidden">
               <POICard poi={selectedPoi} meta={meta} />
@@ -423,18 +425,16 @@ export default function BottomDrawer({
           );
         }
         const peekIdx = selectedIdx ?? 0;
-        const campsite = campsites[peekIdx];
-        if (!campsite) return null;
+        const peekCampsite = campsites[peekIdx];
+        if (!peekCampsite) return null;
         return (
           <div className="px-4 pb-4 overflow-hidden">
             <CampsiteCard
-              campsite={campsite}
+              campsite={peekCampsite}
               index={peekIdx}
               isSelected={selectedIdx === peekIdx}
               userLocation={userLocation}
-              cardRef={(el) => {
-                cardRefs.current[peekIdx] = el;
-              }}
+              cardRef={(el) => { cardRefs.current[peekIdx] = el; }}
               onSelect={() => onSelectPin(peekIdx)}
             />
           </div>
