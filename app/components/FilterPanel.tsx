@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CORAL, CORAL_LIGHT, FOREST_GREEN, SURFACE, BORDER, TEXT_MUTED } from "@/lib/tokens";
+import { CORAL, CORAL_LIGHT, FOREST_GREEN, TEXT, SURFACE, BORDER, TEXT_MUTED } from "@/lib/tokens";
 
 export type FilterState = {
   activities: string[];
@@ -57,7 +57,7 @@ function ToggleChip({
         className="text-xs leading-none"
         style={{
           fontWeight: active ? 600 : 400,
-          color: active ? CORAL : FOREST_GREEN,
+          color: active ? CORAL : TEXT,
         }}
       >
         {item.label}
