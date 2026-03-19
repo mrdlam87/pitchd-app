@@ -2,13 +2,17 @@
  * OSM POI ingestion script — queries Overpass API for standalone amenity POIs
  * across Australia and upserts records into the AmenityPOI table by sourceId.
  *
- * POI types fetched:
+ * POI types fetched (nodes and ways only — relations are rare for these types):
  *   dump_point  → amenity=sanitary_dump_station
  *   water_fill  → amenity=drinking_water
  *   toilets     → amenity=toilets
  *   laundromat  → shop=laundry
  *
+ * Note: no concurrency guard — running two instances simultaneously could race
+ * on the delete step. Don't run in parallel (e.g. overlapping cron jobs).
+ *
  * Usage: npm run db:ingest-osm-pois
+ * Dry run: npm run db:ingest-osm-pois:dry-run
  */
 
 import * as https from "https";
@@ -154,7 +158,8 @@ async function fetchRegionElements(
           );
           await new Promise((resolve) => setTimeout(resolve, 15_000));
         } else {
-          console.log(` failed on main, trying mirror...`);
+          console.log(` failed on main, trying mirror in 5s...`);
+          await new Promise((resolve) => setTimeout(resolve, 5_000));
         }
       }
     }
@@ -177,7 +182,10 @@ async function fetchAllPOIs(): Promise<OverpassElement[]> {
       }
     }
     console.log(` ${elements.length} returned, ${added} new`);
-    await new Promise((resolve) => setTimeout(resolve, BETWEEN_REQUESTS_MS));
+    // Delay between regions to avoid rate-limiting — skip after the last one
+    if (region !== FETCH_REGIONS.at(-1)) {
+      await new Promise((resolve) => setTimeout(resolve, BETWEEN_REQUESTS_MS));
+    }
   }
 
   return Array.from(allElements.values());
@@ -282,10 +290,12 @@ async function main() {
       const existing = existingMap.get(r.sourceId);
       if (!existing) return false;
       const newTypeId = amenityTypeMap.get(r.amenityKey)!;
+      // lat/lng: both are IEEE 754 doubles (OSM JSON → JS number, Postgres DOUBLE PRECISION → Prisma Float),
+      // so they round-trip exactly. Epsilon guard protects against future precision changes.
       return (
         r.name !== existing.name ||
-        r.lat !== existing.lat ||
-        r.lng !== existing.lng ||
+        Math.abs(r.lat - existing.lat) > 1e-6 ||
+        Math.abs(r.lng - existing.lng) > 1e-6 ||
         newTypeId !== existing.amenityTypeId
       );
     });
@@ -293,7 +303,7 @@ async function main() {
       (id) => !fetchedSourceIds.has(id)
     );
 
-    const unchanged = validRecords.filter((r) => existingMap.has(r.sourceId)).length - toUpdate.length;
+    const unchanged = validRecords.length - toInsert.length - toUpdate.length;
     console.log(
       `Would process: ${toInsert.length} to insert, ${toUpdate.length} to update, ${unchanged} unchanged, ${toDelete.length} to delete`
     );
