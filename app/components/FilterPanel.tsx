@@ -1,14 +1,7 @@
 "use client";
 
 import { useState } from "react";
-
-// Design tokens
-const CORAL = "#e8674a";
-const CORAL_LIGHT = "rgba(232,103,74,0.08)";
-const FOREST_GREEN = "#2d4a2d";
-const SURFACE = "#f7f5f0";
-const BORDER = "#e0dbd0";
-const TEXT_MUTED = "#7a9a7a";
+import { CORAL, CORAL_LIGHT, FOREST_GREEN, SURFACE, BORDER, TEXT_MUTED } from "@/lib/tokens";
 
 export type FilterState = {
   activities: string[];
@@ -130,15 +123,30 @@ export default function FilterPanel({
         >
           Filters
         </span>
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex items-center justify-center w-8 h-8 rounded-full transition-opacity hover:opacity-70 active:opacity-50"
-          style={{ color: TEXT_MUTED, fontSize: 18, lineHeight: 1 }}
-          aria-label="Close filters"
-        >
-          ✕
-        </button>
+        <div className="flex items-center gap-3">
+          {(activities.length > 0 || pois.length > 0) && (
+            <button
+              type="button"
+              onClick={() => {
+                setActivities([]);
+                setPois([]);
+              }}
+              className="text-xs transition-opacity hover:opacity-70 active:opacity-50"
+              style={{ color: CORAL, fontWeight: 600 }}
+            >
+              Clear all
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex items-center justify-center w-8 h-8 rounded-full transition-opacity hover:opacity-70 active:opacity-50"
+            style={{ color: TEXT_MUTED, fontSize: 18, lineHeight: 1 }}
+            aria-label="Close filters"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       {/* Scrollable body */}

@@ -5,6 +5,7 @@ import MapGL, { Marker, type MapRef } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import FilterPanel, { type FilterState } from "./FilterPanel";
+import { CORAL, FOREST_GREEN, SURFACE } from "@/lib/tokens";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -18,11 +19,6 @@ const DEFAULT_VIEWPORT = {
   latitude: -33.8688,
   zoom: 10,
 };
-
-// Design tokens
-const FOREST_GREEN = "#2d4a2d";
-const SURFACE = "#f7f5f0";
-const CORAL = "#e8674a";
 
 type Campsite = {
   id: string;
@@ -278,8 +274,8 @@ export default function MapView() {
         />
       )}
 
-      {/* Floating Filters button */}
-      <div className="absolute top-3 right-3 z-40">
+      {/* Floating Filters button — z-[60] must exceed drawer (z-50) to stay clickable */}
+      <div className="absolute top-3 right-3 z-[60]">
         <button
           type="button"
           onClick={() => setShowFilters(true)}
