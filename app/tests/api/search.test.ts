@@ -157,6 +157,20 @@ describe("POST /api/search", () => {
     expect(body.error).toMatch(/lat/i);
   });
 
+  it("accepts lat: 0 and lng: 0 as valid coordinates (equator / prime meridian)", async () => {
+    // Regression: previous || NaN fix treated 0 as falsy and incorrectly returned 400.
+    // 0,0 is valid (equator/prime meridian) — should pass required-field validation.
+    const query = "zero coordinate regression test";
+    createdHashes.push(hashQuery(query));
+    await prisma.searchCache.deleteMany({ where: { queryHash: hashQuery(query) } });
+
+    const res = await POST(makeRequest({ query, lat: 0, lng: 0 }));
+    // 0,0 is in-range, so validation passes — returns 200 with empty campsites (no AU data there)
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveProperty("campsites");
+  });
+
   it("returns 400 when lng is missing", async () => {
     const res = await POST(makeRequest({ query: "camping near Sydney", lat: SYDNEY_LAT }));
     expect(res.status).toBe(400);
@@ -200,8 +214,10 @@ describe("POST /api/search", () => {
     const res = await POST(makeRequest({ query, lat: SYDNEY_LAT, lng: SYDNEY_LNG }));
     expect(res.status).toBe(200);
     expect(mockCreate).toHaveBeenCalledTimes(1);
+    // Second arg is the request options ({ timeout }) — use expect.anything() to allow it
     expect(mockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "claude-haiku-4-5-20251001" })
+      expect.objectContaining({ model: "claude-haiku-4-5-20251001" }),
+      expect.objectContaining({ timeout: 10_000 })
     );
   });
 

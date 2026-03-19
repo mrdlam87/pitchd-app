@@ -17,6 +17,8 @@ const CACHE_TTL_MS = 2 * 60 * 60 * 1000;
 const RESULT_LIMIT = 20;
 // Default search radius when Claude can't infer one
 const DEFAULT_RADIUS_KM = 300;
+// Amenity keys Claude is allowed to return — filter out hallucinated values
+const ALLOWED_AMENITIES = ["dog_friendly", "fishing", "hiking", "swimming"];
 
 interface ParsedIntent {
   amenities: string[];
@@ -50,6 +52,7 @@ function distanceKm(
 async function parseIntentWithClaude(query: string): Promise<ParsedIntent> {
   const today = new Date().toISOString().split("T")[0];
 
+  // 10-second timeout — prevents the request hanging if the Anthropic API is slow
   const message = await anthropic.messages.create({
     model: HAIKU_MODEL,
     max_tokens: 200,
@@ -70,7 +73,7 @@ Rules:
 - radiusKm: inferred drive radius in km (1hr ≈ 80km, 2hr ≈ 160km, 3hr ≈ 240km). Default 300 if not mentioned.`,
       },
     ],
-  });
+  }, { timeout: 10_000 });
 
   const text = message.content
     .filter((b) => b.type === "text")
@@ -84,7 +87,9 @@ Rules:
   const parsed = JSON.parse(text.slice(start, end + 1));
 
   return {
-    amenities: Array.isArray(parsed.amenities) ? parsed.amenities : [],
+    amenities: Array.isArray(parsed.amenities)
+      ? (parsed.amenities as unknown[]).filter((a): a is string => typeof a === "string" && ALLOWED_AMENITIES.includes(a))
+      : [],
     dateFrom: typeof parsed.dateFrom === "string" ? parsed.dateFrom : null,
     dateTo: typeof parsed.dateTo === "string" ? parsed.dateTo : null,
     radiusKm:
@@ -118,10 +123,12 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   // Number() is stricter than parseFloat() — rejects partial strings like "123abc".
-  // || NaN handles null/undefined/empty since Number(null) and Number("") both return 0.
-  // Note: ?? would NOT handle empty string ("" ?? NaN === ""), so || is required here.
-  const userLat = Number(lat || NaN);
-  const userLng = Number(lng || NaN);
+  // Explicit check for undefined/null/"" before Number() so that valid 0 coordinates
+  // (equator / prime meridian) are not incorrectly rejected. Neither ?? nor || work:
+  //   ?? passes "" through as Number("") = 0 (falsy but not nullish)
+  //   || treats 0 as falsy, so lat:0 → NaN → 400
+  const userLat = (lat === undefined || lat === null || lat === "") ? NaN : Number(lat);
+  const userLng = (lng === undefined || lng === null || lng === "") ? NaN : Number(lng);
 
   if (isNaN(userLat) || isNaN(userLng)) {
     return Response.json({ error: "lat and lng are required" }, { status: 400 });
@@ -143,8 +150,12 @@ export async function POST(req: Request): Promise<Response> {
     let parsedIntent: ParsedIntent;
 
     if (cached && cached.expiresAt > now) {
-      // Cache hit — reuse stored intent
+      // Cache hit — reuse stored intent.
+      // Default radiusKm in case a stale or malformed cache entry is missing the field.
       parsedIntent = cached.parsedIntentJson as unknown as ParsedIntent;
+      if (typeof parsedIntent.radiusKm !== "number" || parsedIntent.radiusKm <= 0) {
+        parsedIntent.radiusKm = DEFAULT_RADIUS_KM;
+      }
     } else {
       // Cache miss — call Claude Haiku to parse intent
       parsedIntent = await parseIntentWithClaude(query.trim());
