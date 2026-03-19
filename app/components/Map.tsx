@@ -6,13 +6,12 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import FilterPanel, { type FilterState } from "./FilterPanel";
 import BottomDrawer, {
-  type AmenityPOI,
-  type Campsite,
   type DrawerState,
   PEEK_HEIGHT_PX,
   DRAWER_TRANSITION_MS,
   getDrawerHeightPx,
 } from "./BottomDrawer";
+import type { AmenityPOI, Campsite } from "@/types/map";
 import { CORAL, FOREST_GREEN } from "@/lib/tokens";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -234,6 +233,21 @@ export default function MapView() {
     drawerStateRef.current = drawerState;
   }, [drawerState]);
 
+  // Passed to BottomDrawer as onDrawerStateChange. Syncs Mapbox camera padding
+  // alongside the React state so that subsequent easeTo/flyTo calls correctly
+  // account for the new drawer height when centering pins. This handles state
+  // changes triggered by the More/Less button and touch drag snaps.
+  // Note: selectPin/selectPoi set drawerState directly and pass padding
+  // explicitly in their easeTo calls — they do not go through this callback.
+  const handleDrawerStateChange = useCallback((state: DrawerState) => {
+    setDrawerState(state);
+    if (mapRef.current && mapLoadedRef.current) {
+      // skipNextFetch suppresses the moveend that setPadding fires internally
+      skipNextFetch.current = true;
+      mapRef.current.getMap().setPadding({ top: 0, right: 0, bottom: getDrawerHeightPx(state), left: 0 });
+    }
+  }, []);
+
   useEffect(() => {
     return () => {
       if (scrollTimeoutRef.current !== null) clearTimeout(scrollTimeoutRef.current);
@@ -256,6 +270,10 @@ export default function MapView() {
           padding: { top: 0, right: 0, bottom: getDrawerHeightPx(drawerStateRef.current), left: 0 },
         });
       } else {
+        // No user location — set the initial camera padding to match the peek
+        // drawer height so computeVisibleBounds starts from a consistent baseline.
+        // setPadding fires moveend internally (easeTo duration:0) — skipNextFetch
+        // suppresses that so loadCampsites below isn't called a second time.
         skipNextFetch.current = true;
         _e.target.setPadding({ top: 0, right: 0, bottom: PEEK_HEIGHT_PX, left: 0 });
         loadCampsites(_e.target);
@@ -328,6 +346,10 @@ export default function MapView() {
   const handleApplyFilters = useCallback(
     (filters: FilterState) => {
       setActiveFilters(filters);
+      // Write ref directly here in addition to the useEffect sync — the useEffect
+      // fires after render, which is too late for the synchronous loadCampsites
+      // call below. Without this, the first search after applying filters would
+      // still use the previous filter values.
       activeFiltersRef.current = filters;
       setShowFilters(false);
       if (mapRef.current) {
@@ -570,7 +592,7 @@ export default function MapView() {
           userLocation={userLocation}
           cardRefs={cardRefs}
           drawerState={drawerState}
-          onDrawerStateChange={setDrawerState}
+          onDrawerStateChange={handleDrawerStateChange}
           onSelectPin={selectPin}
         />
       )}

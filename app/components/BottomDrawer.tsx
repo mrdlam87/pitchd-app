@@ -2,44 +2,10 @@
 
 import { useRef, useState } from "react";
 import { CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
+import type { AmenityPOI, Campsite, POIMeta } from "@/types/map";
 
-// ── Types ──────────────────────────────────────────────────────────────────────
-
+export type { AmenityPOI, Campsite, POIMeta };
 export type DrawerState = "peek" | "half" | "full";
-
-export type Campsite = {
-  id: string;
-  name: string;
-  lat: number;
-  lng: number;
-  region: string | null;
-  blurb: string | null;
-  amenities: { key: string; label: string; icon: string; color: string }[];
-};
-
-export type AmenityPOI = {
-  id: string;
-  name: string | null;
-  lat: number;
-  lng: number;
-  amenityType: { key: string };
-};
-
-export type POIMeta = { emoji: string; label: string; color: string };
-
-type Props = {
-  campsites: Campsite[];
-  hasMore: boolean;
-  amenityPois: AmenityPOI[];
-  poiMeta: Record<string, POIMeta>;
-  selectedIdx: number | null;
-  selectedPoiId: string | null;
-  userLocation: { lat: number; lng: number } | null;
-  cardRefs: React.MutableRefObject<(HTMLDivElement | null)[]>;
-  drawerState: DrawerState;
-  onDrawerStateChange: (state: DrawerState) => void;
-  onSelectPin: (i: number) => void;
-};
 
 // ── Heights ────────────────────────────────────────────────────────────────────
 
@@ -208,13 +174,7 @@ function CampsiteCard({
 
 // ── POI detail card ────────────────────────────────────────────────────────────
 
-function POICard({
-  poi,
-  meta,
-}: {
-  poi: AmenityPOI;
-  meta: POIMeta;
-}) {
+function POICard({ poi, meta }: { poi: AmenityPOI; meta: POIMeta }) {
   return (
     <div
       className="relative rounded-xl p-3"
@@ -248,6 +208,55 @@ function POICard({
   );
 }
 
+// ── DrawerContentList — scrollable card list (half/full states) ────────────────
+
+function DrawerContentList({
+  campsites,
+  amenityPois,
+  poiMeta,
+  selectedIdx,
+  selectedPoiId,
+  userLocation,
+  cardRefs,
+  onSelectPin,
+}: {
+  campsites: Campsite[];
+  amenityPois: AmenityPOI[];
+  poiMeta: Record<string, POIMeta>;
+  selectedIdx: number | null;
+  selectedPoiId: string | null;
+  userLocation: { lat: number; lng: number } | null;
+  cardRefs: React.MutableRefObject<(HTMLDivElement | null)[]>;
+  onSelectPin: (i: number) => void;
+}) {
+  const selectedPoi = selectedPoiId
+    ? amenityPois.find((p) => p.id === selectedPoiId) ?? null
+    : null;
+  const selectedPoiMeta = selectedPoi
+    ? (poiMeta[selectedPoi.amenityType.key] ?? { emoji: "📍", label: selectedPoi.amenityType.key, color: FOREST_GREEN })
+    : null;
+
+  return (
+    <div className="overflow-y-auto flex-1 px-4 pb-4 space-y-2">
+      {/* POI detail card — shown when an amenity pin is selected */}
+      {selectedPoi && selectedPoiMeta && (
+        <POICard key={selectedPoi.id} poi={selectedPoi} meta={selectedPoiMeta} />
+      )}
+      {campsites.map((campsite, i) => (
+        <CampsiteCard
+          key={campsite.id}
+          campsite={campsite}
+          index={i}
+          isSelected={selectedIdx === i}
+          userLocation={userLocation}
+          cardRef={(el) => { cardRefs.current[i] = el; }}
+          onSelect={() => onSelectPin(i)}
+        />
+      ))}
+    </div>
+  );
+}
+
 // ── BottomDrawer ───────────────────────────────────────────────────────────────
 
 const DRAG_THRESHOLD_PX = 40;
@@ -258,6 +267,20 @@ function cycleUp(s: DrawerState): DrawerState {
 function cycleDown(s: DrawerState): DrawerState {
   return s === "full" ? "half" : s === "half" ? "peek" : "peek";
 }
+
+type Props = {
+  campsites: Campsite[];
+  hasMore: boolean;
+  amenityPois: AmenityPOI[];
+  poiMeta: Record<string, POIMeta>;
+  selectedIdx: number | null;
+  selectedPoiId: string | null;
+  userLocation: { lat: number; lng: number } | null;
+  cardRefs: React.MutableRefObject<(HTMLDivElement | null)[]>;
+  drawerState: DrawerState;
+  onDrawerStateChange: (state: DrawerState) => void;
+  onSelectPin: (i: number) => void;
+};
 
 export default function BottomDrawer({
   campsites,
@@ -321,20 +344,21 @@ export default function BottomDrawer({
   }
 
   const drawerHeightStyle =
-    drawerState === "peek"
-      ? "64px"
-      : drawerState === "half"
-      ? "52vh"
-      : "82vh";
+    drawerState === "peek" ? "64px" : drawerState === "half" ? "52vh" : "82vh";
+
+  // Peek state: show selected card (or first card) without scrolling
+  const peekIdx = selectedIdx ?? 0;
+  const peekCampsite = campsites[peekIdx];
+  const peekPoiMeta = selectedPoi
+    ? (poiMeta[selectedPoi.amenityType.key] ?? { emoji: "📍", label: selectedPoi.amenityType.key, color: FOREST_GREEN })
+    : null;
 
   return (
     <div
       className="absolute bottom-0 left-0 right-0 rounded-t-2xl shadow-2xl flex flex-col z-50"
       style={{
         height: drawerHeightStyle,
-        transform: isDragging
-          ? `translateY(${dragOffsetY}px)`
-          : "translateY(0)",
+        transform: isDragging ? `translateY(${dragOffsetY}px)` : "translateY(0)",
         transition: isDragging ? "none" : `height ${DRAWER_TRANSITION_MS}ms ease-in-out`,
         background: SURFACE,
         borderTop: "1.5px solid #e0dbd0",
@@ -343,12 +367,10 @@ export default function BottomDrawer({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Peek strip — drag handle + summary row */}
+      {/* Peek strip — drag handle + summary row. Tapping toggles between peek and half. */}
       <div
         className="flex-shrink-0 cursor-pointer select-none"
-        onClick={() =>
-          onDrawerStateChange(drawerState === "peek" ? "half" : drawerState)
-        }
+        onClick={() => onDrawerStateChange(drawerState === "peek" ? "half" : "peek")}
       >
         {/* Drag handle */}
         <div className="flex justify-center pt-3 pb-2">
@@ -360,26 +382,19 @@ export default function BottomDrawer({
           <div className="text-sm font-semibold" style={{ color: FOREST_GREEN }}>
             {resultLabel}
             {campsites.length > 0 && (
-              <span
-                className="ml-1.5 font-normal text-xs"
-                style={{ color: SAGE }}
-              >
+              <span className="ml-1.5 font-normal text-xs" style={{ color: SAGE }}>
                 · nearby
               </span>
             )}
           </div>
-          {/* More / Less toggle — cycles through all three states */}
+          {/* More / Less toggle — cycles peek→half→full→peek */}
           <button
             type="button"
             className="text-[11px] font-bold flex-shrink-0 ml-2"
             style={{ color: CORAL }}
             onClick={(e) => {
               e.stopPropagation();
-              if (drawerState === "full") {
-                onDrawerStateChange("peek");
-              } else {
-                onDrawerStateChange(cycleUp(drawerState));
-              }
+              onDrawerStateChange(drawerState === "full" ? "peek" : cycleUp(drawerState));
             }}
             aria-label={drawerState === "full" ? "Collapse drawer" : "Expand drawer"}
           >
@@ -388,58 +403,38 @@ export default function BottomDrawer({
         </div>
       </div>
 
-      {/* Scrollable content — hidden in peek state */}
-      {drawerState !== "peek" && (() => {
-        const selectedPoiMeta = selectedPoi
-          ? (poiMeta[selectedPoi.amenityType.key] ?? { emoji: "📍", label: selectedPoi.amenityType.key, color: FOREST_GREEN })
-          : null;
-        return (
-          <div className="overflow-y-auto flex-1 px-4 pb-4 space-y-2">
-            {/* POI detail card — shown when an amenity pin is selected */}
-            {selectedPoi && selectedPoiMeta && (
-              <POICard key={selectedPoi.id} poi={selectedPoi} meta={selectedPoiMeta} />
-            )}
-            {campsites.map((campsite, i) => (
-              <CampsiteCard
-                key={campsite.id}
-                campsite={campsite}
-                index={i}
-                isSelected={selectedIdx === i}
-                userLocation={userLocation}
-                cardRef={(el) => { cardRefs.current[i] = el; }}
-                onSelect={() => onSelectPin(i)}
-              />
-            ))}
-          </div>
-        );
-      })()}
+      {/* Scrollable card list — visible in half and full states */}
+      {drawerState !== "peek" && (
+        <DrawerContentList
+          campsites={campsites}
+          amenityPois={amenityPois}
+          poiMeta={poiMeta}
+          selectedIdx={selectedIdx}
+          selectedPoiId={selectedPoiId}
+          userLocation={userLocation}
+          cardRefs={cardRefs}
+          onSelectPin={onSelectPin}
+        />
+      )}
 
-      {/* Peek state — show selected card (or first card) */}
-      {drawerState === "peek" && (() => {
-        if (selectedPoi) {
-          const meta = poiMeta[selectedPoi.amenityType.key] ?? { emoji: "📍", label: selectedPoi.amenityType.key, color: FOREST_GREEN };
-          return (
-            <div className="px-4 pb-4 overflow-hidden">
-              <POICard poi={selectedPoi} meta={meta} />
-            </div>
-          );
-        }
-        const peekIdx = selectedIdx ?? 0;
-        const peekCampsite = campsites[peekIdx];
-        if (!peekCampsite) return null;
-        return (
-          <div className="px-4 pb-4 overflow-hidden">
-            <CampsiteCard
-              campsite={peekCampsite}
-              index={peekIdx}
-              isSelected={selectedIdx === peekIdx}
-              userLocation={userLocation}
-              cardRef={(el) => { cardRefs.current[peekIdx] = el; }}
-              onSelect={() => onSelectPin(peekIdx)}
-            />
-          </div>
-        );
-      })()}
+      {/* Peek state — show selected card (or first card) without scrolling */}
+      {drawerState === "peek" && (
+        <div className="px-4 pb-4 overflow-hidden">
+          {selectedPoi && peekPoiMeta
+            ? <POICard poi={selectedPoi} meta={peekPoiMeta} />
+            : peekCampsite && (
+                <CampsiteCard
+                  campsite={peekCampsite}
+                  index={peekIdx}
+                  isSelected={selectedIdx === peekIdx}
+                  userLocation={userLocation}
+                  cardRef={() => { /* peek card — ref not used for scrollIntoView */ }}
+                  onSelect={() => onSelectPin(peekIdx)}
+                />
+              )
+          }
+        </div>
+      )}
     </div>
   );
 }
