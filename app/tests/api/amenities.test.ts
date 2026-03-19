@@ -122,16 +122,22 @@ describe("GET /api/amenities", () => {
     expect(res.status).toBe(400);
   });
 
+  it("returns 400 for an unknown type key", async () => {
+    const res = await GET(makeRequest({ ...BASE, type: "nonexistent_type_xyz" }));
+    expect(res.status).toBe(400);
+  });
+
   // --- Response shape ---
 
-  it("returns an array (empty when no results)", async (ctx) => {
+  it("returns correct response shape with results array and truncated flag", async (ctx) => {
     if (!dumpPointTypeKey) { ctx.skip(); return; }
-    // No POIs seeded near Sydney for this type — expect empty array, not an error
     const res = await GET(makeRequest({ ...BASE, type: dumpPointTypeKey }));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(Array.isArray(body)).toBe(true);
-    expect(body).toHaveLength(0);
+    expect(body).toMatchObject({
+      results: expect.any(Array),
+      truncated: expect.any(Boolean),
+    });
   });
 
   // --- Results ---
@@ -152,19 +158,19 @@ describe("GET /api/amenities", () => {
 
     const res = await GET(makeRequest({ ...BASE, type: dumpPointTypeKey }));
     expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(Array.isArray(body)).toBe(true);
+    const { results } = await res.json();
 
-    const found = body.find((p: { id: string }) => p.id === poi.id);
+    const found = results.find((p: { id: string }) => p.id === poi.id);
     expect(found).toBeDefined();
     expect(found).toMatchObject({
       id: expect.any(String),
       name: expect.any(String),
       lat: expect.any(Number),
       lng: expect.any(Number),
-      amenityTypeId: dumpPointTypeId,
       amenityType: { key: dumpPointTypeKey },
     });
+    // amenityTypeId (opaque UUID) is not included — amenityType.key makes it redundant
+    expect(found.amenityTypeId).toBeUndefined();
   });
 
   it("excludes POI outside the radius", async (ctx) => {
@@ -184,8 +190,8 @@ describe("GET /api/amenities", () => {
 
     const res = await GET(makeRequest({ ...BASE, type: dumpPointTypeKey }));
     expect(res.status).toBe(200);
-    const body = await res.json();
-    const ids = body.map((p: { id: string }) => p.id);
+    const { results } = await res.json();
+    const ids = results.map((p: { id: string }) => p.id);
     expect(ids).not.toContain(poi.id);
   });
 
@@ -211,13 +217,8 @@ describe("GET /api/amenities", () => {
 
     const res = await GET(makeRequest({ ...BASE, type: dumpPointTypeKey }));
     expect(res.status).toBe(200);
-    const body = await res.json();
-    const ids = body.map((p: { id: string }) => p.id);
+    const { results } = await res.json();
+    const ids = results.map((p: { id: string }) => p.id);
     expect(ids).not.toContain(otherPoi.id);
-  });
-
-  it("returns 400 for an unknown type key", async () => {
-    const res = await GET(makeRequest({ ...BASE, type: "nonexistent_type_xyz" }));
-    expect(res.status).toBe(400);
   });
 });

@@ -6,6 +6,8 @@ import { prisma } from "@/lib/prisma";
 
 // 1 degree of latitude ≈ 111.32 km everywhere.
 // 1 degree of longitude ≈ 111.32 * cos(lat) km — varies with latitude.
+// Note: the filter is a lat/lng bounding box, not a true circle — POIs in the corners
+// can be up to ~41% further than radius km from the centre.
 function boundingBox(lat: number, lng: number, radiusKm: number) {
   const deltaLat = radiusKm / 111.32;
   const deltaLng = radiusKm / (111.32 * Math.cos((lat * Math.PI) / 180));
@@ -88,14 +90,17 @@ export async function GET(req: Request): Promise<Response> {
         name: true,
         lat: true,
         lng: true,
-        amenityTypeId: true,
         amenityType: { select: { key: true } },
       },
       orderBy: { id: "asc" },
-      take: MAX_RESULTS,
+      // Fetch one extra to detect truncation without an extra COUNT query.
+      take: MAX_RESULTS + 1,
     });
 
-    return Response.json(pois);
+    const truncated = pois.length > MAX_RESULTS;
+    const results = truncated ? pois.slice(0, MAX_RESULTS) : pois;
+
+    return Response.json({ results, truncated });
   } catch (e) {
     console.error("[GET /api/amenities]", e);
     return Response.json({ error: "Internal server error" }, { status: 500 });
