@@ -217,6 +217,21 @@ describe("POST /api/search", () => {
     expect(res.status).toBe(400);
   });
 
+  // --- Claude failure ---
+
+  it("returns 500 when Claude SDK rejects", async () => {
+    const query = "claude failure test query";
+    await prisma.searchCache.deleteMany({ where: { queryHash: hashQuery(query) } });
+
+    mockCreate.mockRejectedValueOnce(new Error("Claude error"));
+
+    const res = await POST(makeRequest({ query, lat: SYDNEY_LAT, lng: SYDNEY_LNG }));
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    // Must not leak internal error details
+    expect(body).toEqual({ error: "Internal server error" });
+  });
+
   // --- Cache behaviour ---
 
   it("calls Claude on a cache miss", async () => {

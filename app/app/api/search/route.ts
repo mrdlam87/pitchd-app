@@ -5,8 +5,14 @@ import { prisma } from "@/lib/prisma";
 import { SyncStatus } from "@/lib/generated/prisma/enums";
 import Anthropic from "@anthropic-ai/sdk";
 import { createHash } from "crypto";
+import type { Prisma } from "@/lib/generated/prisma";
 
-const anthropic = new Anthropic();
+// Lazy init — defers SDK instantiation (and the missing-API-key throw) to request time
+let _anthropic: Anthropic | null = null;
+function getAnthropicClient(): Anthropic {
+  if (!_anthropic) _anthropic = new Anthropic();
+  return _anthropic;
+}
 
 const HAIKU_MODEL = "claude-haiku-4-5-20251001";
 // Rough degrees-per-km at Australian latitudes — accurate enough for bounding box
@@ -22,8 +28,10 @@ const MAX_RADIUS_KM = 1000;
 // Amenity keys Claude is allowed to return — filter out hallucinated values.
 // Must match the keys seeded in prisma/seed.ts — keep in sync if the seed changes.
 const ALLOWED_AMENITIES = ["dog_friendly", "fishing", "hiking", "swimming"];
-// ISO date format guard — rejects free-text like "next Tuesday" from Claude or tampered cache
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// ISO date guard — rejects free-text and calendar-invalid dates (e.g. 2026-02-30)
+function isValidIsoDate(s: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) && new Date(s).toISOString().startsWith(s);
+}
 
 interface ParsedIntent {
   amenities: string[];
@@ -61,7 +69,7 @@ async function parseIntentWithClaude(query: string): Promise<ParsedIntent> {
   const safeQuery = query.replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
   // 10-second timeout — prevents the request hanging if the Anthropic API is slow
-  const message = await anthropic.messages.create({
+  const message = await getAnthropicClient().messages.create({
     model: HAIKU_MODEL,
     max_tokens: 200,
     system: "JSON-only. No explanation, no markdown. Output only a single JSON object.",
@@ -98,8 +106,8 @@ Rules:
     amenities: Array.isArray(parsed.amenities)
       ? (parsed.amenities as unknown[]).filter((a): a is string => typeof a === "string" && ALLOWED_AMENITIES.includes(a))
       : [],
-    dateFrom: typeof parsed.dateFrom === "string" && ISO_DATE_RE.test(parsed.dateFrom) ? parsed.dateFrom : null,
-    dateTo: typeof parsed.dateTo === "string" && ISO_DATE_RE.test(parsed.dateTo) ? parsed.dateTo : null,
+    dateFrom: typeof parsed.dateFrom === "string" && isValidIsoDate(parsed.dateFrom) ? parsed.dateFrom : null,
+    dateTo: typeof parsed.dateTo === "string" && isValidIsoDate(parsed.dateTo) ? parsed.dateTo : null,
     radiusKm: Math.min(
       typeof parsed.radiusKm === "number" && parsed.radiusKm > 0
         ? parsed.radiusKm
@@ -177,8 +185,8 @@ export async function POST(req: Request): Promise<Response> {
           ? raw.amenities.filter((a): a is string => typeof a === "string" && ALLOWED_AMENITIES.includes(a))
           : [],
         // Sanitise date fields — must be ISO format (YYYY-MM-DD), not free-text
-        dateFrom: typeof raw.dateFrom === "string" && ISO_DATE_RE.test(raw.dateFrom) ? raw.dateFrom : null,
-        dateTo: typeof raw.dateTo === "string" && ISO_DATE_RE.test(raw.dateTo) ? raw.dateTo : null,
+        dateFrom: typeof raw.dateFrom === "string" && isValidIsoDate(raw.dateFrom) ? raw.dateFrom : null,
+        dateTo: typeof raw.dateTo === "string" && isValidIsoDate(raw.dateTo) ? raw.dateTo : null,
       };
     } else {
       // Cache miss — call Claude Haiku to parse intent
@@ -194,12 +202,12 @@ export async function POST(req: Request): Promise<Response> {
         create: {
           queryHash,
           queryText: query.trim(),
-          parsedIntentJson: parsedIntent as object,
+          parsedIntentJson: parsedIntent as unknown as Prisma.InputJsonValue,
           expiresAt,
         },
         update: {
           queryText: query.trim(),
-          parsedIntentJson: parsedIntent as object,
+          parsedIntentJson: parsedIntent as unknown as Prisma.InputJsonValue,
           expiresAt,
         },
       }).catch((err) => console.error("[search] cache write failed", err));
