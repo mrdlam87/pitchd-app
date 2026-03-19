@@ -10,6 +10,7 @@
     "postinstall": "prisma generate",
     "db:seed": "tsx prisma/seed.ts",
     "db:ingest-osm": "tsx scripts/ingest-osm.ts",
+    "db:ingest-osm-pois": "tsx scripts/ingest-osm-pois.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
