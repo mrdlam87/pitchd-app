@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
 import type { Session } from "next-auth";
 import { UserRole } from "@/lib/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
@@ -198,50 +198,71 @@ describe("GET /api/campsites", () => {
     expect(ids).toContain(created.id);
   });
 
-  it("returns campsite that has the requested amenity", async () => {
-    const amenityType = await prisma.amenityType.findUniqueOrThrow({ where: { key: "dog_friendly" } });
-    const created = await seedCampsite();
-    await prisma.campsiteAmenity.create({
-      data: { campsiteId: created.id, amenityTypeId: amenityType.id },
+  // These three tests require AmenityType rows populated by `npm run db:seed`.
+  // The beforeAll uses findUnique (not findUniqueOrThrow) so a missing seed produces
+  // a clear skip warning rather than a NotFoundError with no obvious cause.
+  describe("with seeded AmenityType data", () => {
+    let dogTypeId: string | null = null;
+    let fishTypeId: string | null = null;
+
+    beforeAll(async () => {
+      const [dog, fish] = await Promise.all([
+        prisma.amenityType.findUnique({ where: { key: "dog_friendly" } }),
+        prisma.amenityType.findUnique({ where: { key: "fishing" } }),
+      ]);
+      dogTypeId = dog?.id ?? null;
+      fishTypeId = fish?.id ?? null;
+      if (!dogTypeId || !fishTypeId) {
+        console.warn(
+          "[campsites.test] AmenityType seed rows not found — skipping amenity filter tests. " +
+          "Run `npm run db:seed`."
+        );
+      }
     });
-    const res = await GET(makeRequest({ ...SYDNEY, amenities: "dog_friendly" }));
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    const ids = body.results.map((c: { id: string }) => c.id);
-    expect(ids).toContain(created.id);
-  });
 
-  it("excludes campsite that does not have the requested amenity", async () => {
-    const created = await seedCampsite(); // no amenities linked
-    const res = await GET(makeRequest({ ...SYDNEY, amenities: "dog_friendly" }));
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    const ids = body.results.map((c: { id: string }) => c.id);
-    expect(ids).not.toContain(created.id);
-  });
+    it("returns campsite that has the requested amenity", async (ctx) => {
+      if (!dogTypeId) { ctx.skip(); return; }
+      const created = await seedCampsite();
+      await prisma.campsiteAmenity.create({
+        data: { campsiteId: created.id, amenityTypeId: dogTypeId },
+      });
+      const res = await GET(makeRequest({ ...SYDNEY, amenities: "dog_friendly" }));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      const ids = body.results.map((c: { id: string }) => c.id);
+      expect(ids).toContain(created.id);
+    });
 
-  it("returns campsite matching any one of multiple amenity filters (OR logic)", async () => {
-    const [dogType, fishType] = await Promise.all([
-      prisma.amenityType.findUniqueOrThrow({ where: { key: "dog_friendly" } }),
-      prisma.amenityType.findUniqueOrThrow({ where: { key: "fishing" } }),
-    ]);
-    // dogCampsite has dog_friendly only; fishCampsite has fishing only; plain has neither
-    const [dogCampsite, fishCampsite, plainCampsite] = await Promise.all([
-      seedCampsite({ lat: -33.87, lng: 151.21 }),
-      seedCampsite({ lat: -33.88, lng: 151.22 }),
-      seedCampsite({ lat: -33.89, lng: 151.23 }),
-    ]);
-    await Promise.all([
-      prisma.campsiteAmenity.create({ data: { campsiteId: dogCampsite.id, amenityTypeId: dogType.id } }),
-      prisma.campsiteAmenity.create({ data: { campsiteId: fishCampsite.id, amenityTypeId: fishType.id } }),
-    ]);
-    const res = await GET(makeRequest({ ...SYDNEY, amenities: ["dog_friendly", "fishing"] }));
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    const ids = body.results.map((c: { id: string }) => c.id);
-    expect(ids).toContain(dogCampsite.id);
-    expect(ids).toContain(fishCampsite.id);
-    expect(ids).not.toContain(plainCampsite.id);
+    it("excludes campsite that does not have the requested amenity", async (ctx) => {
+      if (!dogTypeId) { ctx.skip(); return; }
+      const created = await seedCampsite(); // no amenities linked
+      const res = await GET(makeRequest({ ...SYDNEY, amenities: "dog_friendly" }));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      const ids = body.results.map((c: { id: string }) => c.id);
+      expect(ids).not.toContain(created.id);
+    });
+
+    it("returns campsite matching any one of multiple amenity filters (OR logic)", async (ctx) => {
+      if (!dogTypeId || !fishTypeId) { ctx.skip(); return; }
+      // dogCampsite has dog_friendly only; fishCampsite has fishing only; plain has neither
+      const [dogCampsite, fishCampsite, plainCampsite] = await Promise.all([
+        seedCampsite({ lat: -33.87, lng: 151.21 }),
+        seedCampsite({ lat: -33.88, lng: 151.22 }),
+        seedCampsite({ lat: -33.89, lng: 151.23 }),
+      ]);
+      await Promise.all([
+        prisma.campsiteAmenity.create({ data: { campsiteId: dogCampsite.id, amenityTypeId: dogTypeId } }),
+        prisma.campsiteAmenity.create({ data: { campsiteId: fishCampsite.id, amenityTypeId: fishTypeId } }),
+      ]);
+      const res = await GET(makeRequest({ ...SYDNEY, amenities: ["dog_friendly", "fishing"] }));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      const ids = body.results.map((c: { id: string }) => c.id);
+      expect(ids).toContain(dogCampsite.id);
+      expect(ids).toContain(fishCampsite.id);
+      expect(ids).not.toContain(plainCampsite.id);
+    });
   });
 
   // --- Pagination ---
