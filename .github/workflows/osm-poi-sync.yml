@@ -1,0 +1,41 @@
+name: OSM POI Sync
+
+on:
+  schedule:
+    # Sunday at 15:00 UTC = Monday 01:00 AEST (UTC+10) / 02:00 AEDT (UTC+11, Oct–Apr)
+    # Runs 1 hour after osm-sync to avoid overlapping Overpass load
+    - cron: "0 15 * * 0"
+  workflow_dispatch:
+
+concurrency:
+  group: osm-poi-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync amenity POI data from OSM
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run OSM POI ingestion
+        run: npm run db:ingest-osm-pois
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
