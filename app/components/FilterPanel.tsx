@@ -114,7 +114,7 @@ export default function FilterPanel({
     >
       {/* Header */}
       <div
-        className="flex-shrink-0 flex items-center justify-between px-4 pt-12 pb-3"
+        className="flex-shrink-0 flex items-center justify-between px-4 pb-3 pt-[max(3rem,env(safe-area-inset-top))]"
         style={{ borderBottom: `1px solid ${BORDER}`, background: "#fff" }}
       >
         <span

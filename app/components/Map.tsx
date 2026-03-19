@@ -244,6 +244,10 @@ export default function MapView() {
   const handleApplyFilters = useCallback(
     (filters: FilterState) => {
       setActiveFilters(filters);
+      // Write ref directly here in addition to the useEffect sync — the useEffect
+      // fires after render, which is too late for the synchronous loadCampsites
+      // call below. Without this, the first search after applying filters would
+      // still use the previous filter values.
       activeFiltersRef.current = filters;
       setShowFilters(false);
       // Re-run the search immediately with the new filters applied
