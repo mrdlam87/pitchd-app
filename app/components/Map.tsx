@@ -85,7 +85,8 @@ async function fetchAmenities(bounds: Bounds, poiTypes: string[]): Promise<Ameni
   // Half-diagonal of the bounding box in km — ensures the circle covers the full viewport.
   const latKm = ((bounds.north - bounds.south) / 2) * 111.32;
   const lngKm = ((bounds.east  - bounds.west)  / 2) * 111.32 * Math.cos((centerLat * Math.PI) / 180);
-  const radius = Math.ceil(Math.sqrt(latKm * latKm + lngKm * lngKm));
+  // Clamp to the API's MAX_RADIUS_KM limit — exceeding it returns a 400 and silently drops pins.
+  const radius = Math.min(Math.ceil(Math.sqrt(latKm * latKm + lngKm * lngKm)), 500);
 
   const fetches = poiTypes.map(async (type) => {
     const params = new URLSearchParams({
@@ -101,6 +102,7 @@ async function fetchAmenities(bounds: Bounds, poiTypes: string[]): Promise<Ameni
         return [] as AmenityPOI[];
       }
       const data = await res.json();
+      if (data.truncated) console.warn(`[fetchAmenities] result capped at 200 for type=${type} — consider zooming in`);
       return (data.results ?? []) as AmenityPOI[];
     } catch (e) {
       console.warn(`[fetchAmenities] fetch failed for type=${type}`, e);
@@ -251,10 +253,17 @@ export default function MapView() {
   }, []);
 
   const loadAmenities = useCallback((map: mapboxgl.Map) => {
+    const poiTypes = activeFiltersRef.current.pois;
+    // Early-return before touching the counter — no HTTP will be made and no
+    // stale-discard is needed. Also clears any lingering pins from a previous filter state.
+    if (poiTypes.length === 0) {
+      setAmenityPois([]);
+      setSelectedPoiId(null);
+      return;
+    }
     const id = ++amenityFetchCounterRef.current;
     const drawerBottomPx = drawerOpenRef.current ? drawerOpenPx() : PEEK_HEIGHT;
     const bounds = computeVisibleBounds(map, drawerBottomPx);
-    const poiTypes = activeFiltersRef.current.pois;
     fetchAmenities(bounds, poiTypes).then((results) => {
       if (id !== amenityFetchCounterRef.current) return; // stale — discard
       setAmenityPois(results);
@@ -403,11 +412,17 @@ export default function MapView() {
   );
 
   const resultLabel =
-    campsites.length === 0
-      ? ""
-      : hasMore
-      ? `${campsites.length}+ campsites nearby`
-      : `${campsites.length} campsites nearby`;
+    campsites.length > 0
+      ? hasMore
+        ? `${campsites.length}+ campsites nearby`
+        : `${campsites.length} campsites nearby`
+      : selectedPoiId
+      ? (() => {
+          const poi = amenityPois.find((p) => p.id === selectedPoiId);
+          const meta = poi ? (POI_META[poi.amenityType.key] ?? { label: poi.amenityType.key }) : null;
+          return meta ? meta.label : "POI selected";
+        })()
+      : "";
 
   const filterCount = activeFilters.activities.length + activeFilters.pois.length;
 
