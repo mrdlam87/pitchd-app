@@ -11,11 +11,11 @@ if (!MAPBOX_TOKEN) {
   console.warn("[MapView] NEXT_PUBLIC_MAPBOX_TOKEN is not set");
 }
 
-// Default centre: roughly the middle of Australia
+// Default centre: Sydney — used when location is denied or unavailable
 const DEFAULT_VIEWPORT = {
-  longitude: 134.0,
-  latitude: -25.5,
-  zoom: 4,
+  longitude: 151.2093,
+  latitude: -33.8688,
+  zoom: 10,
 };
 
 // Design tokens
@@ -96,10 +96,20 @@ export default function MapView() {
           lng: pos.coords.longitude,
         }),
       () => {
-        /* denied or unavailable — no-op */
+        /* denied or unavailable — map stays at DEFAULT_VIEWPORT (Sydney) */
       }
     );
   }, []);
+
+  // Fly to user location when it resolves — onMoveEnd will reload campsites at the new centre
+  useEffect(() => {
+    if (!userLocation || !mapRef.current) return;
+    mapRef.current.flyTo({
+      center: [userLocation.lng, userLocation.lat],
+      zoom: 11,
+      duration: 1200,
+    });
+  }, [userLocation]);
 
   const loadCampsites = useCallback((map: mapboxgl.Map) => {
     const id = ++fetchCounterRef.current;
