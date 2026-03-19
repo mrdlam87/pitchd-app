@@ -338,7 +338,7 @@ export default function MapView() {
                   }}
                   aria-label={`Select campsite ${i + 1}: ${campsite.name}`}
                   aria-pressed={isSel}
-                  className="rounded-xl p-3 cursor-pointer transition-all duration-150"
+                  className="relative rounded-xl p-3 cursor-pointer transition-all duration-150"
                   style={{
                     border: isSel
                       ? `1.5px solid ${CORAL}`
@@ -346,7 +346,22 @@ export default function MapView() {
                     background: isSel ? "#fff" : SURFACE,
                   }}
                 >
-                  <div className="flex items-center gap-3">
+                  {/* Navigate icon button — top-right, doesn't interfere with card content */}
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${campsite.lat},${campsite.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="absolute top-2.5 right-2.5 flex items-center justify-center w-7 h-7 rounded-full transition-opacity hover:opacity-70 active:opacity-50"
+                    style={{ background: "rgba(232,103,74,0.12)" }}
+                    aria-label={`Navigate to ${campsite.name} in Google Maps`}
+                  >
+                    {/* Navigation send icon */}
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill={CORAL} />
+                    </svg>
+                  </a>
+                  <div className="flex items-center gap-3 pr-8">
                     {/* Index badge */}
                     <div
                       className="flex-shrink-0 flex items-center justify-center rounded-full w-6 h-6 font-extrabold"
@@ -361,7 +376,7 @@ export default function MapView() {
                       {i + 1}
                     </div>
                     {/* Name + region */}
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0">
                       <div className="font-semibold text-sm truncate text-[#2d4a2d]">
                         {campsite.name}
                       </div>
@@ -371,22 +386,6 @@ export default function MapView() {
                         </div>
                       )}
                     </div>
-                    {/* Navigate button */}
-                    <a
-                      href={`https://www.google.com/maps/dir/?api=1&destination=${campsite.lat},${campsite.lng}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-semibold transition-opacity hover:opacity-80 active:opacity-60"
-                      style={{
-                        background: CORAL,
-                        color: "#fff",
-                        fontFamily: "var(--font-dm-sans), sans-serif",
-                      }}
-                      aria-label={`Navigate to ${campsite.name} in Google Maps`}
-                    >
-                      Navigate
-                    </a>
                   </div>
                 </div>
               );
