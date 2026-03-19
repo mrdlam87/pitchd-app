@@ -97,7 +97,8 @@ export default function MapView() {
         }),
       () => {
         /* denied or unavailable — map stays at DEFAULT_VIEWPORT (Sydney) */
-      }
+      },
+      { timeout: 10_000 }
     );
   }, []);
 
