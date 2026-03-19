@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { SyncStatus } from "@/lib/generated/prisma/enums";
 import Anthropic from "@anthropic-ai/sdk";
 import { createHash } from "crypto";
-import type { Prisma } from "@/lib/generated/prisma";
+import type { Prisma } from "@/lib/generated/prisma/client";
 
 // Lazy init — defers SDK instantiation (and the missing-API-key throw) to request time
 let _anthropic: Anthropic | null = null;
