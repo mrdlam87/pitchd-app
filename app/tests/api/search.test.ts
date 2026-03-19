@@ -24,7 +24,7 @@ vi.mock("@anthropic-ai/sdk", () => {
 });
 
 import { auth } from "@/auth";
-import { POST } from "@/app/api/search/route";
+import { POST, ALLOWED_AMENITIES } from "@/app/api/search/route";
 
 // Cast to session-returning overload to avoid middleware overload conflict
 const mockAuth = vi.mocked(auth as () => Promise<Session | null>);
@@ -217,6 +217,20 @@ describe("POST /api/search", () => {
     expect(res.status).toBe(400);
   });
 
+  // --- ALLOWED_AMENITIES sync guard ---
+
+  it("every key in ALLOWED_AMENITIES exists as a seeded AmenityType", async () => {
+    // ALLOWED_AMENITIES is a subset of all amenity types — only the ones that make sense
+    // for NL search. This test catches typos and drift: if a key is removed or renamed in
+    // prisma/seed.ts, this will fail. Adding new amenity types to the seed will NOT fail this
+    // test — add new keys to ALLOWED_AMENITIES in route.ts only if they should be AI-searchable.
+    const seeded = await prisma.amenityType.findMany({ select: { key: true } });
+    const seededKeys = seeded.map((a) => a.key);
+    for (const key of ALLOWED_AMENITIES) {
+      expect(seededKeys, `"${key}" in ALLOWED_AMENITIES not found in AmenityType seed`).toContain(key);
+    }
+  });
+
   // --- Claude failure ---
 
   it("returns 500 when Claude SDK rejects", async () => {
@@ -373,12 +387,21 @@ describe("POST /api/search", () => {
   });
 
   it("returns campsite with expected fields including distanceKm", async () => {
-    const query = "quick camping trip";
+    const query = "quick camping trip fields test";
     createdHashes.push(hashQuery(query));
     await prisma.searchCache.deleteMany({ where: { queryHash: hashQuery(query) } });
-    const created = await seedCampsite();
 
-    const res = await POST(makeRequest({ query, lat: SYDNEY_LAT, lng: SYDNEY_LNG }));
+    // Use Broken Hill — remote area with no real OSM campsites, so our seeded campsite
+    // is guaranteed to be within the DB_FETCH_LIMIT take cap.
+    const BASE_LAT = -31.95;
+    const BASE_LNG = 141.47;
+    const created = await seedCampsite({ lat: -31.96, lng: 141.48 });
+
+    mockCreate.mockResolvedValueOnce({
+      content: [{ type: "text", text: JSON.stringify({ amenities: [], dateFrom: null, dateTo: null, radiusKm: 50 }) }],
+    });
+
+    const res = await POST(makeRequest({ query, lat: BASE_LAT, lng: BASE_LNG }));
     expect(res.status).toBe(200);
     const body = await res.json();
 

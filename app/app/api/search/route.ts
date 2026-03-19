@@ -21,13 +21,17 @@ const DEG_PER_KM = 1 / 111;
 const CACHE_TTL_MS = 2 * 60 * 60 * 1000;
 // Number of campsites to return after proximity ranking
 const RESULT_LIMIT = 20;
+// Max rows fetched from DB before Haversine sort — guards against large bounding boxes
+// pulling thousands of rows into memory. Well above RESULT_LIMIT to preserve ranking quality.
+const DB_FETCH_LIMIT = 200;
 // Default search radius when Claude can't infer one
 const DEFAULT_RADIUS_KM = 300;
 // Hard cap on radius — prevents a hallucinated large value causing a near-full-table scan
 const MAX_RADIUS_KM = 1000;
 // Amenity keys Claude is allowed to return — filter out hallucinated values.
 // Must match the keys seeded in prisma/seed.ts — keep in sync if the seed changes.
-const ALLOWED_AMENITIES = ["dog_friendly", "fishing", "hiking", "swimming"];
+// Exported so the sync test in tests/api/search.test.ts can assert against the DB.
+export const ALLOWED_AMENITIES = ["dog_friendly", "fishing", "hiking", "swimming"];
 // ISO date guard — rejects free-text and calendar-invalid dates (e.g. 2026-02-30)
 function isValidIsoDate(s: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(s) && new Date(s).toISOString().startsWith(s);
@@ -190,6 +194,7 @@ export async function POST(req: Request): Promise<Response> {
       };
     } else {
       // Cache miss — call Claude Haiku to parse intent
+      // TODO M7: add per-user rate limiting to prevent cost abuse before wider launch
       parsedIntent = await parseIntentWithClaude(query.trim());
 
       // Store in SearchCache with 2-hour TTL.
@@ -254,6 +259,7 @@ export async function POST(req: Request): Promise<Response> {
           },
         },
       },
+      take: DB_FETCH_LIMIT,
     });
 
     // Rank by proximity to the user, return top RESULT_LIMIT
