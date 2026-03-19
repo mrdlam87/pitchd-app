@@ -118,6 +118,9 @@ export default function MapView() {
   // Tracks the previous fetch's result count so loadCampsites can detect 0 → results
   // transitions without calling a state setter inside another setter's updater function.
   const prevCampsitesLengthRef = useRef(0);
+  // Mirrors the selected campsite's ID so loadCampsites (stable callback) can
+  // re-resolve the selection index after a fetch without needing selectedIdx as a dep.
+  const selectedIdRef = useRef<string | null>(null);
 
   // Request user geolocation on mount
   useEffect(() => {
@@ -171,7 +174,12 @@ export default function MapView() {
         prevCampsitesLengthRef.current = results.length;
         setCampsites(results);
         setHasMore(hasMore);
-        setSelectedIdx(null);
+        // Preserve selection if the campsite is still in the new result set
+        const newIdx = selectedIdRef.current
+          ? results.findIndex((c) => c.id === selectedIdRef.current)
+          : -1;
+        setSelectedIdx(newIdx >= 0 ? newIdx : null);
+        if (newIdx < 0) selectedIdRef.current = null;
       }
     );
   }, []);
@@ -225,6 +233,7 @@ export default function MapView() {
       setDrawerOpen(true);
       setSelectedIdx(i);
       const campsite = campsites[i];
+      selectedIdRef.current = campsite?.id ?? null;
       if (fly && campsite && mapRef.current) {
         // Known edge case: a manual pan that starts during the 300ms easeTo animation
         // will have its moveend consumed by this flag (no refetch fires for that gesture).
