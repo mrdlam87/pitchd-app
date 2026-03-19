@@ -185,6 +185,20 @@ describe("POST /api/search", () => {
     expect(body.error).toMatch(/out of range/i);
   });
 
+  it("returns 400 for lat = 90 (pole causes lngDelta → Infinity)", async () => {
+    const res = await POST(makeRequest({ query: "camping", lat: 90, lng: SYDNEY_LNG }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/out of range/i);
+  });
+
+  it("returns 400 for lat = -90 (pole causes lngDelta → Infinity)", async () => {
+    const res = await POST(makeRequest({ query: "camping", lat: -90, lng: SYDNEY_LNG }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/out of range/i);
+  });
+
   it("returns 400 when lng is out of range", async () => {
     const res = await POST(makeRequest({ query: "camping", lat: SYDNEY_LAT, lng: 9999 }));
     expect(res.status).toBe(400);
@@ -267,6 +281,33 @@ describe("POST /api/search", () => {
 
     const body = await res.json();
     expect(body.parsedIntent).toMatchObject(cachedIntent);
+  });
+
+  it("caps radiusKm from cache at 1000 km", async () => {
+    const query = "radius cap cache test";
+    const hash = hashQuery(query);
+    createdHashes.push(hash);
+
+    // Pre-seed a cache entry with an oversized radius
+    await prisma.searchCache.upsert({
+      where: { queryHash: hash },
+      create: {
+        queryHash: hash,
+        queryText: query,
+        parsedIntentJson: { amenities: [], dateFrom: null, dateTo: null, radiusKm: 5000 },
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+      update: {
+        parsedIntentJson: { amenities: [], dateFrom: null, dateTo: null, radiusKm: 5000 },
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    });
+
+    const res = await POST(makeRequest({ query, lat: SYDNEY_LAT, lng: SYDNEY_LNG }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    // radiusKm in response must be capped at 1000, not the stored 5000
+    expect(body.parsedIntent.radiusKm).toBe(1000);
   });
 
   it("calls Claude again when cached entry is expired", async () => {

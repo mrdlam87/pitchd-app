@@ -17,6 +17,8 @@ const CACHE_TTL_MS = 2 * 60 * 60 * 1000;
 const RESULT_LIMIT = 20;
 // Default search radius when Claude can't infer one
 const DEFAULT_RADIUS_KM = 300;
+// Hard cap on radius — prevents a hallucinated large value causing a near-full-table scan
+const MAX_RADIUS_KM = 1000;
 // Amenity keys Claude is allowed to return — filter out hallucinated values
 const ALLOWED_AMENITIES = ["dog_friendly", "fishing", "hiking", "swimming"];
 
@@ -92,10 +94,12 @@ Rules:
       : [],
     dateFrom: typeof parsed.dateFrom === "string" ? parsed.dateFrom : null,
     dateTo: typeof parsed.dateTo === "string" ? parsed.dateTo : null,
-    radiusKm:
+    radiusKm: Math.min(
       typeof parsed.radiusKm === "number" && parsed.radiusKm > 0
         ? parsed.radiusKm
         : DEFAULT_RADIUS_KM,
+      MAX_RADIUS_KM
+    ),
   };
 }
 
@@ -134,7 +138,8 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: "lat and lng are required" }, { status: 400 });
   }
 
-  if (userLat < -90 || userLat > 90 || userLng < -180 || userLng > 180) {
+  // Exclude poles (±90) — cos(±90°) ≈ 6e-17, which makes lngDelta effectively infinite
+  if (userLat <= -90 || userLat >= 90 || userLng < -180 || userLng > 180) {
     return Response.json({ error: "lat/lng out of range" }, { status: 400 });
   }
 
@@ -151,10 +156,20 @@ export async function POST(req: Request): Promise<Response> {
 
     if (cached && cached.expiresAt > now) {
       // Cache hit — reuse stored intent.
-      // Default radiusKm in case a stale or malformed cache entry is missing the field.
+      // Sanitise on read: a tampered or pre-migration cache entry could have bad values.
       parsedIntent = cached.parsedIntentJson as unknown as ParsedIntent;
       if (typeof parsedIntent.radiusKm !== "number" || parsedIntent.radiusKm <= 0) {
         parsedIntent.radiusKm = DEFAULT_RADIUS_KM;
+      }
+      // Cap radiusKm to prevent a large cached value from causing a table scan
+      parsedIntent.radiusKm = Math.min(parsedIntent.radiusKm, MAX_RADIUS_KM);
+      // Re-filter amenities in case the cache entry predates the ALLOWED_AMENITIES list
+      if (Array.isArray(parsedIntent.amenities)) {
+        parsedIntent.amenities = parsedIntent.amenities.filter(
+          (a): a is string => typeof a === "string" && ALLOWED_AMENITIES.includes(a)
+        );
+      } else {
+        parsedIntent.amenities = [];
       }
     } else {
       // Cache miss — call Claude Haiku to parse intent
