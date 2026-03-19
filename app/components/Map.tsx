@@ -80,6 +80,9 @@ export default function MapView() {
     lat: number;
     lng: number;
   } | null>(null);
+  // Ref mirrors state so handleLoad always reads the latest value without
+  // needing userLocation as a dependency (onLoad fires only once).
+  const userLocationRef = useRef<{ lat: number; lng: number } | null>(null);
   const mapRef = useRef<MapRef>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const skipNextFetch = useRef(false);
@@ -90,27 +93,24 @@ export default function MapView() {
   useEffect(() => {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
-      (pos) =>
-        setUserLocation({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-        }),
+      (pos) => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        userLocationRef.current = loc;
+        setUserLocation(loc);
+        // If the map is already loaded, fly there now.
+        // If not yet loaded, handleLoad will pick it up from userLocationRef.
+        mapRef.current?.flyTo({
+          center: [loc.lng, loc.lat],
+          zoom: 11,
+          duration: 1200,
+        });
+      },
       () => {
         /* denied or unavailable — map stays at DEFAULT_VIEWPORT (Sydney) */
       },
       { timeout: 10_000 }
     );
   }, []);
-
-  // Fly to user location when it resolves — onMoveEnd will reload campsites at the new centre
-  useEffect(() => {
-    if (!userLocation || !mapRef.current) return;
-    mapRef.current.flyTo({
-      center: [userLocation.lng, userLocation.lat],
-      zoom: 11,
-      duration: 1200,
-    });
-  }, [userLocation]);
 
   const loadCampsites = useCallback((map: mapboxgl.Map) => {
     const id = ++fetchCounterRef.current;
@@ -129,12 +129,12 @@ export default function MapView() {
 
   const handleLoad = useCallback(
     (_e: { target: mapboxgl.Map }) => {
-      // If geolocation resolved before the map finished loading, fly there now.
-      // onMoveEnd will handle the campsite load after the fly completes.
-      // Otherwise load campsites at the default viewport immediately.
-      if (userLocation) {
+      // Read from ref so we always see the latest geolocation value regardless
+      // of when the geolocation promise resolved vs when the map finished loading.
+      const loc = userLocationRef.current;
+      if (loc) {
         mapRef.current?.flyTo({
-          center: [userLocation.lng, userLocation.lat],
+          center: [loc.lng, loc.lat],
           zoom: 11,
           duration: 1200,
         });
@@ -142,7 +142,7 @@ export default function MapView() {
         loadCampsites(_e.target);
       }
     },
-    [loadCampsites, userLocation]
+    [loadCampsites]
   );
 
   const handleMoveEnd = useCallback(
@@ -198,9 +198,9 @@ export default function MapView() {
         onLoad={handleLoad}
         onMoveEnd={handleMoveEnd}
       >
-        {/* User location dot */}
+        {/* User location dot — zIndex must exceed selected pin (10) */}
         {userLocation && (
-          <Marker longitude={userLocation.lng} latitude={userLocation.lat}>
+          <Marker longitude={userLocation.lng} latitude={userLocation.lat} style={{ zIndex: 20 }}>
             <div
               className="w-[11px] h-[11px] rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
               style={{

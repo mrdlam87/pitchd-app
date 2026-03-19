@@ -29,7 +29,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en-AU">
-      <body className={`${nunito.variable} ${lora.variable} ${dmSans.variable} antialiased`}>
+      <body className={`${nunito.variable} ${lora.variable} ${dmSans.variable} antialiased`} suppressHydrationWarning>
         {children}
       </body>
     </html>
