@@ -419,6 +419,9 @@ export default function MapView() {
         minZoom={7}
         onLoad={handleLoad}
         onMoveEnd={handleMoveEnd}
+        // Use setDrawerState directly (not handleDrawerStateChange) — calling
+        // map.setPadding inside an active drag gesture cancels the gesture via
+        // its internal easeTo(duration:0) and makes the map stutter.
         onDragStart={() => setDrawerState("peek")}
         onClick={() => {
           setSelectedIdx(null);
