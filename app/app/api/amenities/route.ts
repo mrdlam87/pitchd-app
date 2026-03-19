@@ -18,6 +18,8 @@ function boundingBox(lat: number, lng: number, radiusKm: number) {
 }
 
 const MAX_RADIUS_KM = 500;
+// Hard cap to avoid returning thousands of rows at large radii from a well-seeded DB.
+const MAX_RESULTS = 200;
 
 export async function GET(req: Request): Promise<Response> {
   const session = await auth();
@@ -60,14 +62,26 @@ export async function GET(req: Request): Promise<Response> {
     return Response.json({ error: "type is required" }, { status: 400 });
   }
 
-  const { minLat, maxLat, minLng, maxLng } = boundingBox(lat, lng, radius);
-
   try {
+    // Resolve amenityTypeId from the key first so we can filter directly on the indexed column.
+    // This lets Postgres use @@index([amenityTypeId, lat, lng]) instead of planning a JOIN.
+    // Returns 400 for an unknown key — a valid type with no nearby POIs returns [] via findMany.
+    const amenityType = await prisma.amenityType.findUnique({
+      where: { key: type },
+      select: { id: true },
+    });
+
+    if (!amenityType) {
+      return Response.json({ error: `Unknown amenity type: ${type}` }, { status: 400 });
+    }
+
+    const { minLat, maxLat, minLng, maxLng } = boundingBox(lat, lng, radius);
+
     const pois = await prisma.amenityPOI.findMany({
       where: {
+        amenityTypeId: amenityType.id,
         lat: { gte: minLat, lte: maxLat },
         lng: { gte: minLng, lte: maxLng },
-        amenityType: { key: type },
       },
       select: {
         id: true,
@@ -75,8 +89,10 @@ export async function GET(req: Request): Promise<Response> {
         lat: true,
         lng: true,
         amenityTypeId: true,
+        amenityType: { select: { key: true } },
       },
       orderBy: { id: "asc" },
+      take: MAX_RESULTS,
     });
 
     return Response.json(pois);

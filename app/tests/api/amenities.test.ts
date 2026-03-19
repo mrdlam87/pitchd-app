@@ -124,12 +124,14 @@ describe("GET /api/amenities", () => {
 
   // --- Response shape ---
 
-  it("returns an array (empty when no results)", async () => {
-    // No POIs seeded — expect empty array, not an error
-    const res = await GET(makeRequest({ ...BASE, type: "dump_point" }));
+  it("returns an array (empty when no results)", async (ctx) => {
+    if (!dumpPointTypeKey) { ctx.skip(); return; }
+    // No POIs seeded near Sydney for this type — expect empty array, not an error
+    const res = await GET(makeRequest({ ...BASE, type: dumpPointTypeKey }));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(Array.isArray(body)).toBe(true);
+    expect(body).toHaveLength(0);
   });
 
   // --- Results ---
@@ -161,6 +163,7 @@ describe("GET /api/amenities", () => {
       lat: expect.any(Number),
       lng: expect.any(Number),
       amenityTypeId: dumpPointTypeId,
+      amenityType: { key: dumpPointTypeKey },
     });
   });
 
@@ -213,12 +216,8 @@ describe("GET /api/amenities", () => {
     expect(ids).not.toContain(otherPoi.id);
   });
 
-  it("returns empty array (not error) when no POIs match", async () => {
-    // type that almost certainly has no POIs in the area
+  it("returns 400 for an unknown type key", async () => {
     const res = await GET(makeRequest({ ...BASE, type: "nonexistent_type_xyz" }));
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(Array.isArray(body)).toBe(true);
-    expect(body).toHaveLength(0);
+    expect(res.status).toBe(400);
   });
 });
