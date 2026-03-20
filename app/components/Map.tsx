@@ -13,7 +13,7 @@ import BottomDrawer, {
 } from "./BottomDrawer";
 import type { AmenityPOI, Campsite } from "@/types/map";
 import { CORAL, FOREST_GREEN } from "@/lib/tokens";
-import { SEARCH_RESULTS_KEY, type SearchResultsPayload } from "@/components/HomeScreen";
+import { SEARCH_RESULTS_KEY, type SearchResultsPayload } from "@/lib/searchResults";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -307,15 +307,20 @@ export default function MapView() {
         const sw: [number, number] = [Math.min(...lngs), Math.min(...lats)];
         const ne: [number, number] = [Math.max(...lngs), Math.max(...lats)];
         const bottomPad = getDrawerHeightPx("half");
-        // Suppress the moveend that fitBounds fires after its animation, and
+        // Suppress the moveend that fitBounds/flyTo fires after its animation, and
         // prevent the geolocation callback from flying away from the results.
         skipNextFetch.current = true;
         suppressGeoFlyRef.current = true;
-        _e.target.fitBounds([sw, ne], {
-          padding: { top: 60, right: 40, bottom: bottomPad + 20, left: 40 },
-          duration: 800,
-          maxZoom: 11,
-        });
+        if (lats.length === 1) {
+          // Single result — fitBounds with identical sw/ne produces unpredictable zoom
+          _e.target.flyTo({ center: [lngs[0], lats[0]], zoom: 11, duration: 800 });
+        } else {
+          _e.target.fitBounds([sw, ne], {
+            padding: { top: 60, right: 40, bottom: bottomPad + 20, left: 40 },
+            duration: 800,
+            maxZoom: 11,
+          });
+        }
         return;
       }
 

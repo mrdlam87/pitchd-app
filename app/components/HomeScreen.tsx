@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Campsite } from "@/types/map";
-import type { ParsedIntent } from "@/lib/parseIntent";
+import { SEARCH_RESULTS_KEY, type SearchResultsPayload } from "@/lib/searchResults";
 
 // Cycling placeholder prompts — matches prototype EXAMPLE_PROMPTS
 const EXAMPLE_PROMPTS = [
@@ -29,14 +28,6 @@ const LOADING_MESSAGES = [
   "Almost there…",
 ];
 
-// sessionStorage key for passing search results to the map page
-export const SEARCH_RESULTS_KEY = "pitchd:searchResults";
-
-export type SearchResultsPayload = {
-  campsites: Campsite[];
-  parsedIntent: ParsedIntent;
-  query: string;
-};
 
 // SVG scenic landscape illustration — ported from prototype ScenicPhoto (seed=2)
 function ScenicPhoto() {
@@ -165,7 +156,7 @@ export default function HomeScreen() {
         throw new Error(data.error ?? "Search failed");
       }
 
-      const data = (await res.json()) as { campsites: Campsite[]; parsedIntent: ParsedIntent };
+      const data = (await res.json()) as Pick<SearchResultsPayload, "campsites" | "parsedIntent">;
 
       const payload: SearchResultsPayload = {
         campsites: data.campsites,
@@ -176,6 +167,7 @@ export default function HomeScreen() {
       router.push("/map");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
       setLoading(false);
     }
   }
@@ -244,11 +236,7 @@ export default function HomeScreen() {
               <button
                 onClick={() => void handleSearch(query)}
                 disabled={!query.trim() || loading}
-                className="flex min-w-[60px] items-center justify-center gap-1.5 rounded-[10px] px-4 py-1.5 text-xs font-bold transition-colors duration-150 disabled:cursor-not-allowed"
-                style={{
-                  background: query.trim() || loading ? "#e8674a" : "#e8ddd4",
-                  color: query.trim() || loading ? "#fff" : "#8a9e8a",
-                }}
+                className={`flex min-w-[60px] items-center justify-center gap-1.5 rounded-[10px] px-4 py-1.5 text-xs font-bold transition-colors duration-150 disabled:cursor-not-allowed ${query.trim() || loading ? "bg-[#e8674a] text-white" : "bg-[#e8ddd4] text-[#8a9e8a]"}`}
               >
                 {loading ? (
                   <>
@@ -269,6 +257,7 @@ export default function HomeScreen() {
                 key={chip.key}
                 onClick={() => void handleSearch(chip.query)}
                 disabled={loading}
+                aria-label={chip.icon === "logo" ? chip.label : undefined}
                 className="flex shrink-0 cursor-pointer items-center gap-1 rounded-full border border-[#e0dbd0] bg-white px-3 py-1.5 shadow-sm transition-all duration-150 hover:border-[#2d4a2d] hover:bg-[#2d4a2d] hover:text-white disabled:opacity-50 [&:hover_span]:text-white"
               >
                 {chip.icon === "logo" ? (
