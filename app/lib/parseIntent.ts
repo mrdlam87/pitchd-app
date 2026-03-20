@@ -13,6 +13,8 @@ export const MAX_DRIVE_TIME_HRS = 12;
 export const ALLOWED_AMENITIES = ["dog_friendly", "fishing", "hiking", "swimming"];
 
 export interface ParsedIntent {
+  // Extracted place name (e.g. "Blue Mountains"). Returned to the client for display
+  // but not yet used to shift the search centre — geocoding is deferred to a later milestone.
   location: string | null;
   driveTimeHrs: number;
   amenities: string[];
@@ -57,7 +59,7 @@ Return ONLY this JSON shape:
 
 Rules:
 - location: the place name mentioned (e.g. "Blue Mountains", "Victoria") or null if not mentioned. Do not infer from vague queries.
-- driveTimeHrs: inferred drive time in hours (1, 2, or 3). Default 3 if not mentioned. "nearby" or "close" = 1, "a few hours" = 3.
+- driveTimeHrs: number of hours willing to drive (1–12). Default 3 if not mentioned. "nearby"/"close" ≈ 1, "a few hours" ≈ 3, "half a day" ≈ 6. Use the exact number if stated.
 - amenities: array of matching keys from [dog_friendly, fishing, hiking, swimming] — empty array if none mentioned.
 - startDate / endDate: ISO date strings (YYYY-MM-DD) if dates are mentioned, otherwise null. "this weekend" = upcoming Saturday and Sunday. "next weekend" = the weekend after that.
 - sortBy: "proximity" if user wants closest results, "relevance" if they want best match, null if not mentioned.`,

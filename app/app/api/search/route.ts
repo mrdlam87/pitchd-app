@@ -166,7 +166,9 @@ export async function POST(req: Request): Promise<Response> {
     // but not yet used to shift the search centre — geocoding is deferred to a later milestone.
     // Until then, userLat/userLng (the user's GPS coordinates) remain the search origin.
 
-    // Derive search radius from drive time. Cap to prevent near-full-table scans.
+    // Derive search radius from drive time. The Math.min is defence-in-depth — driveTimeHrs
+    // is already capped at MAX_DRIVE_TIME_HRS in parseIntentWithClaude and the cache sanitiser,
+    // so this guard only fires if those layers are bypassed (e.g. a future code path).
     const radiusKm = Math.min(parsedIntent.driveTimeHrs * KM_PER_HOUR, MAX_DRIVE_TIME_HRS * KM_PER_HOUR);
 
     // Build a bounding box around the user's location using the intent-derived radius.

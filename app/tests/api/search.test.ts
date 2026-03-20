@@ -498,7 +498,7 @@ describe("POST /api/search", () => {
 
   // --- Vague query handling ---
 
-  it("handles vague queries by returning sensible defaults", async () => {
+  it("handles vague queries — returns 200 with a valid parsedIntent shape", async () => {
     const query = "somewhere nice this weekend";
     createdHashes.push(hashQuery(query));
     await prisma.searchCache.deleteMany({ where: { queryHash: hashQuery(query) } });
