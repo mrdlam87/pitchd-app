@@ -184,10 +184,10 @@ export default function MapView() {
   // loadCampsites (which would replace the results with browse results). Cleared when the
   // user taps the active Pitchd chip or applies filters.
   const searchModeRef = useRef(initialSearch !== null);
-  // Key of the currently active quick chip (null = browse mode or HomeScreen NL search).
-  // Only set when the user taps a chip directly on the map — HomeScreen NL searches
-  // don't map to a specific chip so we leave this null to avoid misleading highlighting.
-  const [activeChip, setActiveChip] = useState<string | null>(null);
+  // Key of the currently active quick chip (null = browse mode).
+  // Defaults to "pitchd" when arriving from a HomeScreen NL search — this lights up the
+  // Pitchd chip as the NL mode indicator so the user can tap it to return to browse mode.
+  const [activeChip, setActiveChip] = useState<string | null>(initialSearch !== null ? "pitchd" : null);
   // Query string shown as context below the map search input
   const [searchContextQuery, setSearchContextQuery] = useState<string | null>(initialSearch?.query ?? null);
   // Controlled value for the map search input
