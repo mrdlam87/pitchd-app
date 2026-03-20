@@ -17,3 +17,9 @@ body {
   color: var(--foreground);
   font-family: var(--font-nunito), sans-serif;
 }
+
+@keyframes ldprogress {
+  0%   { width: 0%;    margin-left: 0 }
+  50%  { width: 100%;  margin-left: 0 }
+  100% { width: 0%;    margin-left: 100% }
+}

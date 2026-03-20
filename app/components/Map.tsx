@@ -13,6 +13,7 @@ import BottomDrawer, {
 } from "./BottomDrawer";
 import type { AmenityPOI, Campsite } from "@/types/map";
 import { CORAL, FOREST_GREEN } from "@/lib/tokens";
+import { SEARCH_RESULTS_KEY, type SearchResultsPayload } from "@/components/HomeScreen";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -120,8 +121,27 @@ function computeVisibleBounds(map: mapboxgl.Map, drawerHeightPx: number): Bounds
 
 const EMPTY_FILTERS: FilterState = { activities: [], pois: [] };
 
+// Reads and clears the search results payload written by HomeScreen before navigating here.
+// Returns null if nothing is stored or the data is malformed.
+function consumeSearchResults(): SearchResultsPayload | null {
+  try {
+    const raw = sessionStorage.getItem(SEARCH_RESULTS_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(SEARCH_RESULTS_KEY);
+    return JSON.parse(raw) as SearchResultsPayload;
+  } catch {
+    return null;
+  }
+}
+
 export default function MapView() {
   const [campsites, setCampsites] = useState<Campsite[]>([]);
+  // Ref holds initial search payload so handleLoad (a stable useCallback) can access it
+  // without needing it as a dependency.
+  const initialSearchRef = useRef<SearchResultsPayload | null>(null);
+  // Set to true when search results are loaded — suppresses the geolocation flyTo
+  // so it doesn't pan away from the search result bounds.
+  const suppressGeoFlyRef = useRef(false);
   const [hasMore, setHasMore] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [amenityPois, setAmenityPois] = useState<AmenityPOI[]>([]);
@@ -160,6 +180,15 @@ export default function MapView() {
   // previous pending scroll, and so it can be cleaned up on unmount.
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Consume search results from sessionStorage on mount (written by HomeScreen before navigation).
+  // Store in a ref so handleLoad (stable useCallback) can access it without a dep.
+  useEffect(() => {
+    const payload = consumeSearchResults();
+    if (payload) {
+      initialSearchRef.current = payload;
+    }
+  }, []);
+
   // Request user geolocation on mount
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -168,7 +197,7 @@ export default function MapView() {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         userLocationRef.current = loc;
         setUserLocation(loc);
-        if (mapLoadedRef.current) {
+        if (mapLoadedRef.current && !suppressGeoFlyRef.current) {
           mapRef.current?.flyTo({
             center: [loc.lng, loc.lat],
             zoom: 11,
@@ -261,6 +290,35 @@ export default function MapView() {
   const handleLoad = useCallback(
     (_e: { target: mapboxgl.Map }) => {
       mapLoadedRef.current = true;
+
+      // If we arrived from a NL search, display those results immediately and
+      // fit the map to show all pins. Skip the browse API fetch.
+      const searchPayload = initialSearchRef.current;
+      if (searchPayload && searchPayload.campsites.length > 0) {
+        initialSearchRef.current = null;
+        setCampsites(searchPayload.campsites);
+        prevCampsitesLengthRef.current = searchPayload.campsites.length;
+        setDrawerState("half");
+        drawerStateRef.current = "half";
+
+        // Fit map to bounds of all result pins
+        const lats = searchPayload.campsites.map((c) => c.lat);
+        const lngs = searchPayload.campsites.map((c) => c.lng);
+        const sw: [number, number] = [Math.min(...lngs), Math.min(...lats)];
+        const ne: [number, number] = [Math.max(...lngs), Math.max(...lats)];
+        const bottomPad = getDrawerHeightPx("half");
+        // Suppress the moveend that fitBounds fires after its animation, and
+        // prevent the geolocation callback from flying away from the results.
+        skipNextFetch.current = true;
+        suppressGeoFlyRef.current = true;
+        _e.target.fitBounds([sw, ne], {
+          padding: { top: 60, right: 40, bottom: bottomPad + 20, left: 40 },
+          duration: 800,
+          maxZoom: 11,
+        });
+        return;
+      }
+
       const loc = userLocationRef.current;
       if (loc) {
         mapRef.current?.flyTo({
