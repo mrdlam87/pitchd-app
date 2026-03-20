@@ -3,18 +3,23 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { SyncStatus } from "@/lib/generated/prisma/enums";
-import Anthropic from "@anthropic-ai/sdk";
+import {
+  parseIntentWithClaude,
+  isValidIsoDate,
+  ALLOWED_AMENITIES,
+  DEFAULT_DRIVE_TIME_HRS,
+  MAX_DRIVE_TIME_HRS,
+  KM_PER_HOUR,
+  type ParsedIntent,
+} from "@/lib/parseIntent";
 import { createHash } from "crypto";
 import type { Prisma } from "@/lib/generated/prisma/client";
 
-// Lazy init — defers SDK instantiation (and the missing-API-key throw) to request time
-let _anthropic: Anthropic | null = null;
-function getAnthropicClient(): Anthropic {
-  if (!_anthropic) _anthropic = new Anthropic();
-  return _anthropic;
-}
+// Re-export for callers that import from the route rather than from the lib directly.
+// The route is the public API surface for search — keeping this here avoids breaking
+// any future callers that import ALLOWED_AMENITIES alongside POST.
+export { ALLOWED_AMENITIES } from "@/lib/parseIntent";
 
-const HAIKU_MODEL = "claude-haiku-4-5-20251001";
 // Rough degrees-per-km at Australian latitudes — accurate enough for bounding box
 const DEG_PER_KM = 1 / 111;
 // 2-hour cache TTL
@@ -24,25 +29,7 @@ const RESULT_LIMIT = 20;
 // Max rows fetched from DB before Haversine sort — guards against large bounding boxes
 // pulling thousands of rows into memory. Well above RESULT_LIMIT to preserve ranking quality.
 const DB_FETCH_LIMIT = 200;
-// Default search radius when Claude can't infer one
-const DEFAULT_RADIUS_KM = 300;
-// Hard cap on radius — prevents a hallucinated large value causing a near-full-table scan
-const MAX_RADIUS_KM = 1000;
-// Amenity keys Claude is allowed to return — filter out hallucinated values.
-// Must match the keys seeded in prisma/seed.ts — keep in sync if the seed changes.
-// Exported so the sync test in tests/api/search.test.ts can assert against the DB.
-export const ALLOWED_AMENITIES = ["dog_friendly", "fishing", "hiking", "swimming"];
-// ISO date guard — rejects free-text and calendar-invalid dates (e.g. 2026-02-30)
-function isValidIsoDate(s: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(s) && new Date(s).toISOString().startsWith(s);
-}
-
-interface ParsedIntent {
-  amenities: string[];
-  dateFrom: string | null;
-  dateTo: string | null;
-  radiusKm: number;
-}
+// DEFAULT_DRIVE_TIME_HRS, MAX_DRIVE_TIME_HRS, and KM_PER_HOUR imported from @/lib/parseIntent
 
 function hashQuery(query: string): string {
   return createHash("sha256").update(query.toLowerCase().trim()).digest("hex");
@@ -64,61 +51,6 @@ function distanceKm(
       Math.cos((lat2 * Math.PI) / 180) *
       Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-async function parseIntentWithClaude(query: string): Promise<ParsedIntent> {
-  const today = new Date().toISOString().split("T")[0];
-
-  // Escape angle brackets to prevent prompt injection via </query> tag breakout
-  const safeQuery = query.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-  // 10-second timeout — prevents the request hanging if the Anthropic API is slow
-  const message = await getAnthropicClient().messages.create({
-    model: HAIKU_MODEL,
-    max_tokens: 200,
-    system: "JSON-only. No explanation, no markdown. Output only a single JSON object.",
-    messages: [
-      {
-        role: "user",
-        content: `Parse this Australian camping search query and extract structured intent.
-<query>${safeQuery}</query>
-Today: ${today}
-
-Return ONLY this JSON shape:
-{"amenities":[],"dateFrom":null,"dateTo":null,"radiusKm":300}
-
-Rules:
-- amenities: array of matching keys from [dog_friendly, fishing, hiking, swimming] — empty array if none mentioned
-- dateFrom / dateTo: ISO date strings (YYYY-MM-DD) if dates are mentioned, otherwise null. "this weekend" = upcoming Saturday and Sunday.
-- radiusKm: inferred drive radius in km (1hr ≈ 80km, 2hr ≈ 160km, 3hr ≈ 240km). Default 300 if not mentioned.`,
-      },
-    ],
-  }, { timeout: 10_000 });
-
-  const text = message.content
-    .filter((b) => b.type === "text")
-    .map((b) => (b as Anthropic.TextBlock).text)
-    .join("");
-
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start === -1 || end === -1) throw new Error("Claude returned invalid JSON");
-
-  const parsed = JSON.parse(text.slice(start, end + 1));
-
-  return {
-    amenities: Array.isArray(parsed.amenities)
-      ? (parsed.amenities as unknown[]).filter((a): a is string => typeof a === "string" && ALLOWED_AMENITIES.includes(a))
-      : [],
-    dateFrom: typeof parsed.dateFrom === "string" && isValidIsoDate(parsed.dateFrom) ? parsed.dateFrom : null,
-    dateTo: typeof parsed.dateTo === "string" && isValidIsoDate(parsed.dateTo) ? parsed.dateTo : null,
-    radiusKm: Math.min(
-      typeof parsed.radiusKm === "number" && parsed.radiusKm > 0
-        ? parsed.radiusKm
-        : DEFAULT_RADIUS_KM,
-      MAX_RADIUS_KM
-    ),
-  };
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -175,22 +107,35 @@ export async function POST(req: Request): Promise<Response> {
     if (cached && cached.expiresAt > now) {
       // Cache hit — reuse stored intent.
       // Sanitise on read: a tampered or pre-migration cache entry could have bad values.
-      // Use a spread to avoid mutating the Prisma result object directly.
       const raw = cached.parsedIntentJson as unknown as ParsedIntent;
-      const rawRadius = typeof raw.radiusKm === "number" && raw.radiusKm > 0
-        ? raw.radiusKm
-        : DEFAULT_RADIUS_KM;
+      const rawDriveTime =
+        typeof raw.driveTimeHrs === "number" && raw.driveTimeHrs >= 1
+          ? raw.driveTimeHrs
+          : DEFAULT_DRIVE_TIME_HRS;
       parsedIntent = {
-        ...raw,
-        // Cap radiusKm to prevent a large cached value from causing a table scan
-        radiusKm: Math.min(rawRadius, MAX_RADIUS_KM),
+        location: typeof raw.location === "string" && raw.location.trim() !== "" ? raw.location.trim() : null,
+        driveTimeHrs: Math.min(rawDriveTime, MAX_DRIVE_TIME_HRS),
         // Re-filter amenities in case the cache entry predates the ALLOWED_AMENITIES list
         amenities: Array.isArray(raw.amenities)
-          ? raw.amenities.filter((a): a is string => typeof a === "string" && ALLOWED_AMENITIES.includes(a))
+          ? raw.amenities.filter(
+              (a): a is string =>
+                typeof a === "string" &&
+                ALLOWED_AMENITIES.includes(a)
+            )
           : [],
         // Sanitise date fields — must be ISO format (YYYY-MM-DD), not free-text
-        dateFrom: typeof raw.dateFrom === "string" && isValidIsoDate(raw.dateFrom) ? raw.dateFrom : null,
-        dateTo: typeof raw.dateTo === "string" && isValidIsoDate(raw.dateTo) ? raw.dateTo : null,
+        startDate:
+          typeof raw.startDate === "string" && isValidIsoDate(raw.startDate)
+            ? raw.startDate
+            : null,
+        endDate:
+          typeof raw.endDate === "string" && isValidIsoDate(raw.endDate)
+            ? raw.endDate
+            : null,
+        sortBy:
+          raw.sortBy === "proximity" || raw.sortBy === "relevance"
+            ? raw.sortBy
+            : null,
       };
     } else {
       // Cache miss — call Claude Haiku to parse intent
@@ -218,11 +163,20 @@ export async function POST(req: Request): Promise<Response> {
       }).catch((err) => console.error("[search] cache write failed", err));
     }
 
+    // parsedIntent.location (e.g. "Blue Mountains") is extracted and returned to the client
+    // but not yet used to shift the search centre — geocoding is deferred to a later milestone.
+    // Until then, userLat/userLng (the user's GPS coordinates) remain the search origin.
+
+    // Derive search radius from drive time. The Math.min is defence-in-depth — driveTimeHrs
+    // is already capped at MAX_DRIVE_TIME_HRS in parseIntentWithClaude and the cache sanitiser,
+    // so this guard only fires if those layers are bypassed (e.g. a future code path).
+    const radiusKm = Math.min(parsedIntent.driveTimeHrs * KM_PER_HOUR, MAX_DRIVE_TIME_HRS * KM_PER_HOUR);
+
     // Build a bounding box around the user's location using the intent-derived radius.
     // lng delta accounts for longitude convergence at AU latitudes (~30°S).
-    const latDelta = parsedIntent.radiusKm * DEG_PER_KM;
+    const latDelta = radiusKm * DEG_PER_KM;
     const lngDelta =
-      parsedIntent.radiusKm * DEG_PER_KM / Math.cos((userLat * Math.PI) / 180);
+      radiusKm * DEG_PER_KM / Math.cos((userLat * Math.PI) / 180);
 
     const campsites = await prisma.campsite.findMany({
       where: {
