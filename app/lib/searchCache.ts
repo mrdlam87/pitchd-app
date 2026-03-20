@@ -30,6 +30,8 @@ export async function getCachedIntent(queryHash: string): Promise<ParsedIntent |
   if (!cached || cached.expiresAt <= new Date()) return null;
 
   const raw = cached.parsedIntentJson as unknown as ParsedIntent;
+  // Sub-1 values (e.g. 0.5) are treated as missing/invalid and fall back to the default.
+  // Claude is instructed to emit 1–12, so this only fires on pre-migration or tampered entries.
   const rawDriveTime =
     typeof raw.driveTimeHrs === "number" && raw.driveTimeHrs >= 1
       ? raw.driveTimeHrs
