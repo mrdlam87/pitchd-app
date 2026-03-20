@@ -13,6 +13,8 @@ import BottomDrawer, {
 } from "./BottomDrawer";
 import type { AmenityPOI, Campsite } from "@/types/map";
 import { CORAL, FOREST_GREEN } from "@/lib/tokens";
+import { SEARCH_RESULTS_KEY, type SearchResultsPayload } from "@/lib/searchResults";
+import { QUICK_CHIPS } from "@/lib/chips";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -120,8 +122,80 @@ function computeVisibleBounds(map: mapboxgl.Map, drawerHeightPx: number): Bounds
 
 const EMPTY_FILTERS: FilterState = { activities: [], pois: [] };
 
+
+// Fit the map to the bounding box of a set of campsites.
+// Uses reduce instead of spread to avoid V8 stack overflow on large arrays.
+function fitToCampsites(map: mapboxgl.Map, campsites: Campsite[], bottomPad: number) {
+  if (campsites.length === 0) return;
+  const lats = campsites.map((c) => c.lat);
+  const lngs = campsites.map((c) => c.lng);
+  if (lats.length === 1) {
+    map.flyTo({ center: [lngs[0], lats[0]], zoom: 11, duration: 800 });
+  } else {
+    const sw: [number, number] = [lngs.reduce((a, b) => Math.min(a, b)), lats.reduce((a, b) => Math.min(a, b))];
+    const ne: [number, number] = [lngs.reduce((a, b) => Math.max(a, b)), lats.reduce((a, b) => Math.max(a, b))];
+    map.fitBounds([sw, ne], {
+      padding: { top: 120, right: 40, bottom: bottomPad + 20, left: 40 },
+      duration: 800,
+      maxZoom: 11,
+    });
+  }
+}
+
+// Reads and clears the search results payload written by HomeScreen before navigating here.
+// Returns null if nothing is stored, the data is malformed, or sessionStorage is unavailable.
+// Validates the shape at runtime so stale data from a previous app version can't cause a crash.
+function consumeSearchResults(): SearchResultsPayload | null {
+  try {
+    const raw = sessionStorage.getItem(SEARCH_RESULTS_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(SEARCH_RESULTS_KEY);
+    const parsed = JSON.parse(raw) as unknown;
+    const obj = parsed as Record<string, unknown>;
+    if (typeof parsed !== "object" || parsed === null || !Array.isArray(obj.campsites)) {
+      return null;
+    }
+    // Spot-check item shapes — a malformed or null entry would crash fitToCampsites
+    const campsites = obj.campsites as unknown[];
+    if (!campsites.every((c) => c !== null && typeof (c as Record<string, unknown>).lat === "number" && typeof (c as Record<string, unknown>).lng === "number")) {
+      return null;
+    }
+    return parsed as SearchResultsPayload;
+  } catch {
+    return null;
+  }
+}
+
 export default function MapView() {
   const [campsites, setCampsites] = useState<Campsite[]>([]);
+  // useState lazy initialiser runs synchronously on the first render — before any effects
+  // or Mapbox's onLoad — eliminating the race between a useEffect sessionStorage read and
+  // handleLoad firing on a warm tile cache. This is a "use client" component so it never
+  // runs on the server; the try/catch in consumeSearchResults guards against malformed data.
+  const [initialSearch] = useState<SearchResultsPayload | null>(() => consumeSearchResults());
+  const initialSearchRef = useRef(initialSearch);
+  // True while NL search results are displayed — suppresses handleMoveEnd from calling
+  // loadCampsites (which would replace the results with browse results). Cleared when the
+  // user taps the active Pitchd chip or applies filters.
+  const searchModeRef = useRef(initialSearch !== null);
+  // Key of the currently active quick chip (null = browse mode).
+  // When arriving from a HomeScreen chip tap, chipKey flows through SearchResultsPayload so the
+  // correct chip is highlighted. For custom NL queries (textarea), chipKey is undefined and we
+  // default to "pitchd" so the user has a clear affordance to tap and return to browse mode.
+  const [activeChip, setActiveChip] = useState<string | null>(
+    initialSearch !== null ? (initialSearch.chipKey ?? "pitchd") : null
+  );
+  // Query string shown as context below the map search input
+  const [searchContextQuery, setSearchContextQuery] = useState<string | null>(initialSearch?.query ?? null);
+  // Controlled value for the map search input
+  const [mapQuery, setMapQuery] = useState("");
+  const [mapSearchLoading, setMapSearchLoading] = useState(false);
+  const [mapSearchError, setMapSearchError] = useState<string | null>(null);
+  // Suppresses the geolocation flyTo when search results are loaded so the camera
+  // doesn't pan away from the result bounds.
+  // Safe today: MapView unmounts on navigation so this is never permanently stuck.
+  // If MapView is ever reused without unmounting, revisit this.
+  const suppressGeoFlyRef = useRef(initialSearch !== null);
   const [hasMore, setHasMore] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [amenityPois, setAmenityPois] = useState<AmenityPOI[]>([]);
@@ -168,7 +242,7 @@ export default function MapView() {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         userLocationRef.current = loc;
         setUserLocation(loc);
-        if (mapLoadedRef.current) {
+        if (mapLoadedRef.current && !suppressGeoFlyRef.current) {
           mapRef.current?.flyTo({
             center: [loc.lng, loc.lat],
             zoom: 11,
@@ -261,6 +335,30 @@ export default function MapView() {
   const handleLoad = useCallback(
     (_e: { target: mapboxgl.Map }) => {
       mapLoadedRef.current = true;
+
+      // If we arrived from a NL search, display those results immediately and
+      // fit the map to show all pins. Skip the browse API fetch.
+      const searchPayload = initialSearchRef.current;
+      if (searchPayload && searchPayload.campsites.length > 0) {
+        initialSearchRef.current = null;
+        setCampsites(searchPayload.campsites);
+        prevCampsitesLengthRef.current = searchPayload.campsites.length;
+        setDrawerState("half");
+        drawerStateRef.current = "half";
+
+        // Suppress the moveend that fitBounds/flyTo fires after its animation, and
+        // prevent the geolocation callback from flying away from the results.
+        skipNextFetch.current = true;
+        suppressGeoFlyRef.current = true;
+        fitToCampsites(_e.target, searchPayload.campsites, getDrawerHeightPx("half"));
+        return;
+      }
+
+      // Search payload was present but returned no campsites — fall back to browse mode.
+      // Reset both refs so handleMoveEnd fires normally and geolocation flyTo works.
+      searchModeRef.current = false;
+      suppressGeoFlyRef.current = false;
+
       const loc = userLocationRef.current;
       if (loc) {
         mapRef.current?.flyTo({
@@ -289,6 +387,9 @@ export default function MapView() {
         skipNextFetch.current = false;
         return;
       }
+      // While NL search results are active, suppress browse fetches so the map
+      // doesn't silently replace search results when the user pans.
+      if (searchModeRef.current) return;
       loadCampsites(e.target);
       loadAmenities(e.target);
     },
@@ -351,6 +452,12 @@ export default function MapView() {
       // call below. Without this, the first search after applying filters would
       // still use the previous filter values.
       activeFiltersRef.current = filters;
+      // Applying filters signals intent to browse — exit NL search mode so
+      // subsequent moveend events trigger normal browse fetches again.
+      searchModeRef.current = false;
+      suppressGeoFlyRef.current = false;
+      setActiveChip(null);
+      setSearchContextQuery(null);
       setShowFilters(false);
       if (mapRef.current) {
         const map = mapRef.current.getMap();
@@ -360,6 +467,69 @@ export default function MapView() {
     },
     [loadCampsites, loadAmenities],
   );
+
+  // Inline NL search — stays on the map, replaces results without navigating home.
+  async function handleMapSearch(q: string, chipKey: string | null = null) {
+    if (!q.trim() || mapSearchLoading) return;
+    setMapSearchLoading(true);
+    setMapSearchError(null);
+    // Use the current map centre as the search origin so chip searches stay in the
+    // area you're viewing — not the user's GPS location which may be far away.
+    const mapCenter = mapRef.current?.getMap().getCenter();
+    const lat = mapCenter?.lat ?? userLocationRef.current?.lat ?? -33.8688;
+    const lng = mapCenter?.lng ?? userLocationRef.current?.lng ?? 151.2093;
+    try {
+      const res = await fetch("/api/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: q.trim(), lat, lng }),
+      });
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string };
+        throw new Error(data.error ?? "Search failed");
+      }
+      const data = (await res.json()) as Pick<SearchResultsPayload, "campsites" | "parsedIntent">;
+      setCampsites(data.campsites);
+      prevCampsitesLengthRef.current = data.campsites.length;
+      setMapQuery("");
+      if (data.campsites.length > 0 && mapRef.current) {
+        // Results — enter search mode and fit the map to the pins
+        setDrawerState("half");
+        drawerStateRef.current = "half";
+        searchModeRef.current = true;
+        setActiveChip(chipKey);
+        setSearchContextQuery(q.trim());
+        skipNextFetch.current = true;
+        suppressGeoFlyRef.current = true;
+        fitToCampsites(mapRef.current.getMap(), data.campsites, getDrawerHeightPx("half"));
+      } else {
+        // No results — stay in browse mode so handleMoveEnd keeps firing
+        searchModeRef.current = false;
+        suppressGeoFlyRef.current = false;
+        setActiveChip(null);
+        setSearchContextQuery(null);
+      }
+    } catch (e) {
+      console.error("[MapSearch]", e);
+      suppressGeoFlyRef.current = false;
+      setMapSearchError(e instanceof Error ? e.message : "Search failed. Please try again.");
+    } finally {
+      setMapSearchLoading(false);
+    }
+  }
+
+  const handleClearSearch = useCallback(() => {
+    searchModeRef.current = false;
+    suppressGeoFlyRef.current = false;
+    setActiveChip(null);
+    setSearchContextQuery(null);
+    setMapSearchError(null);
+    if (mapRef.current) {
+      const map = mapRef.current.getMap();
+      loadCampsites(map);
+      loadAmenities(map);
+    }
+  }, [loadCampsites, loadAmenities]);
 
   const filterCount = activeFilters.activities.length + activeFilters.pois.length;
 
@@ -376,38 +546,95 @@ export default function MapView() {
         />
       )}
 
-      {/* Floating Filters button — z-[60] must exceed drawer (z-50) to stay clickable */}
-      <div className="absolute top-3 right-3 z-[60]">
-        <button
-          type="button"
-          onClick={() => setShowFilters(true)}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold shadow-md transition-opacity hover:opacity-90 active:opacity-70"
-          style={{
-            background: filterCount > 0 ? CORAL : "#fff",
-            color: filterCount > 0 ? "#fff" : FOREST_GREEN,
-            border: `1.5px solid ${filterCount > 0 ? CORAL : "#e0dbd0"}`,
-            fontFamily: "var(--font-dm-sans), sans-serif",
-          }}
-          aria-label={`Filters${filterCount > 0 ? ` (${filterCount} active)` : ""}`}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M3 6h18M7 12h10M11 18h2"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
+      {/* Floating search bar + quick chips — z-[60] must exceed drawer (z-50) */}
+      <div className="absolute top-3 left-3 right-3 z-[60] flex flex-col gap-2">
+        {/* Search bar */}
+        <div className="flex items-center gap-2 rounded-full border border-[#e0dbd0] bg-white px-4 py-2.5 font-[family-name:var(--font-dm-sans)] shadow-md">
+          <div className="min-w-0 flex-1">
+            <input
+              value={mapQuery}
+              onChange={(e) => setMapQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") void handleMapSearch(mapQuery, null); }}
+              placeholder="New search…"
+              disabled={mapSearchLoading}
+              className="w-full bg-transparent text-sm text-[#1a2e1a] outline-none placeholder:text-[#8a9e8a] disabled:opacity-60"
             />
-          </svg>
-          Filters
-          {filterCount > 0 && (
-            <span
-              className="flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold"
-              style={{ background: "rgba(255,255,255,0.3)" }}
-            >
-              {filterCount}
-            </span>
-          )}
-        </button>
+            {searchContextQuery && !mapQuery && (
+              <div className="mt-0.5 truncate text-[10px] text-[#8a9e8a]">{searchContextQuery}</div>
+            )}
+          </div>
+          {/* Search icon */}
+          <button
+            type="button"
+            onClick={() => void handleMapSearch(mapQuery, null)}
+            disabled={!mapQuery.trim() || mapSearchLoading}
+            aria-label="Search"
+            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40 ${mapQuery.trim() ? "bg-[#e8674a]" : "bg-[#e8f0e8]"}`}
+          >
+            {mapSearchLoading ? (
+              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+            ) : (
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                <circle cx="7" cy="7" r="5" stroke={mapQuery.trim() ? "#fff" : "#5a7a5a"} strokeWidth="1.8" />
+                <path d="M11 11l3 3" stroke={mapQuery.trim() ? "#fff" : "#5a7a5a"} strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            )}
+          </button>
+          <div className="h-4 w-px shrink-0 bg-[#e0dbd0]" />
+          {/* Filters button */}
+          <button
+            type="button"
+            onClick={() => setShowFilters(true)}
+            aria-label={`Filters${filterCount > 0 ? ` (${filterCount} active)` : ""}`}
+            className="shrink-0 text-xs font-bold text-[#e8674a] font-[family-name:var(--font-dm-sans)]"
+          >
+            Filters{filterCount > 0 ? ` (${filterCount})` : ""}
+          </button>
+        </div>
+
+        {/* Search error */}
+        {mapSearchError && (
+          <div className="rounded-xl border border-[#fdd] bg-white px-3 py-2 text-xs text-[#e8674a] shadow-sm">
+            {mapSearchError}
+          </div>
+        )}
+
+        {/* Quick chips */}
+        <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
+          {QUICK_CHIPS.map((chip) => {
+            const isActive = activeChip === chip.key;
+            return (
+              <button
+                key={chip.key}
+                type="button"
+                onClick={() => isActive ? handleClearSearch() : void handleMapSearch(chip.query, chip.key)}
+                disabled={mapSearchLoading}
+                aria-label={chip.icon === "logo" ? chip.label : undefined}
+                className={`flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold font-[family-name:var(--font-dm-sans)] shadow-sm transition-all duration-150 disabled:opacity-50 ${
+                  isActive
+                    ? chip.primary
+                      ? "bg-[#e8674a] border-[#e8674a] text-white"
+                      : "bg-[#2d4a2d] border-[#2d4a2d] text-white"
+                    : chip.primary
+                      ? "bg-white border-[#e0dbd0] text-[#e8674a]"
+                      : "bg-white border-[#e0dbd0] text-[#1a2e1a]"
+                }`}
+              >
+                {chip.icon === "logo" ? (
+                  <span className="flex items-baseline">
+                    <span className={`font-[family-name:var(--font-lora)] text-[11px] font-bold ${isActive ? "text-white" : "text-[#2d4a2d]"}`}>Pitch</span>
+                    <span className={`font-[family-name:var(--font-lora)] text-[11px] font-bold ${isActive ? "text-white/75" : "text-[#e8674a]"}`}>d</span>
+                  </span>
+                ) : (
+                  <>
+                    <span className="text-xs" aria-hidden="true">{chip.icon}</span>
+                    <span>{chip.label}</span>
+                  </>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <MapGL
