@@ -178,9 +178,12 @@ export default function MapView() {
   // user taps the active Pitchd chip or applies filters.
   const searchModeRef = useRef(initialSearch !== null);
   // Key of the currently active quick chip (null = browse mode).
-  // Defaults to "pitchd" when arriving from a HomeScreen NL search — this lights up the
-  // Pitchd chip as the NL mode indicator so the user can tap it to return to browse mode.
-  const [activeChip, setActiveChip] = useState<string | null>(initialSearch !== null ? "pitchd" : null);
+  // When arriving from a HomeScreen chip tap, chipKey flows through SearchResultsPayload so the
+  // correct chip is highlighted. For custom NL queries (textarea), chipKey is undefined and we
+  // default to "pitchd" so the user has a clear affordance to tap and return to browse mode.
+  const [activeChip, setActiveChip] = useState<string | null>(
+    initialSearch !== null ? (initialSearch.chipKey ?? "pitchd") : null
+  );
   // Query string shown as context below the map search input
   const [searchContextQuery, setSearchContextQuery] = useState<string | null>(initialSearch?.query ?? null);
   // Controlled value for the map search input
@@ -451,6 +454,7 @@ export default function MapView() {
       // Applying filters signals intent to browse — exit NL search mode so
       // subsequent moveend events trigger normal browse fetches again.
       searchModeRef.current = false;
+      suppressGeoFlyRef.current = false;
       setActiveChip(null);
       setSearchContextQuery(null);
       setShowFilters(false);
@@ -486,16 +490,23 @@ export default function MapView() {
       const data = (await res.json()) as Pick<SearchResultsPayload, "campsites" | "parsedIntent">;
       setCampsites(data.campsites);
       prevCampsitesLengthRef.current = data.campsites.length;
-      setDrawerState("half");
-      drawerStateRef.current = "half";
-      searchModeRef.current = true;
-      setActiveChip(chipKey);
-      setSearchContextQuery(q.trim());
       setMapQuery("");
       if (data.campsites.length > 0 && mapRef.current) {
+        // Results — enter search mode and fit the map to the pins
+        setDrawerState("half");
+        drawerStateRef.current = "half";
+        searchModeRef.current = true;
+        setActiveChip(chipKey);
+        setSearchContextQuery(q.trim());
         skipNextFetch.current = true;
         suppressGeoFlyRef.current = true;
         fitToCampsites(mapRef.current.getMap(), data.campsites, getDrawerHeightPx("half"));
+      } else {
+        // No results — stay in browse mode so handleMoveEnd keeps firing
+        searchModeRef.current = false;
+        suppressGeoFlyRef.current = false;
+        setActiveChip(null);
+        setSearchContextQuery(null);
       }
     } catch (e) {
       console.error("[MapSearch]", e);

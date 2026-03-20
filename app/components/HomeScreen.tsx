@@ -121,7 +121,7 @@ export default function HomeScreen() {
     };
   }, [loading]);
 
-  async function handleSearch(q: string) {
+  async function handleSearch(q: string, chipKey?: string) {
     if (!q.trim() || loading) return;
     setError(null);
     setLoading(true);
@@ -157,6 +157,7 @@ export default function HomeScreen() {
         campsites: data.campsites,
         parsedIntent: data.parsedIntent,
         query: q.trim(),
+        ...(chipKey && { chipKey }),
       };
       // Wrap setItem separately — QuotaExceededError must not swallow a successful search.
       // If storage is full the map still loads; it just won't pre-populate with results.
@@ -256,7 +257,7 @@ export default function HomeScreen() {
             {QUICK_CHIPS.map((chip) => (
               <button
                 key={chip.key}
-                onClick={() => void handleSearch(chip.query)}
+                onClick={() => void handleSearch(chip.query, chip.key)}
                 disabled={loading}
                 aria-label={chip.icon === "logo" ? chip.label : undefined}
                 className="flex shrink-0 cursor-pointer items-center gap-1 rounded-full border border-[#e0dbd0] bg-white px-3 py-1.5 shadow-sm transition-all duration-150 hover:border-[#2d4a2d] hover:bg-[#2d4a2d] hover:text-white disabled:opacity-50 [&:hover_span]:text-white"
@@ -297,7 +298,7 @@ export default function HomeScreen() {
               {LOADING_MESSAGES[loadingMsgIdx]}
             </p>
             <div className="mx-auto h-0.5 w-12 overflow-hidden rounded-sm bg-[#eeeae2]">
-              <div className="h-full animate-[ldprogress_1.8s_ease-in-out_infinite] rounded-sm bg-[#2d4a2d]" />
+              <div className="h-full animate-ldprogress rounded-sm bg-[#2d4a2d]" />
             </div>
           </div>
         )}
