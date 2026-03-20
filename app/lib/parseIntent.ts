@@ -82,7 +82,7 @@ Rules:
 
   return {
     location: typeof parsed.location === "string" && parsed.location.trim() !== "" ? parsed.location.trim() : null,
-    driveTimeHrs: typeof parsed.driveTimeHrs === "number" && parsed.driveTimeHrs > 0
+    driveTimeHrs: typeof parsed.driveTimeHrs === "number" && parsed.driveTimeHrs >= 1
       ? Math.min(parsed.driveTimeHrs, MAX_DRIVE_TIME_HRS)
       : DEFAULT_DRIVE_TIME_HRS,
     amenities: Array.isArray(parsed.amenities)

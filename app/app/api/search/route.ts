@@ -112,7 +112,7 @@ export async function POST(req: Request): Promise<Response> {
           ? raw.driveTimeHrs
           : DEFAULT_DRIVE_TIME_HRS;
       parsedIntent = {
-        location: typeof raw.location === "string" ? raw.location : null,
+        location: typeof raw.location === "string" && raw.location.trim() !== "" ? raw.location.trim() : null,
         driveTimeHrs: Math.min(rawDriveTime, MAX_DRIVE_TIME_HRS),
         // Re-filter amenities in case the cache entry predates the ALLOWED_AMENITIES list
         amenities: Array.isArray(raw.amenities)

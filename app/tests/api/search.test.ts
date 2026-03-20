@@ -328,6 +328,54 @@ describe("POST /api/search", () => {
     expect(body.parsedIntent).toMatchObject(cachedIntent);
   });
 
+  it("passes valid sortBy values through from cache", async () => {
+    const query = "sortBy proximity cache test";
+    const hash = hashQuery(query);
+    createdHashes.push(hash);
+
+    await prisma.searchCache.upsert({
+      where: { queryHash: hash },
+      create: {
+        queryHash: hash,
+        queryText: query,
+        parsedIntentJson: { location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: "proximity" },
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+      update: {
+        parsedIntentJson: { location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: "proximity" },
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    });
+
+    const res = await POST(makeRequest({ query, lat: SYDNEY_LAT, lng: SYDNEY_LNG }));
+    expect(res.status).toBe(200);
+    expect((await res.json()).parsedIntent.sortBy).toBe("proximity");
+  });
+
+  it("coerces invalid sortBy values from cache to null", async () => {
+    const query = "sortBy invalid cache test";
+    const hash = hashQuery(query);
+    createdHashes.push(hash);
+
+    await prisma.searchCache.upsert({
+      where: { queryHash: hash },
+      create: {
+        queryHash: hash,
+        queryText: query,
+        parsedIntentJson: { location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: "distance" },
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+      update: {
+        parsedIntentJson: { location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: "distance" },
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    });
+
+    const res = await POST(makeRequest({ query, lat: SYDNEY_LAT, lng: SYDNEY_LNG }));
+    expect(res.status).toBe(200);
+    expect((await res.json()).parsedIntent.sortBy).toBeNull();
+  });
+
   it("caps driveTimeHrs from cache at 12 hours", async () => {
     const query = "drive time cap cache test";
     const hash = hashQuery(query);
