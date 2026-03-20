@@ -9,12 +9,15 @@ import {
   ALLOWED_AMENITIES,
   DEFAULT_DRIVE_TIME_HRS,
   MAX_DRIVE_TIME_HRS,
+  KM_PER_HOUR,
   type ParsedIntent,
 } from "@/lib/parseIntent";
 import { createHash } from "crypto";
 import type { Prisma } from "@/lib/generated/prisma/client";
 
-// Re-export so existing tests can import ALLOWED_AMENITIES from this module
+// Re-export for callers that import from the route rather than from the lib directly.
+// The route is the public API surface for search — keeping this here avoids breaking
+// any future callers that import ALLOWED_AMENITIES alongside POST.
 export { ALLOWED_AMENITIES } from "@/lib/parseIntent";
 
 // Rough degrees-per-km at Australian latitudes — accurate enough for bounding box
@@ -26,9 +29,7 @@ const RESULT_LIMIT = 20;
 // Max rows fetched from DB before Haversine sort — guards against large bounding boxes
 // pulling thousands of rows into memory. Well above RESULT_LIMIT to preserve ranking quality.
 const DB_FETCH_LIMIT = 200;
-// Converts drive time hours to a search radius in km (1hr ≈ 80km)
-const KM_PER_HOUR = 80;
-// DEFAULT_DRIVE_TIME_HRS and MAX_DRIVE_TIME_HRS imported from @/lib/parseIntent
+// DEFAULT_DRIVE_TIME_HRS, MAX_DRIVE_TIME_HRS, and KM_PER_HOUR imported from @/lib/parseIntent
 
 function hashQuery(query: string): string {
   return createHash("sha256").update(query.toLowerCase().trim()).digest("hex");
@@ -108,7 +109,7 @@ export async function POST(req: Request): Promise<Response> {
       // Sanitise on read: a tampered or pre-migration cache entry could have bad values.
       const raw = cached.parsedIntentJson as unknown as ParsedIntent;
       const rawDriveTime =
-        typeof raw.driveTimeHrs === "number" && raw.driveTimeHrs > 0
+        typeof raw.driveTimeHrs === "number" && raw.driveTimeHrs >= 1
           ? raw.driveTimeHrs
           : DEFAULT_DRIVE_TIME_HRS;
       parsedIntent = {

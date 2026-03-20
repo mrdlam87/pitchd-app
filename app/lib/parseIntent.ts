@@ -7,6 +7,8 @@ const HAIKU_MODEL = "claude-haiku-4-5-20251001";
 export const DEFAULT_DRIVE_TIME_HRS = 3;
 // Hard cap — prevents a hallucinated large value causing a near-full-table scan in the route
 export const MAX_DRIVE_TIME_HRS = 12;
+// Conversion factor: 1 hour of driving ≈ 80km (Australian highway speeds)
+export const KM_PER_HOUR = 80;
 
 // Amenity keys Claude is allowed to return — filter out hallucinated values.
 // Must match the keys seeded in prisma/seed.ts — keep in sync if the seed changes.
