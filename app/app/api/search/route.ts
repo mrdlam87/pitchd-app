@@ -5,15 +5,11 @@ import { prisma } from "@/lib/prisma";
 import { SyncStatus } from "@/lib/generated/prisma/enums";
 import {
   parseIntentWithClaude,
-  isValidIsoDate,
-  ALLOWED_AMENITIES,
-  DEFAULT_DRIVE_TIME_HRS,
   MAX_DRIVE_TIME_HRS,
   KM_PER_HOUR,
   type ParsedIntent,
 } from "@/lib/parseIntent";
-import { createHash } from "crypto";
-import type { Prisma } from "@/lib/generated/prisma/client";
+import { hashQuery, getCachedIntent, setCachedIntent } from "@/lib/searchCache";
 
 // Re-export for callers that import from the route rather than from the lib directly.
 // The route is the public API surface for search — keeping this here avoids breaking
@@ -22,18 +18,13 @@ export { ALLOWED_AMENITIES } from "@/lib/parseIntent";
 
 // Rough degrees-per-km at Australian latitudes — accurate enough for bounding box
 const DEG_PER_KM = 1 / 111;
-// 2-hour cache TTL
-const CACHE_TTL_MS = 2 * 60 * 60 * 1000;
 // Number of campsites to return after proximity ranking
 const RESULT_LIMIT = 20;
 // Max rows fetched from DB before Haversine sort — guards against large bounding boxes
 // pulling thousands of rows into memory. Well above RESULT_LIMIT to preserve ranking quality.
 const DB_FETCH_LIMIT = 200;
-// DEFAULT_DRIVE_TIME_HRS, MAX_DRIVE_TIME_HRS, and KM_PER_HOUR imported from @/lib/parseIntent
-
-function hashQuery(query: string): string {
-  return createHash("sha256").update(query.toLowerCase().trim()).digest("hex");
-}
+// MAX_DRIVE_TIME_HRS and KM_PER_HOUR imported from @/lib/parseIntent
+// hashQuery, getCachedIntent, setCachedIntent imported from @/lib/searchCache
 
 // Haversine distance (km) — used to sort results by proximity to user
 function distanceKm(
@@ -95,72 +86,20 @@ export async function POST(req: Request): Promise<Response> {
 
   try {
     const queryHash = hashQuery(query);
-    const now = new Date();
 
     // Check SearchCache first — avoid repeat Claude API calls for identical queries
-    const cached = await prisma.searchCache.findUnique({
-      where: { queryHash },
-    });
+    let parsedIntent: ParsedIntent | null = await getCachedIntent(queryHash);
 
-    let parsedIntent: ParsedIntent;
-
-    if (cached && cached.expiresAt > now) {
-      // Cache hit — reuse stored intent.
-      // Sanitise on read: a tampered or pre-migration cache entry could have bad values.
-      const raw = cached.parsedIntentJson as unknown as ParsedIntent;
-      const rawDriveTime =
-        typeof raw.driveTimeHrs === "number" && raw.driveTimeHrs >= 1
-          ? raw.driveTimeHrs
-          : DEFAULT_DRIVE_TIME_HRS;
-      parsedIntent = {
-        location: typeof raw.location === "string" && raw.location.trim() !== "" ? raw.location.trim() : null,
-        driveTimeHrs: Math.min(rawDriveTime, MAX_DRIVE_TIME_HRS),
-        // Re-filter amenities in case the cache entry predates the ALLOWED_AMENITIES list
-        amenities: Array.isArray(raw.amenities)
-          ? raw.amenities.filter(
-              (a): a is string =>
-                typeof a === "string" &&
-                ALLOWED_AMENITIES.includes(a)
-            )
-          : [],
-        // Sanitise date fields — must be ISO format (YYYY-MM-DD), not free-text
-        startDate:
-          typeof raw.startDate === "string" && isValidIsoDate(raw.startDate)
-            ? raw.startDate
-            : null,
-        endDate:
-          typeof raw.endDate === "string" && isValidIsoDate(raw.endDate)
-            ? raw.endDate
-            : null,
-        sortBy:
-          raw.sortBy === "proximity" || raw.sortBy === "relevance"
-            ? raw.sortBy
-            : null,
-      };
-    } else {
+    if (!parsedIntent) {
       // Cache miss — call Claude Haiku to parse intent
       // TODO M7: add per-user rate limiting to prevent cost abuse before wider launch
       parsedIntent = await parseIntentWithClaude(query.trim());
 
-      // Store in SearchCache with 2-hour TTL.
-      // Upsert handles the case where an expired record already exists for this hash.
+      // Store result in SearchCache with 2-hour TTL.
       // Awaited so the write completes before the response returns (prevents test races).
       // .catch() swallows transient DB failures — a failed write still returns a 200.
-      const expiresAt = new Date(now.getTime() + CACHE_TTL_MS);
-      await prisma.searchCache.upsert({
-        where: { queryHash },
-        create: {
-          queryHash,
-          queryText: query.trim(),
-          parsedIntentJson: parsedIntent as unknown as Prisma.InputJsonValue,
-          expiresAt,
-        },
-        update: {
-          queryText: query.trim(),
-          parsedIntentJson: parsedIntent as unknown as Prisma.InputJsonValue,
-          expiresAt,
-        },
-      }).catch((err) => console.error("[search] cache write failed", err));
+      await setCachedIntent(queryHash, query.trim(), parsedIntent)
+        .catch((err) => console.error("[search] cache write failed", err));
     }
 
     // parsedIntent.location (e.g. "Blue Mountains") is extracted and returned to the client

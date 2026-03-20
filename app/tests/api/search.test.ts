@@ -3,7 +3,7 @@ import type { Session } from "next-auth";
 import { UserRole } from "@/lib/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { ALLOWED_AMENITIES } from "@/lib/parseIntent";
-import { createHash } from "crypto";
+import { hashQuery } from "@/lib/searchCache";
 
 // Mock auth — real OAuth not needed for integration tests
 vi.mock("@/auth", () => ({
@@ -51,10 +51,6 @@ const MOCK_CLAUDE_INTENT = {
 const MOCK_CLAUDE_RESPONSE = {
   content: [{ type: "text", text: JSON.stringify(MOCK_CLAUDE_INTENT) }],
 };
-
-function hashQuery(query: string): string {
-  return createHash("sha256").update(query.toLowerCase().trim()).digest("hex");
-}
 
 function makeRequest(body: Record<string, unknown>) {
   return new Request("http://localhost/api/search", {
