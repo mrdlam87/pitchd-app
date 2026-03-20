@@ -251,7 +251,7 @@ export default function HomeScreen() {
           </div>
 
           {/* Quick filter chips */}
-          <div className="flex gap-1.5 overflow-x-auto py-0.5 [scrollbar-width:none] [-webkit-overflow-scrolling:touch]">
+          <div className="flex gap-1.5 overflow-x-auto py-0.5 [scrollbar-width:none]">
             {QUICK_CHIPS.map((chip) => (
               <button
                 key={chip.key}
@@ -307,9 +307,9 @@ export default function HomeScreen() {
             <p className="mb-2 text-[10px] font-bold uppercase tracking-[1.8px] text-[#8a9e8a]">
               Suggested
             </p>
-            {EXAMPLE_PROMPTS.map((p, i) => (
+            {EXAMPLE_PROMPTS.map((p) => (
               <button
-                key={i}
+                key={p}
                 onClick={() => setQuery(p)}
                 className="mb-1.5 flex w-full items-center gap-2.5 rounded-xl border border-[#e0dbd0] bg-white px-3.5 py-3 text-left shadow-sm"
               >

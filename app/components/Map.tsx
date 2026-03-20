@@ -122,13 +122,22 @@ function computeVisibleBounds(map: mapboxgl.Map, drawerHeightPx: number): Bounds
 const EMPTY_FILTERS: FilterState = { activities: [], pois: [] };
 
 // Reads and clears the search results payload written by HomeScreen before navigating here.
-// Returns null if nothing is stored or the data is malformed.
+// Returns null if nothing is stored, the data is malformed, or sessionStorage is unavailable.
+// Validates the shape at runtime so stale data from a previous app version can't cause a crash.
 function consumeSearchResults(): SearchResultsPayload | null {
   try {
     const raw = sessionStorage.getItem(SEARCH_RESULTS_KEY);
     if (!raw) return null;
     sessionStorage.removeItem(SEARCH_RESULTS_KEY);
-    return JSON.parse(raw) as SearchResultsPayload;
+    const parsed = JSON.parse(raw) as unknown;
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      !Array.isArray((parsed as Record<string, unknown>).campsites)
+    ) {
+      return null;
+    }
+    return parsed as SearchResultsPayload;
   } catch {
     return null;
   }
@@ -136,12 +145,21 @@ function consumeSearchResults(): SearchResultsPayload | null {
 
 export default function MapView() {
   const [campsites, setCampsites] = useState<Campsite[]>([]);
-  // Ref holds initial search payload so handleLoad (a stable useCallback) can access it
-  // without needing it as a dependency.
-  const initialSearchRef = useRef<SearchResultsPayload | null>(null);
-  // Set to true when search results are loaded — suppresses the geolocation flyTo
-  // so it doesn't pan away from the search result bounds.
-  const suppressGeoFlyRef = useRef(false);
+  // useState lazy initialiser runs synchronously on the first render — before any effects
+  // or Mapbox's onLoad — eliminating the race between a useEffect sessionStorage read and
+  // handleLoad firing on a warm tile cache. consumeSearchResults is safe during SSR: its
+  // try/catch swallows the ReferenceError that sessionStorage throws on the server.
+  const [initialSearch] = useState<SearchResultsPayload | null>(() => consumeSearchResults());
+  const initialSearchRef = useRef(initialSearch);
+  // True while NL search results are displayed — suppresses handleMoveEnd from calling
+  // loadCampsites (which would replace the results with browse results). Cleared when the
+  // user applies filters, which signals intent to switch to browse mode.
+  const searchModeRef = useRef(initialSearch !== null);
+  // Suppresses the geolocation flyTo when search results are loaded so the camera
+  // doesn't pan away from the result bounds.
+  // Safe today: MapView unmounts on navigation so this is never permanently stuck.
+  // If MapView is ever reused without unmounting, revisit this.
+  const suppressGeoFlyRef = useRef(initialSearch !== null);
   const [hasMore, setHasMore] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [amenityPois, setAmenityPois] = useState<AmenityPOI[]>([]);
@@ -179,15 +197,6 @@ export default function MapView() {
   // Tracks the deferred scrollIntoView timeout so rapid pin clicks cancel the
   // previous pending scroll, and so it can be cleaned up on unmount.
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Consume search results from sessionStorage on mount (written by HomeScreen before navigation).
-  // Store in a ref so handleLoad (stable useCallback) can access it without a dep.
-  useEffect(() => {
-    const payload = consumeSearchResults();
-    if (payload) {
-      initialSearchRef.current = payload;
-    }
-  }, []);
 
   // Request user geolocation on mount
   useEffect(() => {
@@ -304,8 +313,9 @@ export default function MapView() {
         // Fit map to bounds of all result pins
         const lats = searchPayload.campsites.map((c) => c.lat);
         const lngs = searchPayload.campsites.map((c) => c.lng);
-        const sw: [number, number] = [Math.min(...lngs), Math.min(...lats)];
-        const ne: [number, number] = [Math.max(...lngs), Math.max(...lats)];
+        // Use reduce instead of spread to avoid V8 stack overflow on large arrays
+        const sw: [number, number] = [lngs.reduce((a, b) => Math.min(a, b)), lats.reduce((a, b) => Math.min(a, b))];
+        const ne: [number, number] = [lngs.reduce((a, b) => Math.max(a, b)), lats.reduce((a, b) => Math.max(a, b))];
         const bottomPad = getDrawerHeightPx("half");
         // Suppress the moveend that fitBounds/flyTo fires after its animation, and
         // prevent the geolocation callback from flying away from the results.
@@ -352,6 +362,9 @@ export default function MapView() {
         skipNextFetch.current = false;
         return;
       }
+      // While NL search results are active, suppress browse fetches so the map
+      // doesn't silently replace search results when the user pans.
+      if (searchModeRef.current) return;
       loadCampsites(e.target);
       loadAmenities(e.target);
     },
@@ -414,6 +427,9 @@ export default function MapView() {
       // call below. Without this, the first search after applying filters would
       // still use the previous filter values.
       activeFiltersRef.current = filters;
+      // Applying filters signals intent to browse — exit NL search mode so
+      // subsequent moveend events trigger normal browse fetches again.
+      searchModeRef.current = false;
       setShowFilters(false);
       if (mapRef.current) {
         const map = mapRef.current.getMap();
