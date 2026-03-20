@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SEARCH_RESULTS_KEY, type SearchResultsPayload } from "@/lib/searchResults";
 
@@ -31,6 +31,9 @@ const LOADING_MESSAGES = [
 
 // SVG scenic landscape illustration — ported from prototype ScenicPhoto (seed=2)
 function ScenicPhoto() {
+  const uid = useId();
+  const skyId = `${uid}-sky`;
+  const overlayId = `${uid}-overlay`;
   const w = 400;
   const h = 260;
   // Palette index 2 (seed=2 % 4 = 2): sandy sky, earthy hills
@@ -46,16 +49,16 @@ function ScenicPhoto() {
       className="block"
     >
       <defs>
-        <linearGradient id="sky2" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={skyId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={sky} stopOpacity="0.9" />
           <stop offset="100%" stopColor={sky} stopOpacity="0.4" />
         </linearGradient>
-        <linearGradient id="overlay2" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={overlayId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="rgba(0,0,0,0)" />
           <stop offset="100%" stopColor="rgba(0,0,0,0.35)" />
         </linearGradient>
       </defs>
-      <rect width={w} height={h} fill="url(#sky2)" />
+      <rect width={w} height={h} fill={`url(#${skyId})`} />
       {/* Far hills */}
       <path
         d={`M0 ${h*0.65} Q${w*0.2} ${h*0.38} ${w*0.4} ${h*0.52} Q${w*0.6} ${h*0.35} ${w*0.8} ${h*0.48} Q${w*0.9} ${h*0.42} ${w} ${h*0.5} L${w} ${h} L0 ${h}Z`}
@@ -80,7 +83,7 @@ function ScenicPhoto() {
       />
       <rect x={w*0.485} y={h*0.73} width={w*0.03} height={h*0.02} fill="rgba(255,255,255,0.5)" />
       {/* Overlay for text readability */}
-      <rect width={w} height={h} fill="url(#overlay2)" />
+      <rect width={w} height={h} fill={`url(#${overlayId})`} />
       {[...Array(12)].map((_, i) => (
         <circle
           key={i}

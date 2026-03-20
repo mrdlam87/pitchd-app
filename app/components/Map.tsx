@@ -157,11 +157,13 @@ function consumeSearchResults(): SearchResultsPayload | null {
     if (!raw) return null;
     sessionStorage.removeItem(SEARCH_RESULTS_KEY);
     const parsed = JSON.parse(raw) as unknown;
-    if (
-      typeof parsed !== "object" ||
-      parsed === null ||
-      !Array.isArray((parsed as Record<string, unknown>).campsites)
-    ) {
+    const obj = parsed as Record<string, unknown>;
+    if (typeof parsed !== "object" || parsed === null || !Array.isArray(obj.campsites)) {
+      return null;
+    }
+    // Spot-check item shapes — a malformed or null entry would crash fitToCampsites
+    const campsites = obj.campsites as unknown[];
+    if (!campsites.every((c) => c !== null && typeof (c as Record<string, unknown>).lat === "number" && typeof (c as Record<string, unknown>).lng === "number")) {
       return null;
     }
     return parsed as SearchResultsPayload;
@@ -182,13 +184,16 @@ export default function MapView() {
   // loadCampsites (which would replace the results with browse results). Cleared when the
   // user taps the active Pitchd chip or applies filters.
   const searchModeRef = useRef(initialSearch !== null);
-  // Key of the currently active quick chip (null = browse mode / custom NL query)
-  const [activeChip, setActiveChip] = useState<string | null>(initialSearch !== null ? "pitchd" : null);
+  // Key of the currently active quick chip (null = browse mode or HomeScreen NL search).
+  // Only set when the user taps a chip directly on the map — HomeScreen NL searches
+  // don't map to a specific chip so we leave this null to avoid misleading highlighting.
+  const [activeChip, setActiveChip] = useState<string | null>(null);
   // Query string shown as context below the map search input
   const [searchContextQuery, setSearchContextQuery] = useState<string | null>(initialSearch?.query ?? null);
   // Controlled value for the map search input
   const [mapQuery, setMapQuery] = useState("");
   const [mapSearchLoading, setMapSearchLoading] = useState(false);
+  const [mapSearchError, setMapSearchError] = useState<string | null>(null);
   // Suppresses the geolocation flyTo when search results are loaded so the camera
   // doesn't pan away from the result bounds.
   // Safe today: MapView unmounts on navigation so this is never permanently stuck.
@@ -352,6 +357,11 @@ export default function MapView() {
         return;
       }
 
+      // Search payload was present but returned no campsites — fall back to browse mode.
+      // Reset both refs so handleMoveEnd fires normally and geolocation flyTo works.
+      searchModeRef.current = false;
+      suppressGeoFlyRef.current = false;
+
       const loc = userLocationRef.current;
       if (loc) {
         mapRef.current?.flyTo({
@@ -464,6 +474,7 @@ export default function MapView() {
   async function handleMapSearch(q: string, chipKey: string | null = null) {
     if (!q.trim() || mapSearchLoading) return;
     setMapSearchLoading(true);
+    setMapSearchError(null);
     const lat = userLocationRef.current?.lat ?? -33.8688;
     const lng = userLocationRef.current?.lng ?? 151.2093;
     try {
@@ -492,6 +503,7 @@ export default function MapView() {
       }
     } catch (e) {
       console.error("[MapSearch]", e);
+      setMapSearchError(e instanceof Error ? e.message : "Search failed. Please try again.");
     } finally {
       setMapSearchLoading(false);
     }
@@ -499,6 +511,7 @@ export default function MapView() {
 
   const handleClearSearch = useCallback(() => {
     searchModeRef.current = false;
+    suppressGeoFlyRef.current = false;
     setActiveChip(null);
     setSearchContextQuery(null);
     if (mapRef.current) {
@@ -573,6 +586,13 @@ export default function MapView() {
             Filters{filterCount > 0 ? ` (${filterCount})` : ""}
           </button>
         </div>
+
+        {/* Search error */}
+        {mapSearchError && (
+          <div className="rounded-xl border border-[#fdd] bg-white px-3 py-2 text-xs text-[#e8674a] shadow-sm">
+            {mapSearchError}
+          </div>
+        )}
 
         {/* Quick chips */}
         <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
