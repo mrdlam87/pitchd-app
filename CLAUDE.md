@@ -141,6 +141,16 @@ PitchdLight          ← root, owns all state (screen, results, searchState, etc
 
 ---
 
+## Before writing code
+
+Think through these before touching a file — not after:
+
+- **Input contract** — for every input (user, DB, external API): what are the valid types, ranges, and edge cases? (e.g. `0` is falsy but valid, `±90°` causes divide-by-zero, empty string vs null vs undefined behave differently with `??` vs `||`)
+- **Failure paths** — what happens when each external call fails? Cache writes, API calls, and DB queries can all throw. Decide upfront whether failure should propagate or be swallowed.
+- **Security** — does any user-controlled string flow into a prompt, query, or template? Apply escaping or parameterisation at the point of use.
+- **Performance guards** — are there unbounded queries or loops? Add `take`, timeouts, and caps before they're needed, not after a reviewer spots them.
+- **Test coverage** — write tests for the unhappy paths (SDK errors, bad cached data, edge-case inputs) at the same time as the happy path.
+
 ## Pre-PR self-review
 
 Before opening a PR, re-read every file you changed and ask:
