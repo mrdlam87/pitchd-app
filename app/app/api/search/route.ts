@@ -19,10 +19,18 @@ export { ALLOWED_AMENITIES } from "@/lib/parseIntent";
 // Rough degrees-per-km at Australian latitudes — accurate enough for bounding box
 const DEG_PER_KM = 1 / 111;
 
+// Nominatim rate limit: 1 req/s per IP (OSM usage policy). At beta scale this is fine
+// because geocoding only runs on SearchCache misses — repeated queries for the same location
+// string hit the cache and skip this call entirely. If traffic grows, consider caching
+// geocode results separately (location string → lat/lng) with a longer TTL.
+// Max location string length guards against unexpectedly large query params.
+const MAX_LOCATION_LENGTH = 200;
+
 // Geocodes a place name to lat/lng using Nominatim (OSM) — free, no API key required.
 // Returns null if the lookup fails or returns no results so the caller can fall back
 // gracefully to the user's GPS coordinates.
 async function geocodeLocation(location: string): Promise<{ lat: number; lng: number } | null> {
+  if (location.length > MAX_LOCATION_LENGTH) return null;
   try {
     const params = new URLSearchParams({
       q: `${location}, Australia`,
@@ -48,6 +56,7 @@ async function geocodeLocation(location: string): Promise<{ lat: number; lng: nu
     return null;
   }
 }
+
 // Number of campsites to return after proximity ranking
 const RESULT_LIMIT = 20;
 // Max rows fetched from DB before Haversine sort — guards against large bounding boxes

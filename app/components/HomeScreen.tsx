@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SEARCH_RESULTS_KEY, type SearchResultsPayload } from "@/lib/searchResults";
+import { QUICK_CHIPS } from "@/lib/chips";
 
 // Cycling placeholder prompts — matches prototype EXAMPLE_PROMPTS
 const EXAMPLE_PROMPTS = [
@@ -11,15 +12,6 @@ const EXAMPLE_PROMPTS = [
   "Beach camping within 3hrs of Brisbane this weekend",
   "Quiet bush camp near Adelaide, no rain Saturday",
 ];
-
-// Quick filter chips — matches prototype QUICK_FILTERS
-const QUICK_CHIPS = [
-  { key: "pitchd",  label: "Pitchd pick",  icon: "logo", query: "Best camping spots with great weather this weekend" },
-  { key: "weather", label: "Good weather", icon: "☀️",   query: "Dry sunny camping this weekend" },
-  { key: "dog",     label: "Dog friendly", icon: "🐕",   query: "Dog friendly camping this weekend" },
-  { key: "fishing", label: "Fishing",      icon: "🎣",   query: "Camping with fishing this weekend" },
-  { key: "hiking",  label: "Hiking",       icon: "🥾",   query: "Camping near excellent hiking trails this weekend" },
-] as const;
 
 // Loading messages — shown while search is in progress
 const LOADING_MESSAGES = [
@@ -166,7 +158,13 @@ export default function HomeScreen() {
         parsedIntent: data.parsedIntent,
         query: q.trim(),
       };
-      sessionStorage.setItem(SEARCH_RESULTS_KEY, JSON.stringify(payload));
+      // Wrap setItem separately — QuotaExceededError must not swallow a successful search.
+      // If storage is full the map still loads; it just won't pre-populate with results.
+      try {
+        sessionStorage.setItem(SEARCH_RESULTS_KEY, JSON.stringify(payload));
+      } catch {
+        // Storage full — navigate anyway; MapView will start in browse mode
+      }
       router.push("/map");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
@@ -190,7 +188,7 @@ export default function HomeScreen() {
           <span className="font-[family-name:var(--font-lora)] text-2xl font-bold tracking-tight text-white drop-shadow-sm">
             Pitch
           </span>
-          <span className="font-[family-name:var(--font-lora)] text-2xl font-bold tracking-tight text-[#f0a090] drop-shadow-sm">
+          <span className="font-[family-name:var(--font-lora)] text-2xl font-bold tracking-tight text-[#e8674a] drop-shadow-sm">
             d
           </span>
         </div>
@@ -239,7 +237,7 @@ export default function HomeScreen() {
               <button
                 onClick={() => void handleSearch(query)}
                 disabled={!query.trim() || loading}
-                className={`flex min-w-[60px] items-center justify-center gap-1.5 rounded-[10px] px-4 py-1.5 text-xs font-bold transition-colors duration-150 disabled:cursor-not-allowed ${query.trim() || loading ? "bg-[#e8674a] text-white" : "bg-[#e8ddd4] text-[#8a9e8a]"}`}
+                className={`flex min-w-[60px] items-center justify-center gap-1.5 rounded-[10px] px-4 py-1.5 text-xs font-bold transition-colors duration-150 disabled:cursor-not-allowed ${query.trim() ? "bg-[#e8674a] text-white" : "bg-[#e8ddd4] text-[#8a9e8a]"}`}
               >
                 {loading ? (
                   <>
@@ -274,7 +272,7 @@ export default function HomeScreen() {
                   </span>
                 ) : (
                   <>
-                    <span className="text-xs">{chip.icon}</span>
+                    <span className="text-xs" aria-hidden="true">{chip.icon}</span>
                     <span className="whitespace-nowrap text-[11px] font-semibold text-[#1a2e1a]">
                       {chip.label}
                     </span>

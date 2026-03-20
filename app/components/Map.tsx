@@ -14,6 +14,7 @@ import BottomDrawer, {
 import type { AmenityPOI, Campsite } from "@/types/map";
 import { CORAL, FOREST_GREEN } from "@/lib/tokens";
 import { SEARCH_RESULTS_KEY, type SearchResultsPayload } from "@/lib/searchResults";
+import { QUICK_CHIPS } from "@/lib/chips";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -121,14 +122,6 @@ function computeVisibleBounds(map: mapboxgl.Map, drawerHeightPx: number): Bounds
 
 const EMPTY_FILTERS: FilterState = { activities: [], pois: [] };
 
-// Quick filter chips — mirror prototype QUICK_FILTERS (campsite mode only; amenity chips deferred to M4)
-const MAP_QUICK_CHIPS = [
-  { key: "pitchd",  label: "Pitchd pick",  icon: "logo" as const, ai: true,  query: "Best camping spots with great weather this weekend" },
-  { key: "weather", label: "Good weather", icon: "☀️",             ai: false, query: "Dry sunny camping this weekend" },
-  { key: "dog",     label: "Dog friendly", icon: "🐕",             ai: false, query: "Dog friendly camping this weekend" },
-  { key: "fishing", label: "Fishing",      icon: "🎣",             ai: false, query: "Camping with fishing this weekend" },
-  { key: "hiking",  label: "Hiking",       icon: "🥾",             ai: false, query: "Camping near excellent hiking trails this weekend" },
-] as const;
 
 // Fit the map to the bounding box of a set of campsites.
 // Uses reduce instead of spread to avoid V8 stack overflow on large arrays.
@@ -506,6 +499,7 @@ export default function MapView() {
       }
     } catch (e) {
       console.error("[MapSearch]", e);
+      suppressGeoFlyRef.current = false;
       setMapSearchError(e instanceof Error ? e.message : "Search failed. Please try again.");
     } finally {
       setMapSearchLoading(false);
@@ -599,7 +593,7 @@ export default function MapView() {
 
         {/* Quick chips */}
         <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
-          {MAP_QUICK_CHIPS.map((chip) => {
+          {QUICK_CHIPS.map((chip) => {
             const isActive = activeChip === chip.key;
             const activeBg  = chip.ai ? CORAL : FOREST_GREEN;
             return (
@@ -624,7 +618,7 @@ export default function MapView() {
                   </span>
                 ) : (
                   <>
-                    <span className="text-xs">{chip.icon}</span>
+                    <span className="text-xs" aria-hidden="true">{chip.icon}</span>
                     <span>{chip.label}</span>
                   </>
                 )}
