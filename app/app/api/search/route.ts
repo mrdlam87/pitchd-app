@@ -18,6 +18,36 @@ export { ALLOWED_AMENITIES } from "@/lib/parseIntent";
 
 // Rough degrees-per-km at Australian latitudes — accurate enough for bounding box
 const DEG_PER_KM = 1 / 111;
+
+// Geocodes a place name to lat/lng using Nominatim (OSM) — free, no API key required.
+// Returns null if the lookup fails or returns no results so the caller can fall back
+// gracefully to the user's GPS coordinates.
+async function geocodeLocation(location: string): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const params = new URLSearchParams({
+      q: `${location}, Australia`,
+      format: "json",
+      limit: "1",
+      countrycodes: "au",
+    });
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?${params}`,
+      {
+        headers: { "User-Agent": "Pitchd/1.0 (pitchd-app.vercel.app)" },
+        signal: AbortSignal.timeout(5_000),
+      }
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as { lat: string; lon: string }[];
+    if (!data.length) return null;
+    const geocodedLat = Number(data[0].lat);
+    const geocodedLng = Number(data[0].lon);
+    if (isNaN(geocodedLat) || isNaN(geocodedLng)) return null;
+    return { lat: geocodedLat, lng: geocodedLng };
+  } catch {
+    return null;
+  }
+}
 // Number of campsites to return after proximity ranking
 const RESULT_LIMIT = 20;
 // Max rows fetched from DB before Haversine sort — guards against large bounding boxes
@@ -102,26 +132,34 @@ export async function POST(req: Request): Promise<Response> {
         .catch((err) => console.error("[search] cache write failed", err));
     }
 
-    // parsedIntent.location (e.g. "Blue Mountains") is extracted and returned to the client
-    // but not yet used to shift the search centre — geocoding is deferred to a later milestone.
-    // Until then, userLat/userLng (the user's GPS coordinates) remain the search origin.
+    // If the query mentions a location, geocode it and use as the search centre.
+    // Falls back to the user's GPS coordinates if geocoding fails or returns no result.
+    let searchLat = userLat;
+    let searchLng = userLng;
+    if (parsedIntent.location) {
+      const geocoded = await geocodeLocation(parsedIntent.location);
+      if (geocoded) {
+        searchLat = geocoded.lat;
+        searchLng = geocoded.lng;
+      }
+    }
 
     // Derive search radius from drive time. The Math.min is defence-in-depth — driveTimeHrs
     // is already capped at MAX_DRIVE_TIME_HRS in parseIntentWithClaude and the cache sanitiser,
     // so this guard only fires if those layers are bypassed (e.g. a future code path).
     const radiusKm = Math.min(parsedIntent.driveTimeHrs * KM_PER_HOUR, MAX_DRIVE_TIME_HRS * KM_PER_HOUR);
 
-    // Build a bounding box around the user's location using the intent-derived radius.
+    // Build a bounding box around the search centre using the intent-derived radius.
     // lng delta accounts for longitude convergence at AU latitudes (~30°S).
     const latDelta = radiusKm * DEG_PER_KM;
     const lngDelta =
-      radiusKm * DEG_PER_KM / Math.cos((userLat * Math.PI) / 180);
+      radiusKm * DEG_PER_KM / Math.cos((searchLat * Math.PI) / 180);
 
     const campsites = await prisma.campsite.findMany({
       where: {
         syncStatus: SyncStatus.active,
-        lat: { gte: userLat - latDelta, lte: userLat + latDelta },
-        lng: { gte: userLng - lngDelta, lte: userLng + lngDelta },
+        lat: { gte: searchLat - latDelta, lte: searchLat + latDelta },
+        lng: { gte: searchLng - lngDelta, lte: searchLng + lngDelta },
         ...(parsedIntent.amenities.length > 0 && {
           amenities: {
             some: {
@@ -155,12 +193,12 @@ export async function POST(req: Request): Promise<Response> {
       take: DB_FETCH_LIMIT,
     });
 
-    // Rank by proximity to the user, return top RESULT_LIMIT
+    // Rank by proximity to the search centre (geocoded location if provided, else user GPS)
     const ranked = campsites
       .map((c) => ({
         ...c,
         amenities: c.amenities.map((a) => a.amenityType),
-        distanceKm: distanceKm(userLat, userLng, c.lat, c.lng),
+        distanceKm: distanceKm(searchLat, searchLng, c.lat, c.lng),
       }))
       .sort((a, b) => a.distanceKm - b.distanceKm)
       .slice(0, RESULT_LIMIT);
