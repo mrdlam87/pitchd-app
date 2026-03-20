@@ -4,6 +4,10 @@ import Anthropic from "@anthropic-ai/sdk";
 
 const HAIKU_MODEL = "claude-haiku-4-5-20251001";
 
+export const DEFAULT_DRIVE_TIME_HRS = 3;
+// Hard cap — prevents a hallucinated large value causing a near-full-table scan in the route
+export const MAX_DRIVE_TIME_HRS = 12;
+
 // Amenity keys Claude is allowed to return — filter out hallucinated values.
 // Must match the keys seeded in prisma/seed.ts — keep in sync if the seed changes.
 export const ALLOWED_AMENITIES = ["dog_friendly", "fishing", "hiking", "swimming"];
@@ -77,8 +81,8 @@ Rules:
   return {
     location: typeof parsed.location === "string" && parsed.location.trim() !== "" ? parsed.location.trim() : null,
     driveTimeHrs: typeof parsed.driveTimeHrs === "number" && parsed.driveTimeHrs > 0
-      ? Math.min(parsed.driveTimeHrs, 12)
-      : 3,
+      ? Math.min(parsed.driveTimeHrs, MAX_DRIVE_TIME_HRS)
+      : DEFAULT_DRIVE_TIME_HRS,
     amenities: Array.isArray(parsed.amenities)
       ? (parsed.amenities as unknown[]).filter(
           (a): a is string => typeof a === "string" && ALLOWED_AMENITIES.includes(a)

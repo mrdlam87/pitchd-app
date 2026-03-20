@@ -6,6 +6,9 @@ import { SyncStatus } from "@/lib/generated/prisma/enums";
 import {
   parseIntentWithClaude,
   isValidIsoDate,
+  ALLOWED_AMENITIES,
+  DEFAULT_DRIVE_TIME_HRS,
+  MAX_DRIVE_TIME_HRS,
   type ParsedIntent,
 } from "@/lib/parseIntent";
 import { createHash } from "crypto";
@@ -25,10 +28,7 @@ const RESULT_LIMIT = 20;
 const DB_FETCH_LIMIT = 200;
 // Converts drive time hours to a search radius in km (1hr ≈ 80km)
 const KM_PER_HOUR = 80;
-// Default drive time when Claude can't infer one
-const DEFAULT_DRIVE_TIME_HRS = 3;
-// Hard cap on drive time — prevents a hallucinated large value causing a near-full-table scan
-const MAX_DRIVE_TIME_HRS = 12;
+// DEFAULT_DRIVE_TIME_HRS and MAX_DRIVE_TIME_HRS imported from @/lib/parseIntent
 
 function hashQuery(query: string): string {
   return createHash("sha256").update(query.toLowerCase().trim()).digest("hex");
@@ -119,7 +119,7 @@ export async function POST(req: Request): Promise<Response> {
           ? raw.amenities.filter(
               (a): a is string =>
                 typeof a === "string" &&
-                ["dog_friendly", "fishing", "hiking", "swimming"].includes(a)
+                ALLOWED_AMENITIES.includes(a)
             )
           : [],
         // Sanitise date fields — must be ISO format (YYYY-MM-DD), not free-text
@@ -161,6 +161,10 @@ export async function POST(req: Request): Promise<Response> {
         },
       }).catch((err) => console.error("[search] cache write failed", err));
     }
+
+    // parsedIntent.location (e.g. "Blue Mountains") is extracted and returned to the client
+    // but not yet used to shift the search centre — geocoding is deferred to a later milestone.
+    // Until then, userLat/userLng (the user's GPS coordinates) remain the search origin.
 
     // Derive search radius from drive time. Cap to prevent near-full-table scans.
     const radiusKm = Math.min(parsedIntent.driveTimeHrs * KM_PER_HOUR, MAX_DRIVE_TIME_HRS * KM_PER_HOUR);
