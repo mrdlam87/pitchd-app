@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Session } from "next-auth";
 import { UserRole } from "@/lib/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
+import { ALLOWED_AMENITIES } from "@/lib/parseIntent";
 import { createHash } from "crypto";
 
 // Mock auth — real OAuth not needed for integration tests
@@ -24,7 +25,7 @@ vi.mock("@anthropic-ai/sdk", () => {
 });
 
 import { auth } from "@/auth";
-import { POST, ALLOWED_AMENITIES } from "@/app/api/search/route";
+import { POST } from "@/app/api/search/route";
 
 // Cast to session-returning overload to avoid middleware overload conflict
 const mockAuth = vi.mocked(auth as () => Promise<Session | null>);
@@ -38,8 +39,15 @@ const AUTHED_SESSION: Session = {
 const SYDNEY_LAT = -33.8688;
 const SYDNEY_LNG = 151.2093;
 
-// Default mock Claude response — a valid parsedIntent with no amenities, 300km radius
-const MOCK_CLAUDE_INTENT = { amenities: [], dateFrom: null, dateTo: null, radiusKm: 300 };
+// Default mock Claude response — a valid parsedIntent with no amenities, 3hr drive time
+const MOCK_CLAUDE_INTENT = {
+  location: null,
+  driveTimeHrs: 3,
+  amenities: [],
+  startDate: null,
+  endDate: null,
+  sortBy: null,
+};
 const MOCK_CLAUDE_RESPONSE = {
   content: [{ type: "text", text: JSON.stringify(MOCK_CLAUDE_INTENT) }],
 };
@@ -223,7 +231,7 @@ describe("POST /api/search", () => {
     // ALLOWED_AMENITIES is a subset of all amenity types — only the ones that make sense
     // for NL search. This test catches typos and drift: if a key is removed or renamed in
     // prisma/seed.ts, this will fail. Adding new amenity types to the seed will NOT fail this
-    // test — add new keys to ALLOWED_AMENITIES in route.ts only if they should be AI-searchable.
+    // test — add new keys to ALLOWED_AMENITIES in lib/parseIntent.ts only if they should be AI-searchable.
     const seeded = await prisma.amenityType.findMany({ select: { key: true } });
     if (seeded.length === 0) return; // AmenityType not seeded (CI) — nothing to check against
     const seededKeys = seeded.map((a) => a.key);
@@ -288,7 +296,14 @@ describe("POST /api/search", () => {
     const hash = hashQuery(query);
     createdHashes.push(hash);
 
-    const cachedIntent = { amenities: ["hiking"], dateFrom: null, dateTo: null, radiusKm: 200 };
+    const cachedIntent = {
+      location: "Blue Mountains",
+      driveTimeHrs: 2,
+      amenities: ["hiking"],
+      startDate: null,
+      endDate: null,
+      sortBy: null,
+    };
     // Pre-seed a fresh (non-expired) cache entry
     await prisma.searchCache.upsert({
       where: { queryHash: hash },
@@ -313,22 +328,30 @@ describe("POST /api/search", () => {
     expect(body.parsedIntent).toMatchObject(cachedIntent);
   });
 
-  it("caps radiusKm from cache at 1000 km", async () => {
-    const query = "radius cap cache test";
+  it("caps driveTimeHrs from cache at 12 hours", async () => {
+    const query = "drive time cap cache test";
     const hash = hashQuery(query);
     createdHashes.push(hash);
 
-    // Pre-seed a cache entry with an oversized radius
+    // Pre-seed a cache entry with an oversized drive time
+    const oversizedIntent = {
+      location: null,
+      driveTimeHrs: 100,
+      amenities: [],
+      startDate: null,
+      endDate: null,
+      sortBy: null,
+    };
     await prisma.searchCache.upsert({
       where: { queryHash: hash },
       create: {
         queryHash: hash,
         queryText: query,
-        parsedIntentJson: { amenities: [], dateFrom: null, dateTo: null, radiusKm: 5000 },
+        parsedIntentJson: oversizedIntent,
         expiresAt: new Date(Date.now() + 60 * 60 * 1000),
       },
       update: {
-        parsedIntentJson: { amenities: [], dateFrom: null, dateTo: null, radiusKm: 5000 },
+        parsedIntentJson: oversizedIntent,
         expiresAt: new Date(Date.now() + 60 * 60 * 1000),
       },
     });
@@ -336,8 +359,8 @@ describe("POST /api/search", () => {
     const res = await POST(makeRequest({ query, lat: SYDNEY_LAT, lng: SYDNEY_LNG }));
     expect(res.status).toBe(200);
     const body = await res.json();
-    // radiusKm in response must be capped at 1000, not the stored 5000
-    expect(body.parsedIntent.radiusKm).toBe(1000);
+    // driveTimeHrs in response must be capped at 12, not the stored 100
+    expect(body.parsedIntent.driveTimeHrs).toBe(12);
   });
 
   it("calls Claude again when cached entry is expired", async () => {
@@ -346,12 +369,20 @@ describe("POST /api/search", () => {
     createdHashes.push(hash);
 
     // Pre-seed an expired cache entry
+    const expiredIntent = {
+      location: null,
+      driveTimeHrs: 3,
+      amenities: [],
+      startDate: null,
+      endDate: null,
+      sortBy: null,
+    };
     await prisma.searchCache.upsert({
       where: { queryHash: hash },
       create: {
         queryHash: hash,
         queryText: query,
-        parsedIntentJson: { amenities: [], dateFrom: null, dateTo: null, radiusKm: 300 },
+        parsedIntentJson: expiredIntent,
         expiresAt: new Date(Date.now() - 1000), // expired 1 second ago
       },
       update: {
@@ -379,10 +410,12 @@ describe("POST /api/search", () => {
     expect(body).toMatchObject({
       campsites: expect.any(Array),
       parsedIntent: {
+        location: expect.toBeOneOf([expect.any(String), null]),
+        driveTimeHrs: expect.any(Number),
         amenities: expect.any(Array),
-        dateFrom: expect.toBeOneOf([expect.any(String), null]),
-        dateTo: expect.toBeOneOf([expect.any(String), null]),
-        radiusKm: expect.any(Number),
+        startDate: expect.toBeOneOf([expect.any(String), null]),
+        endDate: expect.toBeOneOf([expect.any(String), null]),
+        sortBy: expect.toBeOneOf(["proximity", "relevance", null]),
       },
     });
   });
@@ -399,7 +432,14 @@ describe("POST /api/search", () => {
     const created = await seedCampsite({ lat: -31.96, lng: 141.48 });
 
     mockCreate.mockResolvedValueOnce({
-      content: [{ type: "text", text: JSON.stringify({ amenities: [], dateFrom: null, dateTo: null, radiusKm: 50 }) }],
+      content: [{ type: "text", text: JSON.stringify({
+        location: null,
+        driveTimeHrs: 1,
+        amenities: [],
+        startDate: null,
+        endDate: null,
+        sortBy: null,
+      }) }],
     });
 
     const res = await POST(makeRequest({ query, lat: BASE_LAT, lng: BASE_LNG }));
@@ -430,10 +470,18 @@ describe("POST /api/search", () => {
     const near = await seedCampsite({ lat: -31.96, lng: 141.48 }); // ~1.5km away
     const far = await seedCampsite({ lat: -32.10, lng: 141.60 });  // ~20km away
 
-    // Override mockCreate for this test to return a 50km radius — covers both test campsites
-    // but keeps the bounding box small enough that no real DB campsites appear.
+    // Override mockCreate for this test to return a 1hr drive time (~80km radius) —
+    // covers both test campsites but keeps the bounding box small enough that no
+    // real DB campsites appear.
     mockCreate.mockResolvedValueOnce({
-      content: [{ type: "text", text: JSON.stringify({ amenities: [], dateFrom: null, dateTo: null, radiusKm: 50 }) }],
+      content: [{ type: "text", text: JSON.stringify({
+        location: null,
+        driveTimeHrs: 1,
+        amenities: [],
+        startDate: null,
+        endDate: null,
+        sortBy: null,
+      }) }],
     });
 
     const res = await POST(makeRequest({ query, lat: BASE_LAT, lng: BASE_LNG }));
@@ -446,5 +494,33 @@ describe("POST /api/search", () => {
     expect(nearIdx).not.toBe(-1);
     expect(farIdx).not.toBe(-1);
     expect(nearIdx).toBeLessThan(farIdx);
+  });
+
+  // --- Vague query handling ---
+
+  it("handles vague queries by returning sensible defaults", async () => {
+    const query = "somewhere nice this weekend";
+    createdHashes.push(hashQuery(query));
+    await prisma.searchCache.deleteMany({ where: { queryHash: hashQuery(query) } });
+
+    // Claude returns defaults for vague queries
+    mockCreate.mockResolvedValueOnce({
+      content: [{ type: "text", text: JSON.stringify({
+        location: null,
+        driveTimeHrs: 3,
+        amenities: [],
+        startDate: "2026-03-21",
+        endDate: "2026-03-22",
+        sortBy: null,
+      }) }],
+    });
+
+    const res = await POST(makeRequest({ query, lat: SYDNEY_LAT, lng: SYDNEY_LNG }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    // Vague query should still return a valid parsedIntent with defaults
+    expect(body.parsedIntent.driveTimeHrs).toBeGreaterThan(0);
+    expect(body.parsedIntent.amenities).toEqual([]);
   });
 });
