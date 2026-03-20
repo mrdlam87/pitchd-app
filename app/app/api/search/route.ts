@@ -33,7 +33,7 @@ async function geocodeLocation(location: string): Promise<{ lat: number; lng: nu
   if (location.length > MAX_LOCATION_LENGTH) return null;
   try {
     const params = new URLSearchParams({
-      q: `${location}, Australia`,
+      q: location,
       format: "json",
       limit: "1",
       countrycodes: "au",

@@ -130,11 +130,13 @@ export default function HomeScreen() {
     let lat = -33.8688;
     let lng = 151.2093;
     try {
-      const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 }),
-      );
-      lat = pos.coords.latitude;
-      lng = pos.coords.longitude;
+      if (navigator.geolocation) {
+        const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 }),
+        );
+        lat = pos.coords.latitude;
+        lng = pos.coords.longitude;
+      }
     } catch {
       // Geolocation denied or unavailable — use Sydney default
     }

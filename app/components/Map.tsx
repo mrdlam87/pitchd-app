@@ -126,6 +126,7 @@ const EMPTY_FILTERS: FilterState = { activities: [], pois: [] };
 // Fit the map to the bounding box of a set of campsites.
 // Uses reduce instead of spread to avoid V8 stack overflow on large arrays.
 function fitToCampsites(map: mapboxgl.Map, campsites: Campsite[], bottomPad: number) {
+  if (campsites.length === 0) return;
   const lats = campsites.map((c) => c.lat);
   const lngs = campsites.map((c) => c.lng);
   if (lats.length === 1) {
@@ -169,8 +170,8 @@ export default function MapView() {
   const [campsites, setCampsites] = useState<Campsite[]>([]);
   // useState lazy initialiser runs synchronously on the first render — before any effects
   // or Mapbox's onLoad — eliminating the race between a useEffect sessionStorage read and
-  // handleLoad firing on a warm tile cache. consumeSearchResults is safe during SSR: its
-  // try/catch swallows the ReferenceError that sessionStorage throws on the server.
+  // handleLoad firing on a warm tile cache. This is a "use client" component so it never
+  // runs on the server; the try/catch in consumeSearchResults guards against malformed data.
   const [initialSearch] = useState<SearchResultsPayload | null>(() => consumeSearchResults());
   const initialSearchRef = useRef(initialSearch);
   // True while NL search results are displayed — suppresses handleMoveEnd from calling
@@ -522,6 +523,7 @@ export default function MapView() {
     suppressGeoFlyRef.current = false;
     setActiveChip(null);
     setSearchContextQuery(null);
+    setMapSearchError(null);
     if (mapRef.current) {
       const map = mapRef.current.getMap();
       loadCampsites(map);
@@ -547,10 +549,7 @@ export default function MapView() {
       {/* Floating search bar + quick chips — z-[60] must exceed drawer (z-50) */}
       <div className="absolute top-3 left-3 right-3 z-[60] flex flex-col gap-2">
         {/* Search bar */}
-        <div
-          className="flex items-center gap-2 rounded-full border bg-white px-4 py-2.5 shadow-md"
-          style={{ borderColor: "#e0dbd0", fontFamily: "var(--font-dm-sans), sans-serif" }}
-        >
+        <div className="flex items-center gap-2 rounded-full border border-[#e0dbd0] bg-white px-4 py-2.5 font-[family-name:var(--font-dm-sans)] shadow-md">
           <div className="min-w-0 flex-1">
             <input
               value={mapQuery}
@@ -570,8 +569,7 @@ export default function MapView() {
             onClick={() => void handleMapSearch(mapQuery, null)}
             disabled={!mapQuery.trim() || mapSearchLoading}
             aria-label="Search"
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40"
-            style={{ background: mapQuery.trim() ? CORAL : "#e8f0e8" }}
+            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40 ${mapQuery.trim() ? "bg-[#e8674a]" : "bg-[#e8f0e8]"}`}
           >
             {mapSearchLoading ? (
               <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
@@ -588,8 +586,7 @@ export default function MapView() {
             type="button"
             onClick={() => setShowFilters(true)}
             aria-label={`Filters${filterCount > 0 ? ` (${filterCount} active)` : ""}`}
-            className="shrink-0 text-xs font-bold"
-            style={{ color: CORAL, fontFamily: "var(--font-dm-sans), sans-serif" }}
+            className="shrink-0 text-xs font-bold text-[#e8674a] font-[family-name:var(--font-dm-sans)]"
           >
             Filters{filterCount > 0 ? ` (${filterCount})` : ""}
           </button>
@@ -606,7 +603,6 @@ export default function MapView() {
         <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
           {QUICK_CHIPS.map((chip) => {
             const isActive = activeChip === chip.key;
-            const activeBg  = chip.ai ? CORAL : FOREST_GREEN;
             return (
               <button
                 key={chip.key}
@@ -614,18 +610,20 @@ export default function MapView() {
                 onClick={() => isActive ? handleClearSearch() : void handleMapSearch(chip.query, chip.key)}
                 disabled={mapSearchLoading}
                 aria-label={chip.icon === "logo" ? chip.label : undefined}
-                className="flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold shadow-sm transition-all duration-150 disabled:opacity-50"
-                style={{
-                  background:   isActive ? activeBg : "#fff",
-                  borderColor:  isActive ? activeBg : "#e0dbd0",
-                  color:        isActive ? "#fff"    : chip.ai ? CORAL : "#1a2e1a",
-                  fontFamily: "var(--font-dm-sans), sans-serif",
-                }}
+                className={`flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold font-[family-name:var(--font-dm-sans)] shadow-sm transition-all duration-150 disabled:opacity-50 ${
+                  isActive
+                    ? chip.primary
+                      ? "bg-[#e8674a] border-[#e8674a] text-white"
+                      : "bg-[#2d4a2d] border-[#2d4a2d] text-white"
+                    : chip.primary
+                      ? "bg-white border-[#e0dbd0] text-[#e8674a]"
+                      : "bg-white border-[#e0dbd0] text-[#1a2e1a]"
+                }`}
               >
                 {chip.icon === "logo" ? (
                   <span className="flex items-baseline">
-                    <span style={{ fontFamily: "var(--font-lora), serif", fontWeight: 700, fontSize: 11, color: isActive ? "#fff" : FOREST_GREEN }}>Pitch</span>
-                    <span style={{ fontFamily: "var(--font-lora), serif", fontWeight: 700, fontSize: 11, color: isActive ? "rgba(255,255,255,0.75)" : CORAL }}>d</span>
+                    <span className={`font-[family-name:var(--font-lora)] text-[11px] font-bold ${isActive ? "text-white" : "text-[#2d4a2d]"}`}>Pitch</span>
+                    <span className={`font-[family-name:var(--font-lora)] text-[11px] font-bold ${isActive ? "text-white/75" : "text-[#e8674a]"}`}>d</span>
                   </span>
                 ) : (
                   <>
