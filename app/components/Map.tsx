@@ -475,8 +475,11 @@ export default function MapView() {
     if (!q.trim() || mapSearchLoading) return;
     setMapSearchLoading(true);
     setMapSearchError(null);
-    const lat = userLocationRef.current?.lat ?? -33.8688;
-    const lng = userLocationRef.current?.lng ?? 151.2093;
+    // Use the current map centre as the search origin so chip searches stay in the
+    // area you're viewing — not the user's GPS location which may be far away.
+    const mapCenter = mapRef.current?.getMap().getCenter();
+    const lat = mapCenter?.lat ?? userLocationRef.current?.lat ?? -33.8688;
+    const lng = mapCenter?.lng ?? userLocationRef.current?.lng ?? 151.2093;
     try {
       const res = await fetch("/api/search", {
         method: "POST",
