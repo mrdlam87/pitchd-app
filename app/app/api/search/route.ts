@@ -10,6 +10,7 @@ import {
   type ParsedIntent,
 } from "@/lib/parseIntent";
 import { hashQuery, getCachedIntent, setCachedIntent } from "@/lib/searchCache";
+import { haversineKm } from "@/lib/distance";
 
 // Re-export for callers that import from the route rather than from the lib directly.
 // The route is the public API surface for search — keeping this here avoids breaking
@@ -64,24 +65,6 @@ const RESULT_LIMIT = 20;
 const DB_FETCH_LIMIT = 200;
 // MAX_DRIVE_TIME_HRS and KM_PER_HOUR imported from @/lib/parseIntent
 // hashQuery, getCachedIntent, setCachedIntent imported from @/lib/searchCache
-
-// Haversine distance (km) — used to sort results by proximity to user
-function distanceKm(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number
-): number {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
 
 export async function POST(req: Request): Promise<Response> {
   const session = await auth();
@@ -207,7 +190,7 @@ export async function POST(req: Request): Promise<Response> {
       .map((c) => ({
         ...c,
         amenities: c.amenities.map((a) => a.amenityType),
-        distanceKm: distanceKm(searchLat, searchLng, c.lat, c.lng),
+        distanceKm: haversineKm(searchLat, searchLng, c.lat, c.lng),
       }))
       .sort((a, b) => a.distanceKm - b.distanceKm)
       .slice(0, RESULT_LIMIT);
