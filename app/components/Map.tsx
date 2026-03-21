@@ -567,6 +567,8 @@ export default function MapView() {
     [loadAmenities],
   );
 
+  // TODO M4: pois toggles increment this badge — will read as campsite filters active.
+  // Fix when campsite/amenity linkage lands and the two filter surfaces are separated.
   const filterCount = activeFilters.activities.length + activeFilters.pois.length;
 
   const showDrawer = campsites.length > 0 || selectedPoiId !== null;
@@ -642,6 +644,10 @@ export default function MapView() {
             const isActive = "poiType" in chip
               ? activeFilters.pois.includes(chip.poiType)
               : activeChip === chip.key;
+            // Map chips always go through AI (handleMapSearch) because the search
+            // needs the current viewport centre as the origin. Only HomeScreen uses
+            // filterKey to skip the AI call — it navigates to MapView immediately
+            // without a known centre.
             const handleClick = "poiType" in chip
               ? () => handleAmenityChip(chip.poiType)
               : isActive
@@ -652,7 +658,7 @@ export default function MapView() {
                 key={chip.key}
                 type="button"
                 onClick={handleClick}
-                disabled={mapSearchLoading}
+                disabled={"poiType" in chip ? false : mapSearchLoading}
                 aria-label={chip.icon === "logo" ? chip.label : undefined}
                 className={`flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold font-[family-name:var(--font-dm-sans)] shadow-sm transition-all duration-150 disabled:opacity-50 ${
                   isActive
