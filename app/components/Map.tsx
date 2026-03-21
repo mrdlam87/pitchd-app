@@ -166,6 +166,8 @@ function consumeSearchResults(): SearchResultsPayload | null {
 
     // AISearchPayload (kind === "ai" or legacy payload without kind field)
     if (!Array.isArray(obj.campsites)) return null;
+    const pi = (obj.parsedIntent ?? {}) as Record<string, unknown>;
+    if (!Array.isArray(pi.amenities)) return null;
     // Spot-check item shapes — a malformed or null entry would crash fitToCampsites
     const campsites = obj.campsites as unknown[];
     if (!campsites.every((c) => c !== null && typeof (c as Record<string, unknown>).lat === "number" && typeof (c as Record<string, unknown>).lng === "number")) {
@@ -528,6 +530,9 @@ export default function MapView() {
         searchModeRef.current = true;
         setActiveChip(chipKey ?? "pitchd");
         setAiSyncedActivities(data.parsedIntent.amenities);
+        // Intentionally replace activities (not merge) — the new query redefines
+        // intent and any prior activity selection is stale. pois are preserved
+        // because the AI doesn't infer POI types.
         const aiFilters: FilterState = { ...activeFiltersRef.current, activities: data.parsedIntent.amenities };
         setActiveFilters(aiFilters);
         activeFiltersRef.current = aiFilters;
@@ -558,6 +563,12 @@ export default function MapView() {
     setSearchContextQuery(null);
     setMapSearchError(null);
     setAiSyncedActivities([]);
+    // Reset AI-inferred activities so browse results aren't silently filtered
+    // after the user exits search mode. pois are preserved — they reflect
+    // explicit user choices (amenity chips / filter panel) not AI inference.
+    const resetFilters: FilterState = { ...activeFiltersRef.current, activities: [] };
+    setActiveFilters(resetFilters);
+    activeFiltersRef.current = resetFilters;
     if (mapRef.current) {
       const map = mapRef.current.getMap();
       loadCampsites(map);
