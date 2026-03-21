@@ -12,7 +12,7 @@ type FilterKey = (typeof ALLOWED_AMENITIES)[number] | null;
 export const QUICK_CHIPS: readonly {
   key: string;
   label: string;
-  icon: string | "logo";
+  icon: "logo" | (string & {});
   primary: boolean;
   filterKey: FilterKey;
   query: string;
@@ -28,8 +28,8 @@ export type QuickChip = (typeof QUICK_CHIPS)[number];
 
 // Map-only chips that filter amenity POIs directly — not shown on HomeScreen.
 export const AMENITY_CHIPS = [
-  { key: "dump",  label: "Dump points", icon: "🚐", primary: false, poiType: "dump_point" },
-  { key: "water", label: "Water fill",  icon: "💧", primary: false, poiType: "water_fill"  },
+  { key: "dump",  label: "Dump points", icon: "🚐", poiType: "dump_point" },
+  { key: "water", label: "Water fill",  icon: "💧", poiType: "water_fill"  },
 ] as const;
 
 export type AmenityChip = (typeof AMENITY_CHIPS)[number];

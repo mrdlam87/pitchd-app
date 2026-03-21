@@ -28,3 +28,31 @@ export type DirectFilterPayload = {
 };
 
 export type SearchResultsPayload = AISearchPayload | DirectFilterPayload;
+
+// Parses and validates an unknown value (e.g. from JSON.parse) as a SearchResultsPayload.
+// Returns null if the shape is invalid. Exported for unit testing.
+export function parseSearchResultsPayload(parsed: unknown): SearchResultsPayload | null {
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const obj = parsed as Record<string, unknown>;
+
+  if (obj.kind === "direct") {
+    if (typeof obj.chipKey !== "string") return null;
+    if (typeof obj.filters !== "object" || obj.filters === null) return null;
+    const f = obj.filters as Record<string, unknown>;
+    if (!Array.isArray(f.activities) || !Array.isArray(f.pois)) return null;
+    if (!(f.activities as unknown[]).every((a: unknown) => typeof a === "string")) return null;
+    if (!(f.pois as unknown[]).every((p: unknown) => typeof p === "string")) return null;
+    return parsed as SearchResultsPayload;
+  }
+
+  // AISearchPayload (kind === "ai" or legacy payload without kind field)
+  if (!Array.isArray(obj.campsites)) return null;
+  const pi = (obj.parsedIntent ?? {}) as Record<string, unknown>;
+  if (!Array.isArray(pi.amenities)) return null;
+  // Spot-check item shapes — a malformed or null entry would crash fitToCampsites
+  const campsites = obj.campsites as unknown[];
+  if (!campsites.every((c) => c !== null && typeof (c as Record<string, unknown>).lat === "number" && typeof (c as Record<string, unknown>).lng === "number")) {
+    return null;
+  }
+  return parsed as SearchResultsPayload;
+}

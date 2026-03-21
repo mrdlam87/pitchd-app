@@ -13,7 +13,7 @@ import BottomDrawer, {
 } from "./BottomDrawer";
 import type { AmenityPOI, Campsite } from "@/types/map";
 import { CORAL, FOREST_GREEN } from "@/lib/tokens";
-import { SEARCH_RESULTS_KEY, type SearchResultsPayload, type AISearchPayload } from "@/lib/searchResults";
+import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayload, type AISearchPayload } from "@/lib/searchResults";
 import { QUICK_CHIPS, AMENITY_CHIPS } from "@/lib/chips";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -150,30 +150,7 @@ function consumeSearchResults(): SearchResultsPayload | null {
     const raw = sessionStorage.getItem(SEARCH_RESULTS_KEY);
     if (!raw) return null;
     sessionStorage.removeItem(SEARCH_RESULTS_KEY);
-    const parsed = JSON.parse(raw) as unknown;
-    if (typeof parsed !== "object" || parsed === null) return null;
-    const obj = parsed as Record<string, unknown>;
-
-    if (obj.kind === "direct") {
-      // DirectFilterPayload — validate shape
-      if (typeof obj.chipKey !== "string") return null;
-      if (typeof obj.filters !== "object" || obj.filters === null) return null;
-      const f = obj.filters as Record<string, unknown>;
-      if (!Array.isArray(f.activities) || !Array.isArray(f.pois)) return null;
-      if (!(f.activities as unknown[]).every((a: unknown) => typeof a === "string")) return null;
-      return parsed as SearchResultsPayload;
-    }
-
-    // AISearchPayload (kind === "ai" or legacy payload without kind field)
-    if (!Array.isArray(obj.campsites)) return null;
-    const pi = (obj.parsedIntent ?? {}) as Record<string, unknown>;
-    if (!Array.isArray(pi.amenities)) return null;
-    // Spot-check item shapes — a malformed or null entry would crash fitToCampsites
-    const campsites = obj.campsites as unknown[];
-    if (!campsites.every((c) => c !== null && typeof (c as Record<string, unknown>).lat === "number" && typeof (c as Record<string, unknown>).lng === "number")) {
-      return null;
-    }
-    return parsed as SearchResultsPayload;
+    return parseSearchResultsPayload(JSON.parse(raw) as unknown);
   } catch {
     return null;
   }
@@ -679,10 +656,10 @@ export default function MapView() {
                 aria-label={chip.icon === "logo" ? chip.label : undefined}
                 className={`flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold font-[family-name:var(--font-dm-sans)] shadow-sm transition-all duration-150 disabled:opacity-50 ${
                   isActive
-                    ? chip.primary
+                    ? "primary" in chip && chip.primary
                       ? "bg-[#e8674a] border-[#e8674a] text-white"
                       : "bg-[#2d4a2d] border-[#2d4a2d] text-white"
-                    : chip.primary
+                    : "primary" in chip && chip.primary
                       ? "bg-white border-[#e0dbd0] text-[#e8674a]"
                       : "bg-white border-[#e0dbd0] text-[#1a2e1a]"
                 }`}
