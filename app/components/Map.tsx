@@ -14,7 +14,7 @@ import BottomDrawer, {
 import type { AmenityPOI, Campsite } from "@/types/map";
 import { CORAL, FOREST_GREEN } from "@/lib/tokens";
 import { SEARCH_RESULTS_KEY, type SearchResultsPayload } from "@/lib/searchResults";
-import { QUICK_CHIPS } from "@/lib/chips";
+import { QUICK_CHIPS, AMENITY_CHIPS } from "@/lib/chips";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -222,6 +222,9 @@ export default function MapView() {
   const fetchCounterRef = useRef(0);
   // Separate counter for amenity fetches — same stale-discard pattern
   const amenityFetchCounterRef = useRef(0);
+  // When an amenity chip is active this overrides the filter-panel pois list.
+  // null means fall back to activeFiltersRef.current.pois (filter-panel state).
+  const chipPoisOverrideRef = useRef<string[] | null>(null);
   // Mirrors drawerState so loadCampsites (a stable useCallback) always reads the latest value
   const drawerStateRef = useRef<DrawerState>("peek");
   // Tracks the previous fetch's result count so loadCampsites can detect 0 → results
@@ -286,7 +289,7 @@ export default function MapView() {
   }, []);
 
   const loadAmenities = useCallback((map: mapboxgl.Map) => {
-    const poiTypes = activeFiltersRef.current.pois;
+    const poiTypes = chipPoisOverrideRef.current ?? activeFiltersRef.current.pois;
     if (poiTypes.length === 0) {
       setAmenityPois([]);
       setSelectedPoiId(null);
@@ -456,6 +459,7 @@ export default function MapView() {
       // subsequent moveend events trigger normal browse fetches again.
       searchModeRef.current = false;
       suppressGeoFlyRef.current = false;
+      chipPoisOverrideRef.current = null;
       setActiveChip(null);
       setSearchContextQuery(null);
       setShowFilters(false);
@@ -497,7 +501,7 @@ export default function MapView() {
         setDrawerState("half");
         drawerStateRef.current = "half";
         searchModeRef.current = true;
-        setActiveChip(chipKey);
+        setActiveChip(chipKey ?? "pitchd");
         setSearchContextQuery(q.trim());
         skipNextFetch.current = true;
         suppressGeoFlyRef.current = true;
@@ -521,6 +525,7 @@ export default function MapView() {
   const handleClearSearch = useCallback(() => {
     searchModeRef.current = false;
     suppressGeoFlyRef.current = false;
+    chipPoisOverrideRef.current = null;
     setActiveChip(null);
     setSearchContextQuery(null);
     setMapSearchError(null);
@@ -530,6 +535,15 @@ export default function MapView() {
       loadAmenities(map);
     }
   }, [loadCampsites, loadAmenities]);
+
+  const handleAmenityChip = useCallback(
+    (poiType: string, chipKey: string) => {
+      chipPoisOverrideRef.current = [poiType];
+      setActiveChip(chipKey);
+      if (mapRef.current) loadAmenities(mapRef.current.getMap());
+    },
+    [loadAmenities],
+  );
 
   const filterCount = activeFilters.activities.length + activeFilters.pois.length;
 
@@ -601,13 +615,18 @@ export default function MapView() {
 
         {/* Quick chips */}
         <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
-          {QUICK_CHIPS.map((chip) => {
+          {[...QUICK_CHIPS, ...AMENITY_CHIPS].map((chip) => {
             const isActive = activeChip === chip.key;
+            const handleClick = isActive
+              ? handleClearSearch
+              : "poiType" in chip
+                ? () => handleAmenityChip(chip.poiType, chip.key)
+                : () => void handleMapSearch(chip.query, chip.key);
             return (
               <button
                 key={chip.key}
                 type="button"
-                onClick={() => isActive ? handleClearSearch() : void handleMapSearch(chip.query, chip.key)}
+                onClick={handleClick}
                 disabled={mapSearchLoading}
                 aria-label={chip.icon === "logo" ? chip.label : undefined}
                 className={`flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold font-[family-name:var(--font-dm-sans)] shadow-sm transition-all duration-150 disabled:opacity-50 ${

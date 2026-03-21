@@ -11,3 +11,11 @@ export const QUICK_CHIPS = [
 ] as const;
 
 export type QuickChip = (typeof QUICK_CHIPS)[number];
+
+// Map-only chips that filter amenity POIs directly — not shown on HomeScreen.
+export const AMENITY_CHIPS = [
+  { key: "dump",  label: "Dump points", icon: "🚐", primary: false as const, poiType: "dump_point" },
+  { key: "water", label: "Water fill",  icon: "💧", primary: false as const, poiType: "water_fill"  },
+] as const;
+
+export type AmenityChip = (typeof AMENITY_CHIPS)[number];
