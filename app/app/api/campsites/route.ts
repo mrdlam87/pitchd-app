@@ -1,7 +1,7 @@
 // GET /api/campsites
 // Browse mode — returns campsites within an exact viewport bounding box (north/south/east/west).
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/apiAuth";
 import { SyncStatus } from "@/lib/generated/prisma/enums";
 
 const PAGE_SIZE = 20;
@@ -12,10 +12,8 @@ const MAX_LAT_SPAN = 10;
 const MAX_LNG_SPAN = 15;
 
 export async function GET(req: Request): Promise<Response> {
-  const session = await auth();
-  if (!session) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = await requireAuth();
+  if (authError) return authError;
 
   const { searchParams } = new URL(req.url);
 

@@ -1,8 +1,8 @@
 // GET /api/amenities
 // Returns standalone AmenityPOI pins within a radius of a given coordinate.
 // Params: lat, lng, radius (km), type (AmenityType key)
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/apiAuth";
 
 // 1 degree of latitude ≈ 111.32 km everywhere.
 // 1 degree of longitude ≈ 111.32 * cos(lat) km — varies with latitude.
@@ -24,10 +24,8 @@ const MAX_RADIUS_KM = 500;
 const MAX_RESULTS = 200;
 
 export async function GET(req: Request): Promise<Response> {
-  const session = await auth();
-  if (!session) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = await requireAuth();
+  if (authError) return authError;
 
   const { searchParams } = new URL(req.url);
 
