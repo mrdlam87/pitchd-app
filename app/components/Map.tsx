@@ -222,9 +222,6 @@ export default function MapView() {
   const fetchCounterRef = useRef(0);
   // Separate counter for amenity fetches — same stale-discard pattern
   const amenityFetchCounterRef = useRef(0);
-  // When an amenity chip is active this overrides the filter-panel pois list.
-  // null means fall back to activeFiltersRef.current.pois (filter-panel state).
-  const chipPoisOverrideRef = useRef<string[] | null>(null);
   // Mirrors drawerState so loadCampsites (a stable useCallback) always reads the latest value
   const drawerStateRef = useRef<DrawerState>("peek");
   // Tracks the previous fetch's result count so loadCampsites can detect 0 → results
@@ -289,7 +286,7 @@ export default function MapView() {
   }, []);
 
   const loadAmenities = useCallback((map: mapboxgl.Map) => {
-    const poiTypes = chipPoisOverrideRef.current ?? activeFiltersRef.current.pois;
+    const poiTypes = activeFiltersRef.current.pois;
     if (poiTypes.length === 0) {
       setAmenityPois([]);
       setSelectedPoiId(null);
@@ -459,7 +456,6 @@ export default function MapView() {
       // subsequent moveend events trigger normal browse fetches again.
       searchModeRef.current = false;
       suppressGeoFlyRef.current = false;
-      chipPoisOverrideRef.current = null;
       setActiveChip(null);
       setSearchContextQuery(null);
       setShowFilters(false);
@@ -525,7 +521,6 @@ export default function MapView() {
   const handleClearSearch = useCallback(() => {
     searchModeRef.current = false;
     suppressGeoFlyRef.current = false;
-    chipPoisOverrideRef.current = null;
     setActiveChip(null);
     setSearchContextQuery(null);
     setMapSearchError(null);
@@ -537,9 +532,14 @@ export default function MapView() {
   }, [loadCampsites, loadAmenities]);
 
   const handleAmenityChip = useCallback(
-    (poiType: string, chipKey: string) => {
-      chipPoisOverrideRef.current = [poiType];
-      setActiveChip(chipKey);
+    (poiType: string) => {
+      const current = activeFiltersRef.current.pois;
+      const next = current.includes(poiType)
+        ? current.filter((p: string) => p !== poiType)
+        : [...current, poiType];
+      const newFilters = { ...activeFiltersRef.current, pois: next };
+      setActiveFilters(newFilters);
+      activeFiltersRef.current = newFilters;
       if (mapRef.current) loadAmenities(mapRef.current.getMap());
     },
     [loadAmenities],
@@ -616,11 +616,13 @@ export default function MapView() {
         {/* Quick chips */}
         <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
           {[...QUICK_CHIPS, ...AMENITY_CHIPS].map((chip) => {
-            const isActive = activeChip === chip.key;
-            const handleClick = isActive
-              ? handleClearSearch
-              : "poiType" in chip
-                ? () => handleAmenityChip(chip.poiType, chip.key)
+            const isActive = "poiType" in chip
+              ? activeFilters.pois.includes(chip.poiType)
+              : activeChip === chip.key;
+            const handleClick = "poiType" in chip
+              ? () => handleAmenityChip(chip.poiType)
+              : isActive
+                ? handleClearSearch
                 : () => void handleMapSearch(chip.query, chip.key);
             return (
               <button
