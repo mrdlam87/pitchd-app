@@ -566,6 +566,28 @@ export default function MapView() {
     [loadAmenities],
   );
 
+  // Handles QUICK_CHIPS with a filterKey (dog, fishing, hiking, swimming).
+  // Toggles the activity filter directly — no AI call, stays in browse mode.
+  // Also exits any active AI search mode so the map doesn't stay locked.
+  const handleDirectFilterChip = useCallback(
+    (filterKey: string) => {
+      searchModeRef.current = false;
+      suppressGeoFlyRef.current = false;
+      setSearchContextQuery(null);
+      setActiveChip(null);
+      setAiSyncedActivities([]);
+      const current = activeFiltersRef.current;
+      const next = current.activities.includes(filterKey)
+        ? current.activities.filter((a: string) => a !== filterKey)
+        : [...current.activities, filterKey];
+      const newFilters: FilterState = { ...current, activities: next };
+      setActiveFilters(newFilters);
+      activeFiltersRef.current = newFilters;
+      if (mapRef.current) loadCampsites(mapRef.current.getMap());
+    },
+    [loadCampsites],
+  );
+
   // TODO M4: pois toggles increment this badge — will read as campsite filters active.
   // Fix when campsite/amenity linkage lands and the two filter surfaces are separated.
   const filterCount = activeFilters.activities.length + activeFilters.pois.length;
@@ -640,24 +662,28 @@ export default function MapView() {
         {/* Quick chips */}
         <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
           {[...QUICK_CHIPS, ...AMENITY_CHIPS].map((chip) => {
+            // filterKey is the discriminator: non-null = direct DB filter, null = AI search.
+            const filterKey = "poiType" in chip ? null : chip.filterKey;
             const isActive = "poiType" in chip
               ? activeFilters.pois.includes(chip.poiType)
-              : activeChip === chip.key;
-            // Map chips always go through AI (handleMapSearch) because the search
-            // needs the current viewport centre as the origin. Only HomeScreen uses
-            // filterKey to skip the AI call — it navigates to MapView immediately
-            // without a known centre.
+              : filterKey !== null
+                ? activeFilters.activities.includes(filterKey)  // driven by filter state → syncs with FilterPanel and HomeScreen
+                : activeChip === chip.key;                       // AI chips (Pitchd, weather) use activeChip
             const handleClick = "poiType" in chip
               ? () => handleAmenityChip(chip.poiType)
-              : isActive
-                ? handleClearSearch
-                : () => void handleMapSearch(chip.query, chip.key);
+              : filterKey !== null
+                ? () => handleDirectFilterChip(filterKey)        // direct toggle, no AI call
+                : isActive
+                  ? handleClearSearch
+                  : () => void handleMapSearch(chip.query, chip.key);
+            // Only AI chips (no filterKey, no poiType) should be disabled during a search.
+            const isDisabled = filterKey === null && !("poiType" in chip) && mapSearchLoading;
             return (
               <button
                 key={chip.key}
                 type="button"
                 onClick={handleClick}
-                disabled={!("poiType" in chip) && mapSearchLoading}
+                disabled={isDisabled}
                 aria-label={chip.icon === "logo" ? chip.label : undefined}
                 className={`flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold font-[family-name:var(--font-dm-sans)] shadow-sm transition-all duration-150 disabled:opacity-50 ${
                   isActive
