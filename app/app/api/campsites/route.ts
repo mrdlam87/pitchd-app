@@ -6,6 +6,11 @@ import { SyncStatus } from "@/lib/generated/prisma/enums";
 
 const PAGE_SIZE = 20;
 
+// Guard against full-table scans from very large viewports.
+// ~1,100 km N-S and ~1,350 km E-W at 30°S — matches minZoom=7 on the client.
+const MAX_LAT_SPAN = 10;
+const MAX_LNG_SPAN = 15;
+
 export async function GET(req: Request): Promise<Response> {
   const session = await auth();
   if (!session) {
@@ -51,10 +56,6 @@ export async function GET(req: Request): Promise<Response> {
     );
   }
 
-  // Guard against full-table scans from very large viewports.
-  // ~1,100 km N-S and ~1,350 km E-W at 30°S — matches minZoom=7 on the client.
-  const MAX_LAT_SPAN = 10;
-  const MAX_LNG_SPAN = 15;
   if ((north - south) > MAX_LAT_SPAN || (east - west) > MAX_LNG_SPAN) {
     return Response.json({ error: "bounding box too large" }, { status: 400 });
   }
