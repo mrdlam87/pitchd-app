@@ -168,6 +168,9 @@ export default function MapView() {
   // loadCampsites (which would replace the results with browse results). Cleared when the
   // user taps the active Pitchd chip or applies filters.
   // Only AI search results put the map into locked search mode; direct-filter arrivals browse normally.
+  // Legacy payloads (no kind field) have kind === undefined, so kind === "ai" is false — they
+  // fall through to browse mode with no campsites. Intentional: sessionStorage is short-lived
+  // so legacy entries clear naturally on the next navigation.
   const searchModeRef = useRef(initialSearch?.kind === "ai");
   // Key of the currently active quick chip (null = browse mode).
   // AI arrivals: chipKey flows through AISearchPayload (defaults to "pitchd" for textarea NL queries).
@@ -658,7 +661,7 @@ export default function MapView() {
                 key={chip.key}
                 type="button"
                 onClick={handleClick}
-                disabled={"poiType" in chip ? false : mapSearchLoading}
+                disabled={!("poiType" in chip) && mapSearchLoading}
                 aria-label={chip.icon === "logo" ? chip.label : undefined}
                 className={`flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold font-[family-name:var(--font-dm-sans)] shadow-sm transition-all duration-150 disabled:opacity-50 ${
                   isActive

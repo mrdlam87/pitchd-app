@@ -40,6 +40,8 @@ export function parseSearchResultsPayload(parsed: unknown): SearchResultsPayload
     if (typeof obj.filters !== "object" || obj.filters === null) return null;
     const f = obj.filters as Record<string, unknown>;
     if (!Array.isArray(f.activities) || !Array.isArray(f.pois)) return null;
+    // String check only — ALLOWED_AMENITIES validation is intentionally deferred to the
+    // DB query layer (campsites route filters on known keys via Prisma enum).
     if (!(f.activities as unknown[]).every((a: unknown) => typeof a === "string")) return null;
     if (!(f.pois as unknown[]).every((p: unknown) => typeof p === "string")) return null;
     return parsed as SearchResultsPayload;
@@ -49,6 +51,7 @@ export function parseSearchResultsPayload(parsed: unknown): SearchResultsPayload
   if (!Array.isArray(obj.campsites)) return null;
   const pi = (obj.parsedIntent ?? {}) as Record<string, unknown>;
   if (!Array.isArray(pi.amenities)) return null;
+  if (!(pi.amenities as unknown[]).every((a: unknown) => typeof a === "string")) return null;
   // Spot-check item shapes — a malformed or null entry would crash fitToCampsites
   const campsites = obj.campsites as unknown[];
   if (!campsites.every((c) => c !== null && typeof (c as Record<string, unknown>).lat === "number" && typeof (c as Record<string, unknown>).lng === "number")) {

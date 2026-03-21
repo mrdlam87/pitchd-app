@@ -147,6 +147,15 @@ describe("parseSearchResultsPayload — AISearchPayload", () => {
       })
     ).toBeNull();
   });
+
+  it("returns null when parsedIntent.amenities contains non-string elements", () => {
+    expect(
+      parseSearchResultsPayload({
+        ...validAI,
+        parsedIntent: { amenities: [99, null] },
+      })
+    ).toBeNull();
+  });
 });
 
 describe("parseSearchResultsPayload — invalid input", () => {
