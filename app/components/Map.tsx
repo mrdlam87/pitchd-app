@@ -13,7 +13,7 @@ import BottomDrawer, {
 } from "./BottomDrawer";
 import type { AmenityPOI, Campsite } from "@/types/map";
 import { CORAL, FOREST_GREEN } from "@/lib/tokens";
-import { SEARCH_RESULTS_KEY, type SearchResultsPayload } from "@/lib/searchResults";
+import { SEARCH_RESULTS_KEY, type SearchResultsPayload, type AISearchPayload } from "@/lib/searchResults";
 import { QUICK_CHIPS, AMENITY_CHIPS } from "@/lib/chips";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -151,10 +151,20 @@ function consumeSearchResults(): SearchResultsPayload | null {
     if (!raw) return null;
     sessionStorage.removeItem(SEARCH_RESULTS_KEY);
     const parsed = JSON.parse(raw) as unknown;
+    if (typeof parsed !== "object" || parsed === null) return null;
     const obj = parsed as Record<string, unknown>;
-    if (typeof parsed !== "object" || parsed === null || !Array.isArray(obj.campsites)) {
-      return null;
+
+    if (obj.kind === "direct") {
+      // DirectFilterPayload — validate shape
+      if (typeof obj.chipKey !== "string") return null;
+      if (typeof obj.filters !== "object" || obj.filters === null) return null;
+      const f = obj.filters as Record<string, unknown>;
+      if (!Array.isArray(f.activities) || !Array.isArray(f.pois)) return null;
+      return parsed as SearchResultsPayload;
     }
+
+    // AISearchPayload (kind === "ai" or legacy payload without kind field)
+    if (!Array.isArray(obj.campsites)) return null;
     // Spot-check item shapes — a malformed or null entry would crash fitToCampsites
     const campsites = obj.campsites as unknown[];
     if (!campsites.every((c) => c !== null && typeof (c as Record<string, unknown>).lat === "number" && typeof (c as Record<string, unknown>).lng === "number")) {
@@ -177,16 +187,18 @@ export default function MapView() {
   // True while NL search results are displayed — suppresses handleMoveEnd from calling
   // loadCampsites (which would replace the results with browse results). Cleared when the
   // user taps the active Pitchd chip or applies filters.
-  const searchModeRef = useRef(initialSearch !== null);
+  // Only AI search results put the map into locked search mode; direct-filter arrivals browse normally.
+  const searchModeRef = useRef(initialSearch?.kind === "ai");
   // Key of the currently active quick chip (null = browse mode).
-  // When arriving from a HomeScreen chip tap, chipKey flows through SearchResultsPayload so the
-  // correct chip is highlighted. For custom NL queries (textarea), chipKey is undefined and we
-  // default to "pitchd" so the user has a clear affordance to tap and return to browse mode.
+  // AI arrivals: chipKey flows through AISearchPayload (defaults to "pitchd" for textarea NL queries).
+  // Direct-filter arrivals: no chip is highlighted — the activity shows in the filter count badge.
   const [activeChip, setActiveChip] = useState<string | null>(
-    initialSearch !== null ? (initialSearch.chipKey ?? "pitchd") : null
+    initialSearch?.kind === "ai" ? (initialSearch.chipKey ?? "pitchd") : null
   );
-  // Query string shown as context below the map search input
-  const [searchContextQuery, setSearchContextQuery] = useState<string | null>(initialSearch?.query ?? null);
+  // Query string shown as context below the map search input (AI searches only)
+  const [searchContextQuery, setSearchContextQuery] = useState<string | null>(
+    initialSearch?.kind === "ai" ? (initialSearch.query ?? null) : null
+  );
   // Controlled value for the map search input
   const [mapQuery, setMapQuery] = useState("");
   const [mapSearchLoading, setMapSearchLoading] = useState(false);
@@ -195,17 +207,24 @@ export default function MapView() {
   // doesn't pan away from the result bounds.
   // Safe today: MapView unmounts on navigation so this is never permanently stuck.
   // If MapView is ever reused without unmounting, revisit this.
-  const suppressGeoFlyRef = useRef(initialSearch !== null);
+  // Only suppress geolocation flyTo for AI arrivals — direct-filter arrivals start in browse mode.
+  const suppressGeoFlyRef = useRef(initialSearch?.kind === "ai");
   const [hasMore, setHasMore] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [amenityPois, setAmenityPois] = useState<AmenityPOI[]>([]);
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
   const [drawerState, setDrawerState] = useState<DrawerState>("peek");
   const [showFilters, setShowFilters] = useState(false);
-  const [activeFilters, setActiveFilters] = useState<FilterState>(EMPTY_FILTERS);
+  const initialFilters: FilterState = initialSearch?.kind === "direct" ? initialSearch.filters : EMPTY_FILTERS;
+  const [activeFilters, setActiveFilters] = useState<FilterState>(initialFilters);
   // Ref mirrors state so loadCampsites always reads the latest filters without
   // needing activeFilters as a dependency (the callback is stable).
-  const activeFiltersRef = useRef<FilterState>(EMPTY_FILTERS);
+  const activeFiltersRef = useRef<FilterState>(initialFilters);
+  // Activities that Claude inferred from the last AI search — shown in FilterPanel as "Pitchd suggested".
+  // Cleared when the user applies filters manually or clears search mode.
+  const [aiSyncedActivities, setAiSyncedActivities] = useState<string[]>(
+    initialSearch?.kind === "ai" ? initialSearch.parsedIntent.amenities : []
+  );
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   // Ref mirrors state so handleLoad always reads the latest value without
   // needing userLocation as a dependency (onLoad fires only once).
@@ -336,10 +355,11 @@ export default function MapView() {
     (_e: { target: mapboxgl.Map }) => {
       mapLoadedRef.current = true;
 
-      // If we arrived from a NL search, display those results immediately and
+      // If we arrived from an AI NL search, display those results immediately and
       // fit the map to show all pins. Skip the browse API fetch.
+      // Direct-filter arrivals fall through to browse mode with pre-applied filters.
       const searchPayload = initialSearchRef.current;
-      if (searchPayload && searchPayload.campsites.length > 0) {
+      if (searchPayload?.kind === "ai" && searchPayload.campsites.length > 0) {
         initialSearchRef.current = null;
         setCampsites(searchPayload.campsites);
         prevCampsitesLengthRef.current = searchPayload.campsites.length;
@@ -458,6 +478,7 @@ export default function MapView() {
       suppressGeoFlyRef.current = false;
       setActiveChip(null);
       setSearchContextQuery(null);
+      setAiSyncedActivities([]);
       setShowFilters(false);
       if (mapRef.current) {
         const map = mapRef.current.getMap();
@@ -488,7 +509,7 @@ export default function MapView() {
         const data = (await res.json()) as { error?: string };
         throw new Error(data.error ?? "Search failed");
       }
-      const data = (await res.json()) as Pick<SearchResultsPayload, "campsites" | "parsedIntent">;
+      const data = (await res.json()) as Pick<AISearchPayload, "campsites" | "parsedIntent">;
       setCampsites(data.campsites);
       prevCampsitesLengthRef.current = data.campsites.length;
       setMapQuery("");
@@ -498,6 +519,7 @@ export default function MapView() {
         drawerStateRef.current = "half";
         searchModeRef.current = true;
         setActiveChip(chipKey ?? "pitchd");
+        setAiSyncedActivities(data.parsedIntent.amenities);
         setSearchContextQuery(q.trim());
         skipNextFetch.current = true;
         suppressGeoFlyRef.current = true;
@@ -524,6 +546,7 @@ export default function MapView() {
     setActiveChip(null);
     setSearchContextQuery(null);
     setMapSearchError(null);
+    setAiSyncedActivities([]);
     if (mapRef.current) {
       const map = mapRef.current.getMap();
       loadCampsites(map);
@@ -555,6 +578,7 @@ export default function MapView() {
       {showFilters && (
         <FilterPanel
           initialFilters={activeFilters}
+          aiSyncedActivities={aiSyncedActivities}
           onApply={handleApplyFilters}
           onClose={() => setShowFilters(false)}
         />
