@@ -215,7 +215,10 @@ export default function MapView() {
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
   const [drawerState, setDrawerState] = useState<DrawerState>("peek");
   const [showFilters, setShowFilters] = useState(false);
-  const initialFilters: FilterState = initialSearch?.kind === "direct" ? initialSearch.filters : EMPTY_FILTERS;
+  const initialFilters: FilterState =
+    initialSearch?.kind === "direct" ? initialSearch.filters :
+    initialSearch?.kind === "ai"     ? { activities: initialSearch.parsedIntent.amenities, pois: [] } :
+    EMPTY_FILTERS;
   const [activeFilters, setActiveFilters] = useState<FilterState>(initialFilters);
   // Ref mirrors state so loadCampsites always reads the latest filters without
   // needing activeFilters as a dependency (the callback is stable).
@@ -520,6 +523,9 @@ export default function MapView() {
         searchModeRef.current = true;
         setActiveChip(chipKey ?? "pitchd");
         setAiSyncedActivities(data.parsedIntent.amenities);
+        const aiFilters: FilterState = { ...activeFiltersRef.current, activities: data.parsedIntent.amenities };
+        setActiveFilters(aiFilters);
+        activeFiltersRef.current = aiFilters;
         setSearchContextQuery(q.trim());
         skipNextFetch.current = true;
         suppressGeoFlyRef.current = true;
