@@ -74,7 +74,7 @@ function ToggleChip({
           ✓
         </span>
       )}
-      {aiSynced && (
+      {active && aiSynced && (
         <span
           className="text-[9px] leading-none ml-0.5 px-1 py-0.5 rounded-full"
           style={{ background: CORAL, color: "#fff", fontWeight: 700, letterSpacing: "0.02em" }}

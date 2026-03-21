@@ -21,6 +21,9 @@ export type AISearchPayload = {
 export type DirectFilterPayload = {
   kind: "direct";
   filters: { activities: string[]; pois: string[] };
+  // Stored for analytics / future use (e.g. highlighting the originating chip).
+  // Map.tsx intentionally does not read this on arrival — active chip state is
+  // derived from activeFilters rather than a separate chip-key field.
   chipKey: string;
 };
 

@@ -160,6 +160,7 @@ function consumeSearchResults(): SearchResultsPayload | null {
       if (typeof obj.filters !== "object" || obj.filters === null) return null;
       const f = obj.filters as Record<string, unknown>;
       if (!Array.isArray(f.activities) || !Array.isArray(f.pois)) return null;
+      if (!(f.activities as unknown[]).every((a: unknown) => typeof a === "string")) return null;
       return parsed as SearchResultsPayload;
     }
 
@@ -215,14 +216,18 @@ export default function MapView() {
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
   const [drawerState, setDrawerState] = useState<DrawerState>("peek");
   const [showFilters, setShowFilters] = useState(false);
-  const initialFilters: FilterState =
-    initialSearch?.kind === "direct" ? initialSearch.filters :
-    initialSearch?.kind === "ai"     ? { activities: initialSearch.parsedIntent.amenities, pois: [] } :
-    EMPTY_FILTERS;
-  const [activeFilters, setActiveFilters] = useState<FilterState>(initialFilters);
+  const [activeFilters, setActiveFilters] = useState<FilterState>(() => {
+    if (initialSearch?.kind === "direct") return initialSearch.filters;
+    if (initialSearch?.kind === "ai") return { activities: initialSearch.parsedIntent.amenities, pois: [] };
+    return EMPTY_FILTERS;
+  });
   // Ref mirrors state so loadCampsites always reads the latest filters without
   // needing activeFilters as a dependency (the callback is stable).
-  const activeFiltersRef = useRef<FilterState>(initialFilters);
+  const activeFiltersRef = useRef<FilterState>(
+    initialSearch?.kind === "direct" ? initialSearch.filters :
+    initialSearch?.kind === "ai"     ? { activities: initialSearch.parsedIntent.amenities, pois: [] } :
+    EMPTY_FILTERS
+  );
   // Activities that Claude inferred from the last AI search — shown in FilterPanel as "Pitchd suggested".
   // Cleared when the user applies filters manually or clears search mode.
   const [aiSyncedActivities, setAiSyncedActivities] = useState<string[]>(
