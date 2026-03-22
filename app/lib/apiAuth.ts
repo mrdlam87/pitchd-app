@@ -1,6 +1,10 @@
 // Shared auth guard for API route handlers.
 // Returns a 401 Response if the request is not authenticated, or null if it should proceed.
 //
+// Note: middleware.ts already gates all page routes — this guard covers API routes which
+// call auth() independently of middleware. Keep both bypass conditions in sync if the
+// PREVIEW_BYPASS_AUTH logic ever changes.
+//
 // Preview bypass: when PREVIEW_BYPASS_AUTH=true and VERCEL_ENV !== "production",
 // auth is skipped entirely so preview deployments are testable without Google OAuth.
 // Uses VERCEL_ENV (not NODE_ENV) because Vercel sets NODE_ENV=production on both

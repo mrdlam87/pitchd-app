@@ -109,6 +109,9 @@ describe("parseSearchResultsPayload — DirectFilterPayload", () => {
     ).toBeNull();
   });
 
+  // pois values are validated as strings but NOT checked against a known AmenityType list.
+  // Unknown values (e.g. "not_a_real_type") pass through and produce no DB results — this is
+  // intentional: AmenityType validation is deferred to the DB query layer, not the boundary parser.
   it("returns null when pois is not an array", () => {
     expect(
       parseSearchResultsPayload({

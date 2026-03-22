@@ -577,16 +577,18 @@ export default function MapView() {
   // Also exits any active AI search mode so the map doesn't stay locked.
   const handleDirectFilterChip = useCallback(
     (filterKey: string) => {
+      // When exiting AI search mode, reset activities to [] before toggling so AI-inferred
+      // filters don't silently carry forward into browse mode. Consistent with handleClearSearch.
+      const baseActivities = searchModeRef.current ? [] : activeFiltersRef.current.activities;
       searchModeRef.current = false;
       suppressGeoFlyRef.current = false;
       setSearchContextQuery(null);
       setActiveChip(null);
       setAiSyncedActivities([]);
-      const current = activeFiltersRef.current;
-      const next = current.activities.includes(filterKey)
-        ? current.activities.filter((a: string) => a !== filterKey)
-        : [...current.activities, filterKey];
-      const newFilters: FilterState = { ...current, activities: next };
+      const next = baseActivities.includes(filterKey)
+        ? baseActivities.filter((a: string) => a !== filterKey)
+        : [...baseActivities, filterKey];
+      const newFilters: FilterState = { ...activeFiltersRef.current, activities: next };
       setActiveFilters(newFilters);
       activeFiltersRef.current = newFilters;
       if (mapRef.current) loadCampsites(mapRef.current.getMap());
