@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
 import type { AmenityPOI, Campsite, POIMeta } from "@/types/map";
 import { haversineKm } from "@/lib/distance";
@@ -409,6 +409,16 @@ export default function BottomDrawer({
   // Whether we are currently mid-drag (suppresses CSS transition during drag)
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffsetY, setDragOffsetY] = useState(0);
+  // Ref to the handle strip so we can attach a non-passive native touchmove
+  // listener (React registers touch handlers as passive by default, which
+  // silently ignores e.preventDefault() and spams console warnings).
+  const handleStripRef = useRef<HTMLDivElement | null>(null);
+  // Track whether the last touch was a drag (vs a tap) so we can suppress the
+  // onClick that fires after touchEnd when the gesture was a drag, not a tap.
+  const wasDragRef = useRef(false);
+  // Keep a stable ref to drawerState for use inside the native listener closure
+  const drawerStateRef2 = useRef(drawerState);
+  drawerStateRef2.current = drawerState;
 
   const selectedPoi = selectedPoiId
     ? amenityPois.find((p) => p.id === selectedPoiId) ?? null
@@ -423,7 +433,21 @@ export default function BottomDrawer({
       ? (poiMeta[selectedPoi.amenityType.key] ?? { label: "POI" }).label
       : "";
 
-  // Drag handlers — snap between states on release
+  // Attach a non-passive native touchmove to the handle strip so we can call
+  // preventDefault() without browser console warnings.
+  useEffect(() => {
+    const el = handleStripRef.current;
+    if (!el) return;
+    function onNativeTouchMove(e: TouchEvent) {
+      if (touchStartY.current === null) return;
+      // Only prevent default (scroll lock) when dragging the handle
+      e.preventDefault();
+    }
+    el.addEventListener("touchmove", onNativeTouchMove, { passive: false });
+    return () => el.removeEventListener("touchmove", onNativeTouchMove);
+  }, []);
+
+  // Drag handlers — React synthetic events for start/end; move handled natively above
   function handleTouchStart(e: React.TouchEvent) {
     if (e.touches.length !== 1) return;
     touchStartY.current = e.touches[0].clientY;
@@ -435,26 +459,22 @@ export default function BottomDrawer({
     if (touchStartY.current === null) return;
     const dy = e.touches[0].clientY - touchStartY.current;
     setIsDragging(true);
-    // Constrain: don't drag past drawer's natural height
+    // Constrain: don't drag past drawer's natural height (upward only)
     setDragOffsetY(Math.max(0, dy));
-    // Prevent the page from scrolling while the user is dragging the drawer.
-    // Note: React registers touch handlers as passive by default in some environments,
-    // which means preventDefault() may be silently ignored in mobile WebViews. If
-    // scroll-bleed becomes an issue, switch to a native addEventListener with
-    // { passive: false } via useEffect.
-    e.preventDefault();
   }
 
   function handleTouchEnd(e: React.TouchEvent) {
     if (touchStartY.current === null) return;
     const dy = e.changedTouches[0].clientY - touchStartY.current;
     touchStartY.current = null;
+    const wasDrag = Math.abs(dy) > DRAG_THRESHOLD_PX;
+    wasDragRef.current = wasDrag;
     setIsDragging(false);
     setDragOffsetY(0);
     if (dy < -DRAG_THRESHOLD_PX) {
-      onDrawerStateChange(cycleUp(drawerState));
+      onDrawerStateChange(cycleUp(drawerStateRef2.current));
     } else if (dy > DRAG_THRESHOLD_PX) {
-      onDrawerStateChange(cycleDown(drawerState));
+      onDrawerStateChange(cycleDown(drawerStateRef2.current));
     }
   }
 
@@ -488,19 +508,25 @@ export default function BottomDrawer({
         background: SURFACE,
         borderTop: isFull ? "none" : "1.5px solid #e0dbd0",
       }}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
     >
       {/* Spacer in full state — pushes content below the floating search bar + chips (z-[60]) */}
       {isFull && <div style={{ height: FULL_STATE_SPACER_PX, flexShrink: 0 }} />}
 
       {/* Peek strip — drag handle + summary row.
-          Tapping steps down (full→half, half→peek) or expands from peek to half. */}
+          Touch handlers live here so only dragging the handle strip moves the drawer;
+          the card list scrolls independently without triggering drag. */}
       <div
+        ref={handleStripRef}
         className="flex-shrink-0 cursor-pointer select-none"
         style={{ borderTop: isFull ? "1.5px solid #e0dbd0" : "none" }}
-        onClick={() => onDrawerStateChange(drawerState === "peek" ? "half" : cycleDown(drawerState))}
+        onClick={() => {
+          // Suppress click when the touch gesture was a drag (not a tap)
+          if (wasDragRef.current) { wasDragRef.current = false; return; }
+          onDrawerStateChange(drawerState === "peek" ? "half" : cycleDown(drawerState));
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
         {/* Drag handle */}
         <div className="flex justify-center pt-3 pb-2">
