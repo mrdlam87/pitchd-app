@@ -671,21 +671,21 @@ export default function MapView() {
         <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
           {[...QUICK_CHIPS, ...AMENITY_CHIPS].map((chip) => {
             // filterKey is the discriminator: non-null = direct DB filter, null = AI search.
-            const filterKey = "poiType" in chip ? null : chip.filterKey;
-            const isActive = "poiType" in chip
+            const filterKey = chip.kind === "amenity" ? null : chip.filterKey;
+            const isActive = chip.kind === "amenity"
               ? activeFilters.pois.includes(chip.poiType)
               : filterKey !== null
                 ? activeFilters.activities.includes(filterKey)  // driven by filter state → syncs with FilterPanel and HomeScreen
                 : activeChip === chip.key;                       // AI chips (Pitchd, weather) use activeChip
-            const handleClick = "poiType" in chip
+            const handleClick = chip.kind === "amenity"
               ? () => handleAmenityChip(chip.poiType)
               : filterKey !== null
                 ? () => handleDirectFilterChip(filterKey)        // direct toggle, no AI call
                 : isActive
                   ? handleClearSearch
                   : () => void handleMapSearch(chip.query, chip.key);
-            // AI chips have no filterKey and no poiType — only they trigger mapSearchLoading.
-            const isAiChip = filterKey === null && !("poiType" in chip);
+            // AI chips have no filterKey and are kind="quick" — only they trigger mapSearchLoading.
+            const isAiChip = chip.kind === "quick" && filterKey === null;
             const isDisabled = isAiChip && mapSearchLoading;
             return (
               <button
@@ -696,10 +696,10 @@ export default function MapView() {
                 aria-label={chip.icon === "logo" ? chip.label : undefined}
                 className={`flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold font-[family-name:var(--font-dm-sans)] shadow-sm transition-all duration-150 disabled:opacity-50 ${
                   isActive
-                    ? "primary" in chip && chip.primary
+                    ? chip.kind === "quick" && chip.primary
                       ? "bg-[#e8674a] border-[#e8674a] text-white"
                       : "bg-[#2d4a2d] border-[#2d4a2d] text-white"
-                    : "primary" in chip && chip.primary
+                    : chip.kind === "quick" && chip.primary
                       ? "bg-white border-[#e0dbd0] text-[#e8674a]"
                       : "bg-white border-[#e0dbd0] text-[#1a2e1a]"
                 }`}
