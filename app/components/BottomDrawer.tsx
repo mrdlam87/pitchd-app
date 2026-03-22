@@ -15,10 +15,13 @@ export const PEEK_HEIGHT_PX = 64;
 // can use it to delay scrollIntoView until the animation has settled.
 export const DRAWER_TRANSITION_MS = 300;
 
-// Viewport-height fractions for half and full states — single source of truth
-// shared by both the CSS height string and the Mapbox px calculation below.
+// Viewport-height fraction for half state
 const HALF_VH = 0.52;
-const FULL_VH = 0.82;
+
+// Height of the top spacer in full state — clears the floating search bar + chips
+// that remain absolutely positioned above the drawer (z-[60]).
+// Accounts for: top-3 (12px) + search bar (~44px) + gap-2 (8px) + chips row (~32px) + breathing room.
+const FULL_STATE_SPACER_PX = 108;
 
 /**
  * Returns the drawer height in px for a given state.
@@ -27,7 +30,8 @@ const FULL_VH = 0.82;
 export function getDrawerHeightPx(state: DrawerState): number {
   if (state === "peek") return PEEK_HEIGHT_PX;
   if (state === "half") return Math.round(window.innerHeight * HALF_VH);
-  return Math.round(window.innerHeight * FULL_VH);
+  // Full state covers 100dvh — use full viewport height for Mapbox padding calculation
+  return window.innerHeight;
 }
 
 // ── Drive time estimate ────────────────────────────────────────────────────────
@@ -39,6 +43,71 @@ function driveLabel(km: number): string {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   return m === 0 ? `~${h} h` : `~${h} h ${m} min`;
+}
+
+// ── Scenic SVG illustration (ported from prototype) ────────────────────────────
+
+const SCENIC_PALETTES = [
+  { sky: "#87CEAB", hills: ["#4a7c4a", "#5a9a5a", "#3d6b3d"] as const, ground: "#6b8f4a" },
+  { sky: "#7ab5d4", hills: ["#3d6b6b", "#4a8a7a", "#2d5a5a"] as const, ground: "#5a7a5a" },
+  { sky: "#c4a882", hills: ["#8a6a4a", "#6b5a3a", "#4a3a2a"] as const, ground: "#7a6a4a" },
+  { sky: "#b0c8a0", hills: ["#4a6a3a", "#3a5a2a", "#5a7a4a"] as const, ground: "#6a8a4a" },
+];
+
+function ScenicPhoto({ seed }: { seed: number }) {
+  const p = SCENIC_PALETTES[seed % SCENIC_PALETTES.length];
+  const w = 400;
+  const h = 120;
+  // Suffix seed into gradient IDs to avoid collisions across multiple cards in the DOM
+  const sid = `sp${seed}`;
+  return (
+    <svg
+      width="100%"
+      height={h}
+      viewBox={`0 0 ${w} ${h}`}
+      preserveAspectRatio="xMidYMid slice"
+      style={{ display: "block" }}
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id={`sky${sid}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={p.sky} stopOpacity="0.9" />
+          <stop offset="100%" stopColor={p.sky} stopOpacity="0.4" />
+        </linearGradient>
+        <linearGradient id={`ov${sid}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="rgba(0,0,0,0)" />
+          <stop offset="100%" stopColor="rgba(0,0,0,0.35)" />
+        </linearGradient>
+      </defs>
+      <rect width={w} height={h} fill={`url(#sky${sid})`} />
+      {/* Far hills */}
+      <path
+        d={`M0 ${h * 0.65} Q${w * 0.2} ${h * 0.38} ${w * 0.4} ${h * 0.52} Q${w * 0.6} ${h * 0.35} ${w * 0.8} ${h * 0.48} Q${w * 0.9} ${h * 0.42} ${w} ${h * 0.5} L${w} ${h} L0 ${h}Z`}
+        fill={p.hills[0]}
+        opacity="0.6"
+      />
+      {/* Mid hills */}
+      <path
+        d={`M0 ${h * 0.72} Q${w * 0.15} ${h * 0.55} ${w * 0.3} ${h * 0.65} Q${w * 0.5} ${h * 0.48} ${w * 0.65} ${h * 0.62} Q${w * 0.82} ${h * 0.52} ${w} ${h * 0.6} L${w} ${h} L0 ${h}Z`}
+        fill={p.hills[1]}
+      />
+      {/* Foreground */}
+      <path
+        d={`M0 ${h * 0.82} Q${w * 0.25} ${h * 0.7} ${w * 0.5} ${h * 0.78} Q${w * 0.75} ${h * 0.68} ${w} ${h * 0.75} L${w} ${h} L0 ${h}Z`}
+        fill={p.hills[2]}
+      />
+      {/* Ground strip */}
+      <rect x="0" y={h * 0.9} width={w} height={h * 0.1} fill={p.ground} />
+      {/* Tent silhouette */}
+      <polygon
+        points={`${w * 0.45},${h * 0.75} ${w * 0.5},${h * 0.63} ${w * 0.55},${h * 0.75}`}
+        fill="rgba(255,255,255,0.85)"
+      />
+      <rect x={w * 0.485} y={h * 0.73} width={w * 0.03} height={h * 0.02} fill="rgba(255,255,255,0.5)" />
+      {/* Darkening overlay for readability */}
+      <rect width={w} height={h} fill={`url(#ov${sid})`} />
+    </svg>
+  );
 }
 
 // ── Amenity tags ───────────────────────────────────────────────────────────────
@@ -69,10 +138,27 @@ function AmenityTags({ amenities }: { amenities: Campsite["amenities"] }) {
 
 // ── Campsite card ──────────────────────────────────────────────────────────────
 
+const NavigateButton = ({ lat, lng, name }: { lat: number; lng: number; name: string }) => (
+  <a
+    href={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`}
+    target="_blank"
+    rel="noopener noreferrer"
+    onClick={(e) => e.stopPropagation()}
+    className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full transition-opacity hover:opacity-70 active:opacity-50"
+    style={{ background: "rgba(232,103,74,0.12)" }}
+    aria-label={`Navigate to ${name} in Google Maps`}
+  >
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill={CORAL} />
+    </svg>
+  </a>
+);
+
 function CampsiteCard({
   campsite,
   index,
   isSelected,
+  compact,
   userLocation,
   cardRef,
   onSelect,
@@ -80,6 +166,7 @@ function CampsiteCard({
   campsite: Campsite;
   index: number;
   isSelected: boolean;
+  compact: boolean;
   userLocation: { lat: number; lng: number } | null;
   cardRef: (el: HTMLDivElement | null) => void;
   onSelect: () => void;
@@ -88,20 +175,64 @@ function CampsiteCard({
     ? driveLabel(haversineKm(userLocation.lat, userLocation.lng, campsite.lat, campsite.lng))
     : null;
 
+  const sharedInteractionProps = {
+    ref: cardRef,
+    role: "button" as const,
+    tabIndex: 0,
+    onClick: onSelect,
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onSelect();
+      }
+    },
+    "aria-label": `Select campsite ${index + 1}: ${campsite.name}`,
+    "aria-pressed": isSelected,
+  };
+
+  if (!compact) {
+    // Full drawer: rich card with scenic illustration, serif name, blurb
+    return (
+      <div
+        {...sharedInteractionProps}
+        className="cursor-pointer rounded-2xl overflow-hidden transition-all duration-150"
+        style={{
+          boxShadow: isSelected
+            ? `0 0 0 2px ${CORAL}, 0 2px 12px rgba(0,0,0,0.08)`
+            : "0 2px 12px rgba(0,0,0,0.08)",
+          background: "#fff",
+        }}
+      >
+        <ScenicPhoto seed={index} />
+        <div className="p-3">
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <div className="min-w-0 flex-1">
+              <div
+                className="text-[15px] font-normal leading-snug"
+                style={{ color: FOREST_GREEN, fontFamily: "var(--font-lora), serif" }}
+              >
+                {campsite.name}
+              </div>
+              {(driveTime || campsite.blurb) && (
+                <div className="text-[10px] mt-0.5 leading-relaxed" style={{ color: SAGE }}>
+                  {driveTime && <span>🚗 {driveTime}</span>}
+                  {driveTime && campsite.blurb && <span> · </span>}
+                  {campsite.blurb && <span>{campsite.blurb}</span>}
+                </div>
+              )}
+            </div>
+            <NavigateButton lat={campsite.lat} lng={campsite.lng} name={campsite.name} />
+          </div>
+          <AmenityTags amenities={campsite.amenities} />
+        </div>
+      </div>
+    );
+  }
+
+  // Compact (half / peek): index badge + name + region + drive time + amenity tags
   return (
     <div
-      ref={cardRef}
-      role="button"
-      tabIndex={0}
-      onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onSelect();
-        }
-      }}
-      aria-label={`Select campsite ${index + 1}: ${campsite.name}`}
-      aria-pressed={isSelected}
+      {...sharedInteractionProps}
       className="relative rounded-xl p-3 cursor-pointer transition-all duration-150"
       style={{
         border: isSelected ? `1.5px solid ${CORAL}` : "1.5px solid #e0dbd0",
@@ -109,19 +240,9 @@ function CampsiteCard({
       }}
     >
       {/* Navigate icon button */}
-      <a
-        href={`https://www.google.com/maps/dir/?api=1&destination=${campsite.lat},${campsite.lng}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(e) => e.stopPropagation()}
-        className="absolute top-2.5 right-2.5 flex items-center justify-center w-7 h-7 rounded-full transition-opacity hover:opacity-70 active:opacity-50"
-        style={{ background: "rgba(232,103,74,0.12)" }}
-        aria-label={`Navigate to ${campsite.name} in Google Maps`}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill={CORAL} />
-        </svg>
-      </a>
+      <div className="absolute top-2.5 right-2.5">
+        <NavigateButton lat={campsite.lat} lng={campsite.lng} name={campsite.name} />
+      </div>
 
       <div className="flex items-start gap-3 pr-8">
         {/* Index badge */}
@@ -206,6 +327,7 @@ function DrawerContentList({
   selectedIdx,
   userLocation,
   cardRefs,
+  drawerState,
   onSelectPin,
 }: {
   campsites: Campsite[];
@@ -214,8 +336,10 @@ function DrawerContentList({
   selectedIdx: number | null;
   userLocation: { lat: number; lng: number } | null;
   cardRefs: React.MutableRefObject<(HTMLDivElement | null)[]>;
+  drawerState: DrawerState;
   onSelectPin: (i: number) => void;
 }) {
+  const compact = drawerState !== "full";
   const selectedPoiMeta = selectedPoi
     ? (poiMeta[selectedPoi.amenityType.key] ?? { emoji: "📍", label: selectedPoi.amenityType.key, color: FOREST_GREEN })
     : null;
@@ -232,6 +356,7 @@ function DrawerContentList({
           campsite={campsite}
           index={i}
           isSelected={selectedIdx === i}
+          compact={compact}
           userLocation={userLocation}
           cardRef={(el) => { cardRefs.current[i] = el; }}
           onSelect={() => onSelectPin(i)}
@@ -333,12 +458,12 @@ export default function BottomDrawer({
     }
   }
 
-  const drawerHeightStyle =
-    drawerState === "peek"
-      ? `${PEEK_HEIGHT_PX}px`
-      : drawerState === "half"
-      ? `${HALF_VH * 100}vh`
-      : `${FULL_VH * 100}vh`;
+  const isFull = drawerState === "full";
+  const drawerHeightStyle = isFull
+    ? "100dvh"
+    : drawerState === "half"
+    ? `${HALF_VH * 100}vh`
+    : `${PEEK_HEIGHT_PX}px`;
 
   // Peek state: show selected card (or first card) without scrolling
   const peekIdx = selectedIdx ?? 0;
@@ -349,22 +474,32 @@ export default function BottomDrawer({
 
   return (
     <div
-      className="absolute bottom-0 left-0 right-0 rounded-t-2xl shadow-2xl flex flex-col z-50"
+      className="flex flex-col shadow-2xl z-50"
       style={{
+        position: isFull ? "fixed" : "absolute",
+        top: isFull ? 0 : "auto",
+        bottom: 0,
+        left: 0,
+        right: 0,
         height: drawerHeightStyle,
+        borderRadius: isFull ? 0 : "1rem 1rem 0 0",
         transform: isDragging ? `translateY(${dragOffsetY}px)` : "translateY(0)",
-        transition: isDragging ? "none" : `height ${DRAWER_TRANSITION_MS}ms ease-in-out`,
+        transition: isDragging ? "none" : `height ${DRAWER_TRANSITION_MS}ms ease-in-out, border-radius ${DRAWER_TRANSITION_MS}ms ease-in-out`,
         background: SURFACE,
-        borderTop: "1.5px solid #e0dbd0",
+        borderTop: isFull ? "none" : "1.5px solid #e0dbd0",
       }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
+      {/* Spacer in full state — pushes content below the floating search bar + chips (z-[60]) */}
+      {isFull && <div style={{ height: FULL_STATE_SPACER_PX, flexShrink: 0 }} />}
+
       {/* Peek strip — drag handle + summary row.
           Tapping steps down (full→half, half→peek) or expands from peek to half. */}
       <div
         className="flex-shrink-0 cursor-pointer select-none"
+        style={{ borderTop: isFull ? "1.5px solid #e0dbd0" : "none" }}
         onClick={() => onDrawerStateChange(drawerState === "peek" ? "half" : cycleDown(drawerState))}
       >
         {/* Drag handle */}
@@ -407,6 +542,7 @@ export default function BottomDrawer({
           selectedIdx={selectedIdx}
           userLocation={userLocation}
           cardRefs={cardRefs}
+          drawerState={drawerState}
           onSelectPin={onSelectPin}
         />
       )}
@@ -421,6 +557,7 @@ export default function BottomDrawer({
                   campsite={peekCampsite}
                   index={peekIdx}
                   isSelected={selectedIdx === peekIdx}
+                  compact={true}
                   userLocation={userLocation}
                   cardRef={() => { /* peek card — ref not used for scrollIntoView */ }}
                   onSelect={() => onSelectPin(peekIdx)}
