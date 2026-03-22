@@ -44,7 +44,8 @@ describe("parseSearchResultsPayload — DirectFilterPayload", () => {
 
   it("returns null when kind is missing", () => {
     const { kind: _kind, ...withoutKind } = validDirect;
-    // Without kind it falls through to AI path — campsites missing → null
+    // Falls through to the AI path (no kind !== "direct"). DirectFilterPayload
+    // has no campsites field, so the AI path returns null immediately.
     expect(parseSearchResultsPayload(withoutKind)).toBeNull();
   });
 
@@ -155,6 +156,15 @@ describe("parseSearchResultsPayload — AISearchPayload", () => {
         parsedIntent: { amenities: [99, null] },
       })
     ).toBeNull();
+  });
+
+  // Legacy payloads (written before the discriminated union) have no `kind` field.
+  // The parser normalises them to kind: "ai" so downstream narrowing works correctly.
+  it("accepts a legacy payload without kind and normalises it to kind: \"ai\"", () => {
+    const { kind: _kind, ...legacy } = validAI;
+    const result = parseSearchResultsPayload(legacy);
+    expect(result).not.toBeNull();
+    expect(result?.kind).toBe("ai");
   });
 });
 

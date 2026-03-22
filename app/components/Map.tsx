@@ -198,14 +198,20 @@ export default function MapView() {
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
   const [drawerState, setDrawerState] = useState<DrawerState>("peek");
   const [showFilters, setShowFilters] = useState(false);
-  const initialFilters: FilterState =
+  // Lazy initialiser runs once on mount — avoids recomputing the conditional on every render.
+  const [activeFilters, setActiveFilters] = useState<FilterState>(() =>
     initialSearch?.kind === "direct" ? initialSearch.filters :
     initialSearch?.kind === "ai"     ? { activities: initialSearch.parsedIntent.amenities, pois: [] } :
-    EMPTY_FILTERS;
-  const [activeFilters, setActiveFilters] = useState<FilterState>(initialFilters);
+    EMPTY_FILTERS
+  );
   // Ref mirrors state so loadCampsites always reads the latest filters without
   // needing activeFilters as a dependency (the callback is stable).
-  const activeFiltersRef = useRef<FilterState>(initialFilters);
+  // useRef has no lazy form — the ternary is cheap and the value is ignored after mount.
+  const activeFiltersRef = useRef<FilterState>(
+    initialSearch?.kind === "direct" ? initialSearch.filters :
+    initialSearch?.kind === "ai"     ? { activities: initialSearch.parsedIntent.amenities, pois: [] } :
+    EMPTY_FILTERS
+  );
   // Activities that Claude inferred from the last AI search — shown in FilterPanel as "Pitchd suggested".
   // Cleared when the user applies filters manually or clears search mode.
   const [aiSyncedActivities, setAiSyncedActivities] = useState<string[]>(
@@ -676,8 +682,9 @@ export default function MapView() {
                 : isActive
                   ? handleClearSearch
                   : () => void handleMapSearch(chip.query, chip.key);
-            // Only AI chips (no filterKey, no poiType) should be disabled during a search.
-            const isDisabled = filterKey === null && !("poiType" in chip) && mapSearchLoading;
+            // AI chips have no filterKey and no poiType — only they trigger mapSearchLoading.
+            const isAiChip = filterKey === null && !("poiType" in chip);
+            const isDisabled = isAiChip && mapSearchLoading;
             return (
               <button
                 key={chip.key}
