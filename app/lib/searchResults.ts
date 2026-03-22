@@ -48,7 +48,7 @@ export function parseSearchResultsPayload(parsed: unknown): SearchResultsPayload
   }
 
   // AISearchPayload (kind === "ai" or legacy payload without kind field).
-  // Normalise legacy entries by writing kind: "ai" so downstream narrowing works correctly
+  // Normalise legacy entries to kind: "ai" so downstream narrowing works correctly
   // rather than silently falling through every kind === "ai" check.
   if (!Array.isArray(obj.campsites)) return null;
   const pi = (obj.parsedIntent ?? {}) as Record<string, unknown>;
@@ -59,6 +59,5 @@ export function parseSearchResultsPayload(parsed: unknown): SearchResultsPayload
   if (!campsites.every((c) => c !== null && typeof (c as Record<string, unknown>).lat === "number" && typeof (c as Record<string, unknown>).lng === "number")) {
     return null;
   }
-  if (!obj.kind) obj.kind = "ai";
-  return parsed as SearchResultsPayload;
+  return (obj.kind ? parsed : { ...obj, kind: "ai" }) as SearchResultsPayload;
 }
