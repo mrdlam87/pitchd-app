@@ -592,9 +592,13 @@ export default function MapView() {
       const newFilters: FilterState = { ...activeFiltersRef.current, activities: next };
       setActiveFilters(newFilters);
       activeFiltersRef.current = newFilters;
-      if (mapRef.current) loadCampsites(mapRef.current.getMap());
+      if (mapRef.current) {
+        const map = mapRef.current.getMap();
+        loadCampsites(map);
+        loadAmenities(map);
+      }
     },
-    [loadCampsites],
+    [loadCampsites, loadAmenities],
   );
 
   // TODO M4: pois toggles increment this badge — will read as campsite filters active.

@@ -25,8 +25,11 @@ export async function requireAuth(requiredRole?: UserRole): Promise<Response | n
   if (!session) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (requiredRole && ROLE_RANK[session.user.role] < ROLE_RANK[requiredRole]) {
-    return Response.json({ error: "Forbidden" }, { status: 403 });
+  if (requiredRole) {
+    const rank = ROLE_RANK[session.user.role];
+    if (rank === undefined || rank < ROLE_RANK[requiredRole]) {
+      return Response.json({ error: "Forbidden" }, { status: 403 });
+    }
   }
   return null;
 }

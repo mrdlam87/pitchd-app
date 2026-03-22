@@ -9,6 +9,11 @@ import { ALLOWED_AMENITIES } from "@/lib/parseIntent";
 // Typed against ALLOWED_AMENITIES so a typo is a compile error, not a silent no-op.
 type FilterKey = (typeof ALLOWED_AMENITIES)[number] | null;
 
+// POI type keys must match AmenityType.key values seeded in the DB.
+// Typed as a const tuple so a typo in AMENITY_CHIPS is a compile error, not a runtime 400.
+export const ALLOWED_POI_TYPES = ["dump_point", "water_fill"] as const;
+type PoiType = (typeof ALLOWED_POI_TYPES)[number];
+
 export const QUICK_CHIPS = [
   { kind: "quick" as const, key: "pitchd",  label: "Pitchd pick",  icon: "logo" as const, primary: true,  filterKey: null           as FilterKey, query: "Best camping spots with great weather this weekend" },
   { kind: "quick" as const, key: "weather", label: "Good weather", icon: "☀️",            primary: false, filterKey: null           as FilterKey, query: "Dry sunny camping this weekend" },
@@ -36,7 +41,7 @@ export const AMENITY_CHIPS = [
   key: string;
   label: string;
   icon: string;
-  poiType: string;
+  poiType: PoiType;
 }[];
 
 export type AmenityChip = (typeof AMENITY_CHIPS)[number];

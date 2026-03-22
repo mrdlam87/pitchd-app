@@ -182,6 +182,8 @@ export default function HomeScreen() {
     const payload: DirectFilterPayload = {
       kind: "direct",
       filters: { activities: [filterKey], pois: [] },
+      // chipKey is stored for future analytics / chip-highlighting use.
+      // Map.tsx derives active chip state from activeFilters rather than reading this field.
       chipKey,
     };
     try {
