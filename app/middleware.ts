@@ -5,6 +5,15 @@ import { authConfig } from "@/auth.config";
 const { auth } = NextAuth(authConfig);
 
 export default auth((req) => {
+  // Preview deployments: bypass auth entirely so the app is testable without
+  // needing Google OAuth configured for every unique Vercel preview URL.
+  // Set PREVIEW_BYPASS_AUTH=true in Vercel's Preview environment only — never in Production.
+  // Uses VERCEL_ENV (not NODE_ENV) because Vercel sets NODE_ENV=production on both
+  // production and preview deployments.
+  if (process.env.PREVIEW_BYPASS_AUTH === "true" && process.env.VERCEL_ENV !== "production") {
+    return NextResponse.next();
+  }
+
   const { nextUrl, auth: session } = req;
 
   // Allow auth routes and public pages through unconditionally

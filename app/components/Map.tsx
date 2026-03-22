@@ -13,8 +13,8 @@ import BottomDrawer, {
 } from "./BottomDrawer";
 import type { AmenityPOI, Campsite } from "@/types/map";
 import { CORAL, FOREST_GREEN } from "@/lib/tokens";
-import { SEARCH_RESULTS_KEY, type SearchResultsPayload } from "@/lib/searchResults";
-import { QUICK_CHIPS } from "@/lib/chips";
+import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayload, type AISearchPayload } from "@/lib/searchResults";
+import { QUICK_CHIPS, AMENITY_CHIPS } from "@/lib/chips";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -150,17 +150,7 @@ function consumeSearchResults(): SearchResultsPayload | null {
     const raw = sessionStorage.getItem(SEARCH_RESULTS_KEY);
     if (!raw) return null;
     sessionStorage.removeItem(SEARCH_RESULTS_KEY);
-    const parsed = JSON.parse(raw) as unknown;
-    const obj = parsed as Record<string, unknown>;
-    if (typeof parsed !== "object" || parsed === null || !Array.isArray(obj.campsites)) {
-      return null;
-    }
-    // Spot-check item shapes — a malformed or null entry would crash fitToCampsites
-    const campsites = obj.campsites as unknown[];
-    if (!campsites.every((c) => c !== null && typeof (c as Record<string, unknown>).lat === "number" && typeof (c as Record<string, unknown>).lng === "number")) {
-      return null;
-    }
-    return parsed as SearchResultsPayload;
+    return parseSearchResultsPayload(JSON.parse(raw) as unknown);
   } catch {
     return null;
   }
@@ -177,16 +167,21 @@ export default function MapView() {
   // True while NL search results are displayed — suppresses handleMoveEnd from calling
   // loadCampsites (which would replace the results with browse results). Cleared when the
   // user taps the active Pitchd chip or applies filters.
-  const searchModeRef = useRef(initialSearch !== null);
+  // Only AI search results put the map into locked search mode; direct-filter arrivals browse normally.
+  // Legacy payloads (no kind field) have kind === undefined, so kind === "ai" is false — they
+  // fall through to browse mode with no campsites. Intentional: sessionStorage is short-lived
+  // so legacy entries clear naturally on the next navigation.
+  const searchModeRef = useRef(initialSearch?.kind === "ai");
   // Key of the currently active quick chip (null = browse mode).
-  // When arriving from a HomeScreen chip tap, chipKey flows through SearchResultsPayload so the
-  // correct chip is highlighted. For custom NL queries (textarea), chipKey is undefined and we
-  // default to "pitchd" so the user has a clear affordance to tap and return to browse mode.
+  // AI arrivals: chipKey flows through AISearchPayload (defaults to "pitchd" for textarea NL queries).
+  // Direct-filter arrivals: no chip is highlighted — the activity shows in the filter count badge.
   const [activeChip, setActiveChip] = useState<string | null>(
-    initialSearch !== null ? (initialSearch.chipKey ?? "pitchd") : null
+    initialSearch?.kind === "ai" ? (initialSearch.chipKey ?? "pitchd") : null
   );
-  // Query string shown as context below the map search input
-  const [searchContextQuery, setSearchContextQuery] = useState<string | null>(initialSearch?.query ?? null);
+  // Query string shown as context below the map search input (AI searches only)
+  const [searchContextQuery, setSearchContextQuery] = useState<string | null>(
+    initialSearch?.kind === "ai" ? (initialSearch.query ?? null) : null
+  );
   // Controlled value for the map search input
   const [mapQuery, setMapQuery] = useState("");
   const [mapSearchLoading, setMapSearchLoading] = useState(false);
@@ -195,17 +190,33 @@ export default function MapView() {
   // doesn't pan away from the result bounds.
   // Safe today: MapView unmounts on navigation so this is never permanently stuck.
   // If MapView is ever reused without unmounting, revisit this.
-  const suppressGeoFlyRef = useRef(initialSearch !== null);
+  // Only suppress geolocation flyTo for AI arrivals — direct-filter arrivals start in browse mode.
+  const suppressGeoFlyRef = useRef(initialSearch?.kind === "ai");
   const [hasMore, setHasMore] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [amenityPois, setAmenityPois] = useState<AmenityPOI[]>([]);
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
   const [drawerState, setDrawerState] = useState<DrawerState>("peek");
   const [showFilters, setShowFilters] = useState(false);
-  const [activeFilters, setActiveFilters] = useState<FilterState>(EMPTY_FILTERS);
+  // Lazy initialiser runs once on mount — avoids recomputing the conditional on every render.
+  const [activeFilters, setActiveFilters] = useState<FilterState>(() =>
+    initialSearch?.kind === "direct" ? initialSearch.filters :
+    initialSearch?.kind === "ai"     ? { activities: initialSearch.parsedIntent.amenities, pois: [] } :
+    EMPTY_FILTERS
+  );
   // Ref mirrors state so loadCampsites always reads the latest filters without
   // needing activeFilters as a dependency (the callback is stable).
-  const activeFiltersRef = useRef<FilterState>(EMPTY_FILTERS);
+  // useRef has no lazy form — the ternary is cheap and the value is ignored after mount.
+  const activeFiltersRef = useRef<FilterState>(
+    initialSearch?.kind === "direct" ? initialSearch.filters :
+    initialSearch?.kind === "ai"     ? { activities: initialSearch.parsedIntent.amenities, pois: [] } :
+    EMPTY_FILTERS
+  );
+  // Activities that Claude inferred from the last AI search — shown in FilterPanel as "Pitchd suggested".
+  // Cleared when the user applies filters manually or clears search mode.
+  const [aiSyncedActivities, setAiSyncedActivities] = useState<string[]>(
+    initialSearch?.kind === "ai" ? initialSearch.parsedIntent.amenities : []
+  );
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   // Ref mirrors state so handleLoad always reads the latest value without
   // needing userLocation as a dependency (onLoad fires only once).
@@ -336,10 +347,11 @@ export default function MapView() {
     (_e: { target: mapboxgl.Map }) => {
       mapLoadedRef.current = true;
 
-      // If we arrived from a NL search, display those results immediately and
+      // If we arrived from an AI NL search, display those results immediately and
       // fit the map to show all pins. Skip the browse API fetch.
+      // Direct-filter arrivals fall through to browse mode with pre-applied filters.
       const searchPayload = initialSearchRef.current;
-      if (searchPayload && searchPayload.campsites.length > 0) {
+      if (searchPayload?.kind === "ai" && searchPayload.campsites.length > 0) {
         initialSearchRef.current = null;
         setCampsites(searchPayload.campsites);
         prevCampsitesLengthRef.current = searchPayload.campsites.length;
@@ -458,6 +470,7 @@ export default function MapView() {
       suppressGeoFlyRef.current = false;
       setActiveChip(null);
       setSearchContextQuery(null);
+      setAiSyncedActivities([]);
       setShowFilters(false);
       if (mapRef.current) {
         const map = mapRef.current.getMap();
@@ -488,7 +501,7 @@ export default function MapView() {
         const data = (await res.json()) as { error?: string };
         throw new Error(data.error ?? "Search failed");
       }
-      const data = (await res.json()) as Pick<SearchResultsPayload, "campsites" | "parsedIntent">;
+      const data = (await res.json()) as Pick<AISearchPayload, "campsites" | "parsedIntent">;
       setCampsites(data.campsites);
       prevCampsitesLengthRef.current = data.campsites.length;
       setMapQuery("");
@@ -497,7 +510,14 @@ export default function MapView() {
         setDrawerState("half");
         drawerStateRef.current = "half";
         searchModeRef.current = true;
-        setActiveChip(chipKey);
+        setActiveChip(chipKey ?? "pitchd");
+        setAiSyncedActivities(data.parsedIntent.amenities);
+        // Intentionally replace activities (not merge) — the new query redefines
+        // intent and any prior activity selection is stale. pois are preserved
+        // because the AI doesn't infer POI types.
+        const aiFilters: FilterState = { ...activeFiltersRef.current, activities: data.parsedIntent.amenities };
+        setActiveFilters(aiFilters);
+        activeFiltersRef.current = aiFilters;
         setSearchContextQuery(q.trim());
         skipNextFetch.current = true;
         suppressGeoFlyRef.current = true;
@@ -524,6 +544,13 @@ export default function MapView() {
     setActiveChip(null);
     setSearchContextQuery(null);
     setMapSearchError(null);
+    setAiSyncedActivities([]);
+    // Reset AI-inferred activities so browse results aren't silently filtered
+    // after the user exits search mode. pois are preserved — they reflect
+    // explicit user choices (amenity chips / filter panel) not AI inference.
+    const resetFilters: FilterState = { ...activeFiltersRef.current, activities: [] };
+    setActiveFilters(resetFilters);
+    activeFiltersRef.current = resetFilters;
     if (mapRef.current) {
       const map = mapRef.current.getMap();
       loadCampsites(map);
@@ -531,6 +558,51 @@ export default function MapView() {
     }
   }, [loadCampsites, loadAmenities]);
 
+  const handleAmenityChip = useCallback(
+    (poiType: string) => {
+      const current = activeFiltersRef.current.pois;
+      const next = current.includes(poiType)
+        ? current.filter((p: string) => p !== poiType)
+        : [...current, poiType];
+      const newFilters = { ...activeFiltersRef.current, pois: next };
+      setActiveFilters(newFilters);
+      activeFiltersRef.current = newFilters;
+      if (mapRef.current) loadAmenities(mapRef.current.getMap());
+    },
+    [loadAmenities],
+  );
+
+  // Handles QUICK_CHIPS with a filterKey (dog, fishing, hiking, swimming).
+  // Toggles the activity filter directly — no AI call, stays in browse mode.
+  // Also exits any active AI search mode so the map doesn't stay locked.
+  const handleDirectFilterChip = useCallback(
+    (filterKey: string) => {
+      // When exiting AI search mode, reset activities to [] before toggling so AI-inferred
+      // filters don't silently carry forward into browse mode. Consistent with handleClearSearch.
+      const baseActivities = searchModeRef.current ? [] : activeFiltersRef.current.activities;
+      searchModeRef.current = false;
+      suppressGeoFlyRef.current = false;
+      setSearchContextQuery(null);
+      setMapSearchError(null);
+      setActiveChip(null);
+      setAiSyncedActivities([]);
+      const next = baseActivities.includes(filterKey)
+        ? baseActivities.filter((a: string) => a !== filterKey)
+        : [...baseActivities, filterKey];
+      const newFilters: FilterState = { ...activeFiltersRef.current, activities: next };
+      setActiveFilters(newFilters);
+      activeFiltersRef.current = newFilters;
+      if (mapRef.current) {
+        const map = mapRef.current.getMap();
+        loadCampsites(map);
+        loadAmenities(map);
+      }
+    },
+    [loadCampsites, loadAmenities],
+  );
+
+  // TODO M4: pois toggles increment this badge — will read as campsite filters active.
+  // Fix when campsite/amenity linkage lands and the two filter surfaces are separated.
   const filterCount = activeFilters.activities.length + activeFilters.pois.length;
 
   const showDrawer = campsites.length > 0 || selectedPoiId !== null;
@@ -541,6 +613,7 @@ export default function MapView() {
       {showFilters && (
         <FilterPanel
           initialFilters={activeFilters}
+          aiSyncedActivities={aiSyncedActivities}
           onApply={handleApplyFilters}
           onClose={() => setShowFilters(false)}
         />
@@ -601,21 +674,37 @@ export default function MapView() {
 
         {/* Quick chips */}
         <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
-          {QUICK_CHIPS.map((chip) => {
-            const isActive = activeChip === chip.key;
+          {[...QUICK_CHIPS, ...AMENITY_CHIPS].map((chip) => {
+            // filterKey is the discriminator: non-null = direct DB filter, null = AI search.
+            const filterKey = chip.kind === "amenity" ? null : chip.filterKey;
+            const isActive = chip.kind === "amenity"
+              ? activeFilters.pois.includes(chip.poiType)
+              : filterKey !== null
+                ? activeFilters.activities.includes(filterKey)  // driven by filter state → syncs with FilterPanel and HomeScreen
+                : activeChip === chip.key;                       // AI chips (Pitchd, weather) use activeChip
+            const handleClick = chip.kind === "amenity"
+              ? () => handleAmenityChip(chip.poiType)
+              : filterKey !== null
+                ? () => handleDirectFilterChip(filterKey)        // direct toggle, no AI call
+                : isActive
+                  ? handleClearSearch
+                  : () => void handleMapSearch(chip.query, chip.key);
+            // AI chips have no filterKey and are kind="quick" — only they trigger mapSearchLoading.
+            const isAiChip = chip.kind === "quick" && filterKey === null;
+            const isDisabled = isAiChip && mapSearchLoading;
             return (
               <button
                 key={chip.key}
                 type="button"
-                onClick={() => isActive ? handleClearSearch() : void handleMapSearch(chip.query, chip.key)}
-                disabled={mapSearchLoading}
+                onClick={handleClick}
+                disabled={isDisabled}
                 aria-label={chip.icon === "logo" ? chip.label : undefined}
                 className={`flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold font-[family-name:var(--font-dm-sans)] shadow-sm transition-all duration-150 disabled:opacity-50 ${
                   isActive
-                    ? chip.primary
+                    ? chip.kind === "quick" && chip.primary
                       ? "bg-[#e8674a] border-[#e8674a] text-white"
                       : "bg-[#2d4a2d] border-[#2d4a2d] text-white"
-                    : chip.primary
+                    : chip.kind === "quick" && chip.primary
                       ? "bg-white border-[#e0dbd0] text-[#e8674a]"
                       : "bg-white border-[#e0dbd0] text-[#1a2e1a]"
                 }`}

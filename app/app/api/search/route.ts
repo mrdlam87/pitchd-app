@@ -1,6 +1,5 @@
 // POST /api/search
 // NL query → Claude Haiku → ranked campsite results
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { SyncStatus } from "@/lib/generated/prisma/enums";
 import {
@@ -11,6 +10,7 @@ import {
 } from "@/lib/parseIntent";
 import { hashQuery, getCachedIntent, setCachedIntent } from "@/lib/searchCache";
 import { haversineKm } from "@/lib/distance";
+import { requireAuth } from "@/lib/apiAuth";
 
 // Re-export for callers that import from the route rather than from the lib directly.
 // The route is the public API surface for search — keeping this here avoids breaking
@@ -67,10 +67,8 @@ const DB_FETCH_LIMIT = 200;
 // hashQuery, getCachedIntent, setCachedIntent imported from @/lib/searchCache
 
 export async function POST(req: Request): Promise<Response> {
-  const session = await auth();
-  if (!session) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = await requireAuth();
+  if (authError) return authError;
 
   let body: unknown;
   try {

@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { SEARCH_RESULTS_KEY, type SearchResultsPayload } from "@/lib/searchResults";
+import { SEARCH_RESULTS_KEY, type AISearchPayload, type DirectFilterPayload } from "@/lib/searchResults";
 import { QUICK_CHIPS } from "@/lib/chips";
 
 // Cycling placeholder prompts — matches prototype EXAMPLE_PROMPTS
@@ -153,9 +153,10 @@ export default function HomeScreen() {
         throw new Error(data.error ?? "Search failed");
       }
 
-      const data = (await res.json()) as Pick<SearchResultsPayload, "campsites" | "parsedIntent">;
+      const data = (await res.json()) as Pick<AISearchPayload, "campsites" | "parsedIntent">;
 
-      const payload: SearchResultsPayload = {
+      const payload: AISearchPayload = {
+        kind: "ai",
         campsites: data.campsites,
         parsedIntent: data.parsedIntent,
         query: q.trim(),
@@ -174,6 +175,23 @@ export default function HomeScreen() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // Chips with a filterKey skip AI entirely — write a DirectFilterPayload and navigate.
+  function handleDirectFilter(filterKey: string, chipKey: string) {
+    const payload: DirectFilterPayload = {
+      kind: "direct",
+      filters: { activities: [filterKey], pois: [] },
+      // chipKey is stored for future analytics / chip-highlighting use.
+      // Map.tsx derives active chip state from activeFilters rather than reading this field.
+      chipKey,
+    };
+    try {
+      sessionStorage.setItem(SEARCH_RESULTS_KEY, JSON.stringify(payload));
+    } catch {
+      // Storage full — navigate anyway; MapView will start in browse mode with no pre-filter
+    }
+    router.push("/map");
   }
 
   return (
@@ -259,7 +277,7 @@ export default function HomeScreen() {
             {QUICK_CHIPS.map((chip) => (
               <button
                 key={chip.key}
-                onClick={() => void handleSearch(chip.query, chip.key)}
+                onClick={() => chip.filterKey ? handleDirectFilter(chip.filterKey, chip.key) : void handleSearch(chip.query, chip.key)}
                 disabled={loading}
                 aria-label={chip.icon === "logo" ? chip.label : undefined}
                 className="flex shrink-0 cursor-pointer items-center gap-1 rounded-full border border-[#e0dbd0] bg-white px-3 py-1.5 shadow-sm transition-all duration-150 hover:border-[#2d4a2d] hover:bg-[#2d4a2d] hover:text-white disabled:opacity-50 [&:hover_span]:text-white"
