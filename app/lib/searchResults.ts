@@ -59,5 +59,9 @@ export function parseSearchResultsPayload(parsed: unknown): SearchResultsPayload
   if (!campsites.every((c) => c !== null && typeof (c as Record<string, unknown>).lat === "number" && typeof (c as Record<string, unknown>).lng === "number")) {
     return null;
   }
-  return (obj.kind ? parsed : { ...obj, kind: "ai" }) as SearchResultsPayload;
+  // Normalise legacy entries (no kind field) to kind: "ai".
+  // Reject unknown kind values — an unrecognised kind would silently pass through
+  // all kind === "ai" narrowing checks downstream.
+  if (obj.kind !== "ai" && obj.kind !== undefined) return null;
+  return (obj.kind === "ai" ? parsed : { ...obj, kind: "ai" }) as SearchResultsPayload;
 }

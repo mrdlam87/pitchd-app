@@ -583,6 +583,7 @@ export default function MapView() {
       searchModeRef.current = false;
       suppressGeoFlyRef.current = false;
       setSearchContextQuery(null);
+      setMapSearchError(null);
       setActiveChip(null);
       setAiSyncedActivities([]);
       const next = baseActivities.includes(filterKey)

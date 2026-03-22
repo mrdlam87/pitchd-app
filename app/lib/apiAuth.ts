@@ -13,6 +13,10 @@
 import { auth } from "@/auth";
 import { UserRole } from "@/lib/generated/prisma/enums";
 
+// Rank-based role hierarchy: higher rank includes all lower ranks.
+// A route requiring "beta" access should also admit "admin" users.
+const ROLE_RANK: Record<UserRole, number> = { admin: 2, beta: 1, user: 0 };
+
 export async function requireAuth(requiredRole?: UserRole): Promise<Response | null> {
   if (!requiredRole && process.env.PREVIEW_BYPASS_AUTH === "true" && process.env.VERCEL_ENV !== "production") {
     return null;
@@ -21,7 +25,7 @@ export async function requireAuth(requiredRole?: UserRole): Promise<Response | n
   if (!session) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (requiredRole && session.user.role !== requiredRole) {
+  if (requiredRole && ROLE_RANK[session.user.role] < ROLE_RANK[requiredRole]) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
   return null;
