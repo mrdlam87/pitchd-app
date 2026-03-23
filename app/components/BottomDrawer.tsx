@@ -508,7 +508,8 @@ export default function BottomDrawer({
         background: SURFACE,
       }}
     >
-      {/* Spacer in full state — pushes content below the floating search bar + chips (z-[60]) */}
+      {/* Spacer in full state — pushes content below the floating search bar + chips (z-[60]).
+          Intentionally opaque (inherits SURFACE background) to occlude map tiles beneath it. */}
       {isFull && <div style={{ height: FULL_STATE_SPACER_PX, flexShrink: 0 }} />}
 
       {/* Peek strip — drag handle + summary row.
@@ -516,7 +517,7 @@ export default function BottomDrawer({
           the card list scrolls independently without triggering drag. */}
       <div
         ref={handleStripRef}
-        className="flex-shrink-0 cursor-pointer select-none border-t border-[#e0dbd0]"
+        className="flex-shrink-0 cursor-pointer select-none border-t-[1.5px] border-[#e0dbd0]"
         onClick={() => {
           // Suppress click when the touch gesture was a drag (not a tap)
           if (wasDragRef.current) { wasDragRef.current = false; return; }
