@@ -196,4 +196,12 @@ describe("GET /api/weather", () => {
     const res = await GET(makeRequest({ lat: String(SYDNEY_LAT), lng: String(SYDNEY_LNG) }));
     expect(res.status).toBe(502);
   });
+
+  it("returns 502 when Open-Meteo fetch times out (AbortError)", async () => {
+    const abortError = new DOMException("The operation was aborted", "AbortError");
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(abortError));
+
+    const res = await GET(makeRequest({ lat: String(SYDNEY_LAT), lng: String(SYDNEY_LNG) }));
+    expect(res.status).toBe(502);
+  });
 });

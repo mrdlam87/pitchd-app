@@ -3,9 +3,11 @@
 // Checks WeatherCache (TTL: 1 hour) before fetching from Open-Meteo.
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/apiAuth";
+import { Prisma } from "@/lib/generated/prisma/client";
 
 const OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast";
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const FETCH_TIMEOUT_MS = 10_000; // 10 seconds
 
 export async function GET(req: Request): Promise<Response> {
   const authError = await requireAuth();
@@ -60,11 +62,13 @@ export async function GET(req: Request): Promise<Response> {
       "temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode"
     );
     url.searchParams.set("timezone", "auto");
+    url.searchParams.set("forecast_days", "7");
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let forecastJson: any;
+    let forecastJson: Prisma.InputJsonValue;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
-      const fetchRes = await fetch(url.toString());
+      const fetchRes = await fetch(url.toString(), { signal: controller.signal });
       if (!fetchRes.ok) {
         console.error(
           "[GET /api/weather] Open-Meteo error",
@@ -83,6 +87,8 @@ export async function GET(req: Request): Promise<Response> {
         { error: "Failed to fetch weather data" },
         { status: 502 }
       );
+    } finally {
+      clearTimeout(timeout);
     }
 
     // Upsert into cache — write failures are logged but don't block the response
