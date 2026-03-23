@@ -11,7 +11,7 @@ import BottomDrawer, {
   DRAWER_TRANSITION_MS,
   getDrawerHeightPx,
 } from "./BottomDrawer";
-import type { AmenityPOI, Campsite } from "@/types/map";
+import type { AmenityPOI, Campsite, WeatherDay } from "@/types/map";
 import { CORAL, FOREST_GREEN } from "@/lib/tokens";
 import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayload, type AISearchPayload } from "@/lib/searchResults";
 import { QUICK_CHIPS, AMENITY_CHIPS } from "@/lib/chips";
@@ -61,6 +61,51 @@ async function fetchCampsites(bounds: Bounds, amenities: string[] = []): Promise
   } catch (e) {
     console.warn("[fetchCampsites] fetch failed", e);
     return { results: [], hasMore: false };
+  }
+}
+
+// Extracts day-0 weather data from an Open-Meteo forecast response.
+// Returns null if the response shape is unexpected.
+function extractWeatherDay(forecast: unknown): WeatherDay | null {
+  if (typeof forecast !== "object" || forecast === null) return null;
+  const f = forecast as Record<string, unknown>;
+  if (typeof f.daily !== "object" || f.daily === null) return null;
+  const d = f.daily as Record<string, unknown>;
+  if (!Array.isArray(d.temperature_2m_max) || !Array.isArray(d.temperature_2m_min)) return null;
+  if (!Array.isArray(d.precipitation_sum) || !Array.isArray(d.weathercode)) return null;
+  const tempMax = d.temperature_2m_max[0];
+  const tempMin = d.temperature_2m_min[0];
+  const precipitationSum = d.precipitation_sum[0];
+  const weatherCode = d.weathercode[0];
+  if (typeof tempMax !== "number" || typeof tempMin !== "number") return null;
+  if (typeof precipitationSum !== "number" || typeof weatherCode !== "number") return null;
+  return { tempMax, tempMin, precipitationSum, weatherCode };
+}
+
+// Fetches weather for a batch of campsites from /api/weather/batch.
+// Returns the same array with weather attached — failures result in weather: null.
+// Never throws; errors are logged and each campsite gets weather: null.
+async function fetchWeatherBatch(campsites: Campsite[]): Promise<Campsite[]> {
+  if (campsites.length === 0) return campsites;
+  const locations = campsites.map((c) => ({ id: c.id, lat: c.lat, lng: c.lng }));
+  try {
+    const res = await fetch("/api/weather/batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ locations }),
+    });
+    if (!res.ok) {
+      console.warn(`[fetchWeatherBatch] ${res.status} ${res.statusText}`);
+      return campsites.map((c) => ({ ...c, weather: null }));
+    }
+    const data = (await res.json()) as { results: Record<string, unknown> };
+    return campsites.map((c) => ({
+      ...c,
+      weather: extractWeatherDay(data.results[c.id]) ?? null,
+    }));
+  } catch (e) {
+    console.warn("[fetchWeatherBatch] fetch failed", e);
+    return campsites.map((c) => ({ ...c, weather: null }));
   }
 }
 
@@ -233,6 +278,9 @@ export default function MapView() {
   const fetchCounterRef = useRef(0);
   // Separate counter for amenity fetches — same stale-discard pattern
   const amenityFetchCounterRef = useRef(0);
+  // Separate counter for weather fetches — incremented before every weather batch
+  // call (browse and AI search) so stale weather updates don't overwrite newer results.
+  const weatherFetchCounterRef = useRef(0);
   // Mirrors drawerState so loadCampsites (a stable useCallback) always reads the latest value
   const drawerStateRef = useRef<DrawerState>("peek");
   // Tracks the previous fetch's result count so loadCampsites can detect 0 → results
@@ -293,6 +341,15 @@ export default function MapView() {
         : -1;
       setSelectedIdx(newIdx >= 0 ? newIdx : null);
       if (newIdx < 0) selectedIdRef.current = null;
+      // Fetch weather in the background — pins render immediately above; cards
+      // gain weather badges once the batch response arrives.
+      if (results.length > 0) {
+        const wid = ++weatherFetchCounterRef.current;
+        fetchWeatherBatch(results).then((withWeather) => {
+          if (wid !== weatherFetchCounterRef.current) return; // stale — a newer weather fetch superseded this one
+          setCampsites(withWeather);
+        });
+      }
     });
   }, []);
 
@@ -363,6 +420,12 @@ export default function MapView() {
         skipNextFetch.current = true;
         suppressGeoFlyRef.current = true;
         fitToCampsites(_e.target, searchPayload.campsites, getDrawerHeightPx("half"));
+
+        // Fetch weather in the background — no stale-guard needed here since
+        // handleLoad only fires once per MapView mount.
+        fetchWeatherBatch(searchPayload.campsites).then((withWeather) => {
+          setCampsites(withWeather);
+        });
         return;
       }
 
@@ -522,6 +585,12 @@ export default function MapView() {
         skipNextFetch.current = true;
         suppressGeoFlyRef.current = true;
         fitToCampsites(mapRef.current.getMap(), data.campsites, getDrawerHeightPx("half"));
+        // Fetch weather in the background after displaying results
+        const wid = ++weatherFetchCounterRef.current;
+        fetchWeatherBatch(data.campsites).then((withWeather) => {
+          if (wid !== weatherFetchCounterRef.current) return; // stale — a newer search fired
+          setCampsites(withWeather);
+        });
       } else {
         // No results — stay in browse mode so handleMoveEnd keeps firing
         searchModeRef.current = false;

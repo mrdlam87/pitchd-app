@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
-import type { AmenityPOI, Campsite, POIMeta } from "@/types/map";
+import type { AmenityPOI, Campsite, POIMeta, WeatherDay } from "@/types/map";
 import { haversineKm } from "@/lib/distance";
 
 export type DrawerState = "peek" | "half" | "full";
@@ -110,6 +110,39 @@ function ScenicPhoto({ seed }: { seed: number }) {
       {/* Darkening overlay for readability */}
       <rect width={w} height={h} fill={`url(#ov${sid})`} />
     </svg>
+  );
+}
+
+// ── Weather badge ──────────────────────────────────────────────────────────────
+
+// Maps WMO weather interpretation codes to a display emoji.
+// See: https://open-meteo.com/en/docs#weathervariables (weathercode)
+function wmoIcon(code: number): string {
+  if (code === 0) return "☀️";
+  if (code <= 2) return "⛅";
+  if (code === 3) return "☁️";
+  if (code <= 49) return "🌫️"; // fog / rime fog
+  if (code <= 55) return "🌦️"; // drizzle
+  if (code <= 65) return "🌧️"; // rain
+  if (code <= 77) return "🌨️"; // snow
+  if (code <= 82) return "🌦️"; // showers
+  if (code <= 86) return "🌨️"; // snow showers
+  return "⛈️";                  // thunderstorm (95–99)
+}
+
+function WeatherBadge({ weather }: { weather: WeatherDay }) {
+  return (
+    <span
+      className="inline-flex items-center gap-[3px] text-[10px] font-semibold rounded-full px-2 py-[3px]"
+      style={{
+        color: "#2a6eb0",
+        background: "#2a6eb015",
+        border: "1px solid #2a6eb030",
+      }}
+    >
+      <span className="text-[11px]">{wmoIcon(weather.weatherCode)}</span>
+      {Math.round(weather.tempMax)}°
+    </span>
   );
 }
 
@@ -228,6 +261,11 @@ function CampsiteCard({
             </div>
             <NavigateButton lat={campsite.lat} lng={campsite.lng} name={campsite.name} />
           </div>
+          {campsite.weather && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              <WeatherBadge weather={campsite.weather} />
+            </div>
+          )}
           <AmenityTags amenities={campsite.amenities} />
         </div>
       </div>
@@ -280,6 +318,11 @@ function CampsiteCard({
           </div>
           <NavigateButton lat={campsite.lat} lng={campsite.lng} name={campsite.name} />
         </div>
+        {campsite.weather && (
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            <WeatherBadge weather={campsite.weather} />
+          </div>
+        )}
         <AmenityTags amenities={campsite.amenities} />
       </div>
     </div>
