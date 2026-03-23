@@ -330,14 +330,6 @@ export default function MapView() {
 
       const bounds = computeVisibleBounds(map, getDrawerHeightPx(drawerStateRef.current));
 
-      // Apply cached weather to the full list immediately
-      const withCache = allCampsites.map((c) =>
-        weatherCacheRef.current.has(c.id)
-          ? { ...c, weather: weatherCacheRef.current.get(c.id) ?? null }
-          : c
-      );
-      setCampsites(withCache);
-
       // Only fetch weather for visible pins not already in the client cache.
       // Longitude check assumes west < east (no antimeridian wrap). This is safe
       // for Australian coverage — the dateline (180°) sits east of NZ and is
@@ -351,26 +343,44 @@ export default function MapView() {
           c.lng <= bounds.east
       );
 
-      if (uncached.length === 0) return;
-
-      const wid = ++weatherFetchCounterRef.current;
-      fetchWeatherBatch(uncached).then((fetched) => {
-        if (wid !== weatherFetchCounterRef.current) return; // stale — a newer fetch superseded this
-        // Only cache successful results — null means the fetch failed (network/5xx).
-        // Leaving failed pins out of the cache allows them to be retried on the next pan.
-        for (const c of fetched) {
-          if (c.weather != null) {
-            weatherCacheRef.current.set(c.id, c.weather);
-          }
-        }
-        setCampsites((prev) =>
-          prev.map((c) =>
+      // Apply cached weather to the full list immediately, but only re-render if
+      // at least one pin gains weather from the cache (avoids redundant renders on
+      // repeated AI-mode pans where all visible pins are already cached).
+      const anyCached = allCampsites.some(
+        (c) => weatherCacheRef.current.has(c.id) && c.weather == null
+      );
+      if (anyCached) {
+        setCampsites(
+          allCampsites.map((c) =>
             weatherCacheRef.current.has(c.id)
-              ? { ...c, weather: weatherCacheRef.current.get(c.id) }
+              ? { ...c, weather: weatherCacheRef.current.get(c.id) ?? null }
               : c
           )
         );
-      });
+      }
+
+      if (uncached.length === 0) return;
+
+      const wid = ++weatherFetchCounterRef.current;
+      fetchWeatherBatch(uncached)
+        .then((fetched) => {
+          if (wid !== weatherFetchCounterRef.current) return; // stale — a newer fetch superseded this
+          // Only cache successful results — null means the fetch failed (network/5xx).
+          // Leaving failed pins out of the cache allows them to be retried on the next pan.
+          for (const c of fetched) {
+            if (c.weather != null) {
+              weatherCacheRef.current.set(c.id, c.weather);
+            }
+          }
+          setCampsites((prev) =>
+            prev.map((c) =>
+              weatherCacheRef.current.has(c.id)
+                ? { ...c, weather: weatherCacheRef.current.get(c.id) ?? null }
+                : c
+            )
+          );
+        })
+        .catch((e) => console.warn("[loadWeatherForViewport] fetchWeatherBatch failed", e));
     },
     []
   );
