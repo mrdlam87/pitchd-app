@@ -60,7 +60,8 @@ function ScenicPhoto({ seed }: { seed: number }) {
   const p = SCENIC_PALETTES[seed % SCENIC_PALETTES.length];
   const w = 400;
   const h = 120;
-  // Suffix seed into gradient IDs to avoid collisions across multiple cards in the DOM
+  // Suffix seed into gradient IDs to avoid DOM-scope collisions across multiple cards.
+  // Assumes seed (card index) is unique within any single rendered list.
   const sid = `sp${seed}`;
   return (
     <svg
@@ -161,6 +162,7 @@ function CampsiteCard({
   index,
   isSelected,
   compact,
+  showIndex = false,
   userLocation,
   cardRef,
   onSelect,
@@ -169,6 +171,7 @@ function CampsiteCard({
   index: number;
   isSelected: boolean;
   compact: boolean;
+  showIndex?: boolean;
   userLocation: { lat: number; lng: number } | null;
   cardRef: (el: HTMLDivElement | null) => void;
   onSelect: () => void;
@@ -232,6 +235,7 @@ function CampsiteCard({
   }
 
   // Compact (half / peek): rich card matching prototype — serif name, drive time + blurb, amenity tags
+  const subText = campsite.blurb ?? campsite.region;
   return (
     <div
       {...sharedInteractionProps}
@@ -244,7 +248,21 @@ function CampsiteCard({
       }}
     >
       <div className="p-3">
-        <div className="flex items-start justify-between gap-2 mb-1.5">
+        <div className="flex items-start gap-3 mb-1.5">
+          {showIndex && (
+            <div
+              className="flex-shrink-0 flex items-center justify-center rounded-full w-6 h-6 font-extrabold mt-0.5"
+              style={{
+                background: isSelected ? FOREST_GREEN : "transparent",
+                border: `2px solid ${FOREST_GREEN}`,
+                color: isSelected ? "#fff" : FOREST_GREEN,
+                fontSize: 10,
+                fontFamily: "var(--font-dm-sans), sans-serif",
+              }}
+            >
+              {index + 1}
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <div
               className="font-bold text-[15px] leading-snug font-[family-name:var(--font-lora)]"
@@ -252,11 +270,11 @@ function CampsiteCard({
             >
               {campsite.name}
             </div>
-            {(driveTime || campsite.blurb) && (
+            {(driveTime || subText) && (
               <div className="text-[11px] mt-0.5 leading-relaxed" style={{ color: SAGE }}>
                 {driveTime && <span>🚗 {driveTime}</span>}
-                {driveTime && campsite.blurb && <span> · </span>}
-                {campsite.blurb && <span>{campsite.blurb}</span>}
+                {driveTime && subText && <span> · </span>}
+                {subText && <span>{subText}</span>}
               </div>
             )}
           </div>
@@ -313,7 +331,7 @@ function DrawerContentList({
   selectedIdx,
   userLocation,
   cardRefs,
-  drawerState,
+  compact,
   onSelectPin,
 }: {
   campsites: Campsite[];
@@ -322,10 +340,9 @@ function DrawerContentList({
   selectedIdx: number | null;
   userLocation: { lat: number; lng: number } | null;
   cardRefs: React.MutableRefObject<(HTMLDivElement | null)[]>;
-  drawerState: DrawerState;
+  compact: boolean;
   onSelectPin: (i: number) => void;
 }) {
-  const compact = drawerState !== "full";
   const selectedPoiMeta = selectedPoi
     ? (poiMeta[selectedPoi.amenityType.key] ?? { emoji: "📍", label: selectedPoi.amenityType.key, color: FOREST_GREEN })
     : null;
@@ -343,6 +360,7 @@ function DrawerContentList({
           index={i}
           isSelected={selectedIdx === i}
           compact={compact}
+          showIndex={compact}
           userLocation={userLocation}
           cardRef={(el) => { cardRefs.current[i] = el; }}
           onSelect={() => onSelectPin(i)}
@@ -557,7 +575,7 @@ export default function BottomDrawer({
           selectedIdx={selectedIdx}
           userLocation={userLocation}
           cardRefs={cardRefs}
-          drawerState={drawerState}
+          compact={drawerState !== "full"}
           onSelectPin={onSelectPin}
         />
       )}
