@@ -31,7 +31,9 @@ function wmoCodePenalty(code: number): number {
     return 10;
   if (code === 3 || (code >= 45 && code <= 48)) return 4; // overcast / fog
   if (code === 1 || code === 2) return 2; // mainly clear / partly cloudy
-  return 0; // 0 = clear sky
+  // Code 0 = clear sky. Any unrecognised code (e.g. future WMO additions not
+  // in Open-Meteo's daily set) is treated as clear sky — no penalty.
+  return 0;
 }
 
 // Precipitation sum (mm) → additional penalty.
@@ -45,6 +47,10 @@ function precipPenalty(mm: number): number {
 /**
  * Returns a 0–100 camping quality score for a single forecast day.
  * Higher is better.
+ *
+ * With current WMO codes the maximum combined penalty is 28 (thunderstorm) + 8
+ * (≥10mm rain) = 36, so the practical floor is 64. The Math.max(0, ...) guard
+ * is a safety net for future penalty changes or unexpected input.
  */
 export function weatherScore(day: WeatherDay): number {
   const penalty = wmoCodePenalty(day.weatherCode) + precipPenalty(day.precipitationSum);
