@@ -416,9 +416,6 @@ export default function BottomDrawer({
   // Track whether the last touch was a drag (vs a tap) so we can suppress the
   // onClick that fires after touchEnd when the gesture was a drag, not a tap.
   const wasDragRef = useRef(false);
-  // Keep a stable ref to drawerState for use inside the native listener closure
-  const drawerStateRef2 = useRef(drawerState);
-  drawerStateRef2.current = drawerState;
 
   const selectedPoi = selectedPoiId
     ? amenityPois.find((p) => p.id === selectedPoiId) ?? null
@@ -472,9 +469,9 @@ export default function BottomDrawer({
     setIsDragging(false);
     setDragOffsetY(0);
     if (dy < -DRAG_THRESHOLD_PX) {
-      onDrawerStateChange(cycleUp(drawerStateRef2.current));
+      onDrawerStateChange(cycleUp(drawerState));
     } else if (dy > DRAG_THRESHOLD_PX) {
-      onDrawerStateChange(cycleDown(drawerStateRef2.current));
+      onDrawerStateChange(cycleDown(drawerState));
     }
   }
 
