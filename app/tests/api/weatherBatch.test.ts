@@ -218,6 +218,18 @@ describe("POST /api/weather/batch", () => {
     expect(vi.mocked(fetch)).toHaveBeenCalledOnce();
   });
 
+  // --- Deduplication ---
+
+  it("deduplicates by id — first occurrence wins, only one Open-Meteo call made", async () => {
+    // Same id as LOC_A but different coordinates — should be ignored
+    const dupLoc = { id: LOC_A.id, lat: LOC_B.lat, lng: LOC_B.lng };
+    const res = await POST(makeRequest({ locations: [LOC_A, dupLoc] }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.results[LOC_A.id]).toEqual(MOCK_FORECAST);
+    expect(vi.mocked(fetch)).toHaveBeenCalledOnce();
+  });
+
   // --- Partial failure ---
 
   it("returns null for a failed location but succeeds for others", async () => {

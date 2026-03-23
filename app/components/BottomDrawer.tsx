@@ -262,7 +262,7 @@ function CampsiteCard({
             <NavigateButton lat={campsite.lat} lng={campsite.lng} name={campsite.name} />
           </div>
           {campsite.weather && (
-            <div className="flex flex-wrap gap-1 mt-2">
+            <div className="mt-2">
               <WeatherBadge weather={campsite.weather} />
             </div>
           )}
@@ -319,7 +319,7 @@ function CampsiteCard({
           <NavigateButton lat={campsite.lat} lng={campsite.lng} name={campsite.name} />
         </div>
         {campsite.weather && (
-          <div className="flex flex-wrap gap-1 mt-1.5">
+          <div className="mt-1.5">
             <WeatherBadge weather={campsite.weather} />
           </div>
         )}
@@ -403,7 +403,7 @@ function DrawerContentList({
           index={i}
           isSelected={selectedIdx === i}
           compact={compact}
-          showIndex={compact}
+          showIndex={false}
           userLocation={userLocation}
           cardRef={(el) => { cardRefs.current[i] = el; }}
           onSelect={() => onSelectPin(i)}
