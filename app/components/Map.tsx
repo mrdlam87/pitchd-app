@@ -338,7 +338,10 @@ export default function MapView() {
       );
       setCampsites(withCache);
 
-      // Only fetch weather for visible pins not already in the client cache
+      // Only fetch weather for visible pins not already in the client cache.
+      // Longitude check assumes west < east (no antimeridian wrap). This is safe
+      // for Australian coverage — the dateline (180°) sits east of NZ and is
+      // never crossed by a normal AU map viewport.
       const uncached = allCampsites.filter(
         (c) =>
           !weatherCacheRef.current.has(c.id) &&
@@ -353,13 +356,17 @@ export default function MapView() {
       const wid = ++weatherFetchCounterRef.current;
       fetchWeatherBatch(uncached).then((fetched) => {
         if (wid !== weatherFetchCounterRef.current) return; // stale — a newer fetch superseded this
+        // Only cache successful results — null means the fetch failed (network/5xx).
+        // Leaving failed pins out of the cache allows them to be retried on the next pan.
         for (const c of fetched) {
-          weatherCacheRef.current.set(c.id, c.weather ?? null);
+          if (c.weather != null) {
+            weatherCacheRef.current.set(c.id, c.weather);
+          }
         }
         setCampsites((prev) =>
           prev.map((c) =>
             weatherCacheRef.current.has(c.id)
-              ? { ...c, weather: weatherCacheRef.current.get(c.id) ?? null }
+              ? { ...c, weather: weatherCacheRef.current.get(c.id) }
               : c
           )
         );
@@ -387,17 +394,22 @@ export default function MapView() {
         map.setPadding({ top: 0, right: 0, bottom: getDrawerHeightPx("half"), left: 0 });
       }
       prevCampsitesLengthRef.current = results.length;
-      setCampsites(results);
       setHasMore(hasMore);
       const newIdx = selectedIdRef.current
         ? results.findIndex((c) => c.id === selectedIdRef.current)
         : -1;
       setSelectedIdx(newIdx >= 0 ? newIdx : null);
       if (newIdx < 0) selectedIdRef.current = null;
-      // Fetch weather only for visible pins not already cached client-side.
-      // loadWeatherForViewport increments weatherFetchCounterRef internally, so
-      // any in-flight fetch from a previous loadCampsites call is invalidated.
-      loadWeatherForViewport(map, results);
+      // loadWeatherForViewport sets campsites state (with cache applied) for non-empty
+      // results. For empty results it returns early, so clear the list explicitly.
+      if (results.length === 0) {
+        setCampsites([]);
+      } else {
+        // Fetch weather only for visible pins not already cached client-side.
+        // loadWeatherForViewport increments weatherFetchCounterRef internally, so
+        // any in-flight fetch from a previous loadCampsites call is invalidated.
+        loadWeatherForViewport(map, results);
+      }
     });
   }, [loadWeatherForViewport]);
 
