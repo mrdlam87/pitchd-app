@@ -210,14 +210,14 @@ function CampsiteCard({
           <div className="flex items-start justify-between gap-2 mb-1">
             <div className="min-w-0 flex-1">
               <div
-                className="text-[15px] font-normal leading-snug"
-                style={{ color: FOREST_GREEN, fontFamily: "var(--font-lora), serif" }}
+                className="text-[15px] font-normal leading-snug font-[family-name:var(--font-lora)]"
+                style={{ color: FOREST_GREEN }}
               >
                 {campsite.name}
               </div>
               {(driveTime || campsite.blurb) && (
                 <div className="text-[10px] mt-0.5 leading-relaxed" style={{ color: SAGE }}>
-                  {driveTime && <span>🚗 {driveTime} drive</span>}
+                  {driveTime && <span>🚗 {driveTime}</span>}
                   {driveTime && campsite.blurb && <span> · </span>}
                   {campsite.blurb && <span>{campsite.blurb}</span>}
                 </div>
@@ -247,8 +247,8 @@ function CampsiteCard({
         <div className="flex items-start justify-between gap-2 mb-1.5">
           <div className="min-w-0 flex-1">
             <div
-              className="font-bold text-[15px] leading-snug"
-              style={{ color: FOREST_GREEN, fontFamily: "var(--font-lora), serif" }}
+              className="font-bold text-[15px] leading-snug font-[family-name:var(--font-lora)]"
+              style={{ color: FOREST_GREEN }}
             >
               {campsite.name}
             </div>
@@ -430,7 +430,9 @@ export default function BottomDrawer({
     return () => el.removeEventListener("touchmove", onNativeTouchMove);
   }, []);
 
-  // Drag handlers — React synthetic events for start/end; move handled natively above
+  // Drag handlers — start/end via React synthetic events; move split:
+  // native listener (above) calls preventDefault() to suppress passive-listener warnings,
+  // React onTouchMove updates isDragging / dragOffsetY visual state.
   function handleTouchStart(e: React.TouchEvent) {
     // Reset here (not in onClick) so a drag that never fires a click event
     // doesn't leave wasDragRef stuck at true and swallow the next real tap.
