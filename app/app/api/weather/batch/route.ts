@@ -118,13 +118,23 @@ export async function POST(req: Request): Promise<Response> {
     validLocations.push({ id: loc.id, lat, lng });
   }
 
+  // Deduplicate by id — first occurrence wins. Duplicate ids from a single
+  // request would cause last-write-wins on results[loc.id] and trigger
+  // redundant Open-Meteo calls for the same coordinate.
+  const seenIds = new Set<string>();
+  const uniqueLocations = validLocations.filter(({ id }) => {
+    if (seenIds.has(id)) return false;
+    seenIds.add(id);
+    return true;
+  });
+
   const now = new Date();
 
   try {
     // Batch cache lookup — fetch all valid non-expired entries in one query
     const cachedRecords = await prisma.weatherCache.findMany({
       where: {
-        OR: validLocations.map(({ lat, lng }) => ({ lat, lng })),
+        OR: uniqueLocations.map(({ lat, lng }) => ({ lat, lng })),
         expiresAt: { gt: now },
       },
     });
@@ -138,7 +148,7 @@ export async function POST(req: Request): Promise<Response> {
 
     // Separate hits from misses
     const misses: Location[] = [];
-    for (const loc of validLocations) {
+    for (const loc of uniqueLocations) {
       const key = `${loc.lat}:${loc.lng}`;
       if (cacheMap.has(key)) {
         results[loc.id] = cacheMap.get(key)!;

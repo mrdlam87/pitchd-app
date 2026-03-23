@@ -341,10 +341,14 @@ export default function MapView() {
         : -1;
       setSelectedIdx(newIdx >= 0 ? newIdx : null);
       if (newIdx < 0) selectedIdRef.current = null;
+      // Always bump the counter so any in-flight weather fetch from the previous
+      // loadCampsites call is invalidated — even when results are empty.
+      // Without this, a stale fetch resolving after an empty result would ghost-pin
+      // the old campsite list with weather attached.
+      const wid = ++weatherFetchCounterRef.current;
       // Fetch weather in the background — pins render immediately above; cards
       // gain weather badges once the batch response arrives.
       if (results.length > 0) {
-        const wid = ++weatherFetchCounterRef.current;
         fetchWeatherBatch(results).then((withWeather) => {
           if (wid !== weatherFetchCounterRef.current) return; // stale — a newer weather fetch superseded this one
           setCampsites(withWeather);
@@ -421,9 +425,12 @@ export default function MapView() {
         suppressGeoFlyRef.current = true;
         fitToCampsites(_e.target, searchPayload.campsites, getDrawerHeightPx("half"));
 
-        // Fetch weather in the background — no stale-guard needed here since
-        // handleLoad only fires once per MapView mount.
+        // Fetch weather in the background. Guard with the counter so a subsequent
+        // pan (which calls loadCampsites → bumps weatherFetchCounterRef) prevents
+        // this callback from overwriting the browse results with stale AI data.
+        const wid = ++weatherFetchCounterRef.current;
         fetchWeatherBatch(searchPayload.campsites).then((withWeather) => {
+          if (wid !== weatherFetchCounterRef.current) return;
           setCampsites(withWeather);
         });
         return;

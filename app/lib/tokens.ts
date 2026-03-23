@@ -9,3 +9,4 @@ export const SAGE = "#5a7a5a";
 export const SURFACE = "#f7f5f0";
 export const BORDER = "#e0dbd0";
 export const TEXT_MUTED = "#8a9e8a";
+export const WEATHER_BLUE = "#2a6eb0"; // weather badge — sky blue

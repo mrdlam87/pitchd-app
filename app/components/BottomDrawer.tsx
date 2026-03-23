@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
+import { CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE, WEATHER_BLUE } from "@/lib/tokens";
 import type { AmenityPOI, Campsite, POIMeta, WeatherDay } from "@/types/map";
 import { haversineKm } from "@/lib/distance";
 
@@ -135,9 +135,9 @@ function WeatherBadge({ weather }: { weather: WeatherDay }) {
     <span
       className="inline-flex items-center gap-[3px] text-[10px] font-semibold rounded-full px-2 py-[3px]"
       style={{
-        color: "#2a6eb0",
-        background: "#2a6eb015",
-        border: "1px solid #2a6eb030",
+        color: WEATHER_BLUE,
+        background: WEATHER_BLUE + "15",
+        border: `1px solid ${WEATHER_BLUE}30`,
       }}
     >
       <span className="text-[11px]">{wmoIcon(weather.weatherCode)}</span>
