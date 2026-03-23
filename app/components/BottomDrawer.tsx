@@ -21,6 +21,8 @@ const HALF_VH = 0.52;
 // Height of the top spacer in full state — clears the floating search bar + chips
 // that remain absolutely positioned above the drawer (z-[60]).
 // Accounts for: top-3 (12px) + search bar (~44px) + gap-2 (8px) + chips row (~32px) + breathing room.
+// TODO: make dynamic via ResizeObserver if the SearchBar or QuickFilterChips
+// padding/height changes (e.g. during M4/M5 search bar evolution).
 const FULL_STATE_SPACER_PX = 108;
 
 /**
@@ -66,7 +68,7 @@ function ScenicPhoto({ seed }: { seed: number }) {
       height={h}
       viewBox={`0 0 ${w} ${h}`}
       preserveAspectRatio="xMidYMid slice"
-      style={{ display: "block" }}
+      className="block"
       aria-hidden="true"
     >
       <defs>
@@ -215,7 +217,7 @@ function CampsiteCard({
               </div>
               {(driveTime || campsite.blurb) && (
                 <div className="text-[10px] mt-0.5 leading-relaxed" style={{ color: SAGE }}>
-                  {driveTime && <span>🚗 {driveTime}</span>}
+                  {driveTime && <span>{driveTime} drive</span>}
                   {driveTime && campsite.blurb && <span> · </span>}
                   {campsite.blurb && <span>{campsite.blurb}</span>}
                 </div>
@@ -270,9 +272,7 @@ function CampsiteCard({
               <span className="text-[#e0dbd0]">·</span>
             )}
             {driveTime && (
-              <span className="flex items-center gap-0.5 flex-shrink-0">
-                🚗 {driveTime}
-              </span>
+              <span className="flex-shrink-0">{driveTime} drive</span>
             )}
           </div>
           <AmenityTags amenities={campsite.amenities} />
@@ -446,6 +446,9 @@ export default function BottomDrawer({
 
   // Drag handlers — React synthetic events for start/end; move handled natively above
   function handleTouchStart(e: React.TouchEvent) {
+    // Reset here (not in onClick) so a drag that never fires a click event
+    // doesn't leave wasDragRef stuck at true and swallow the next real tap.
+    wasDragRef.current = false;
     if (e.touches.length !== 1) return;
     touchStartY.current = e.touches[0].clientY;
     setIsDragging(false);
@@ -503,7 +506,6 @@ export default function BottomDrawer({
         transform: isDragging ? `translateY(${dragOffsetY}px)` : "translateY(0)",
         transition: isDragging ? "none" : `height ${DRAWER_TRANSITION_MS}ms ease-in-out, border-radius ${DRAWER_TRANSITION_MS}ms ease-in-out`,
         background: SURFACE,
-        borderTop: isFull ? "none" : "1.5px solid #e0dbd0",
       }}
     >
       {/* Spacer in full state — pushes content below the floating search bar + chips (z-[60]) */}
@@ -514,8 +516,7 @@ export default function BottomDrawer({
           the card list scrolls independently without triggering drag. */}
       <div
         ref={handleStripRef}
-        className="flex-shrink-0 cursor-pointer select-none"
-        style={{ borderTop: isFull ? "1.5px solid #e0dbd0" : "none" }}
+        className="flex-shrink-0 cursor-pointer select-none border-t border-[#e0dbd0]"
         onClick={() => {
           // Suppress click when the touch gesture was a drag (not a tap)
           if (wasDragRef.current) { wasDragRef.current = false; return; }

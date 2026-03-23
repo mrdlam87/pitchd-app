@@ -326,11 +326,11 @@ export default function MapView() {
   // explicitly in their easeTo calls — they do not go through this callback.
   const handleDrawerStateChange = useCallback((state: DrawerState) => {
     setDrawerState(state);
-    if (mapRef.current && mapLoadedRef.current) {
-      // skipNextFetch suppresses the moveend that setPadding fires internally
-      skipNextFetch.current = true;
-      mapRef.current.getMap().setPadding({ top: 0, right: 0, bottom: getDrawerHeightPx(state), left: 0 });
-    }
+    // Do NOT call map.setPadding here — it animates the camera to compensate
+    // for the padding change, causing the map to pan/shift visibly whenever
+    // the drawer opens or closes. All explicit camera movements (easeTo,
+    // fitBounds, selectPin) already pass padding directly, so Mapbox's
+    // internal padding state doesn't need to track the drawer in real-time.
   }, []);
 
   useEffect(() => {
