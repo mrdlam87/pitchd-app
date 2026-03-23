@@ -217,7 +217,7 @@ function CampsiteCard({
               </div>
               {(driveTime || campsite.blurb) && (
                 <div className="text-[10px] mt-0.5 leading-relaxed" style={{ color: SAGE }}>
-                  {driveTime && <span>{driveTime} drive</span>}
+                  {driveTime && <span>🚗 {driveTime} drive</span>}
                   {driveTime && campsite.blurb && <span> · </span>}
                   {campsite.blurb && <span>{campsite.blurb}</span>}
                 </div>
@@ -272,7 +272,7 @@ function CampsiteCard({
               <span className="text-[#e0dbd0]">·</span>
             )}
             {driveTime && (
-              <span className="flex-shrink-0">{driveTime} drive</span>
+              <span className="flex-shrink-0">🚗 {driveTime} drive</span>
             )}
           </div>
           <AmenityTags amenities={campsite.amenities} />
@@ -503,6 +503,7 @@ export default function BottomDrawer({
         right: 0,
         height: drawerHeightStyle,
         borderRadius: isFull ? 0 : "1rem 1rem 0 0",
+        borderTop: isFull ? "none" : "1.5px solid #e0dbd0",
         transform: isDragging ? `translateY(${dragOffsetY}px)` : "translateY(0)",
         transition: isDragging ? "none" : `height ${DRAWER_TRANSITION_MS}ms ease-in-out, border-radius ${DRAWER_TRANSITION_MS}ms ease-in-out`,
         background: SURFACE,
@@ -517,7 +518,8 @@ export default function BottomDrawer({
           the card list scrolls independently without triggering drag. */}
       <div
         ref={handleStripRef}
-        className="flex-shrink-0 cursor-pointer select-none border-t-[1.5px] border-[#e0dbd0]"
+        className="flex-shrink-0 cursor-pointer select-none"
+        style={{ borderTop: isFull ? "1.5px solid #e0dbd0" : "none" }}
         onClick={() => {
           // Suppress click when the touch gesture was a drag (not a tap)
           if (wasDragRef.current) { wasDragRef.current = false; return; }
