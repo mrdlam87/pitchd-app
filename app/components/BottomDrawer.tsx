@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE, WEATHER_BLUE } from "@/lib/tokens";
+import { CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
+import { weatherScore, getWeatherBadge } from "@/lib/weatherScore";
 import type { AmenityPOI, Campsite, POIMeta, WeatherDay } from "@/types/map";
 import { haversineKm } from "@/lib/distance";
 
@@ -115,33 +116,15 @@ function ScenicPhoto({ seed }: { seed: number }) {
 
 // ── Weather badge ──────────────────────────────────────────────────────────────
 
-// Maps WMO weather interpretation codes to a display emoji.
-// See: https://open-meteo.com/en/docs#weathervariables (weathercode)
-function wmoIcon(code: number): string {
-  if (code === 0) return "☀️";
-  if (code <= 2) return "⛅";
-  if (code === 3) return "☁️";
-  if (code <= 49) return "🌫️"; // fog / rime fog
-  if (code <= 55) return "🌦️"; // drizzle
-  if (code <= 65) return "🌧️"; // rain
-  if (code <= 77) return "🌨️"; // snow
-  if (code <= 82) return "🌦️"; // showers
-  if (code <= 86) return "🌨️"; // snow showers
-  return "⛈️";                  // thunderstorm (95–99)
-}
 
 function WeatherBadge({ weather }: { weather: WeatherDay }) {
+  const badge = getWeatherBadge(weatherScore(weather));
   return (
     <span
-      className="inline-flex items-center gap-[3px] text-[10px] font-semibold rounded-full px-2 py-[3px]"
-      style={{
-        color: WEATHER_BLUE,
-        background: WEATHER_BLUE + "15",
-        border: `1px solid ${WEATHER_BLUE}30`,
-      }}
+      className="inline-flex items-center gap-[3px] text-[10px] font-bold rounded-full px-[9px] py-[3px] flex-shrink-0"
+      style={{ color: badge.color, background: badge.bg }}
     >
-      <span className="text-[11px]">{wmoIcon(weather.weatherCode)}</span>
-      {Math.round(weather.tempMax)}°
+      ● {badge.label}
     </span>
   );
 }
@@ -259,13 +242,9 @@ function CampsiteCard({
                 </div>
               )}
             </div>
+            {campsite.weather && <WeatherBadge weather={campsite.weather} />}
             <NavigateButton lat={campsite.lat} lng={campsite.lng} name={campsite.name} />
           </div>
-          {campsite.weather && (
-            <div className="mt-2">
-              <WeatherBadge weather={campsite.weather} />
-            </div>
-          )}
           <AmenityTags amenities={campsite.amenities} />
         </div>
       </div>
@@ -316,13 +295,9 @@ function CampsiteCard({
               </div>
             )}
           </div>
+          {campsite.weather && <WeatherBadge weather={campsite.weather} />}
           <NavigateButton lat={campsite.lat} lng={campsite.lng} name={campsite.name} />
         </div>
-        {campsite.weather && (
-          <div className="mt-1.5">
-            <WeatherBadge weather={campsite.weather} />
-          </div>
-        )}
         <AmenityTags amenities={campsite.amenities} />
       </div>
     </div>
