@@ -292,6 +292,11 @@ export default function MapView() {
   // Tracks the deferred scrollIntoView timeout so rapid pin clicks cancel the
   // previous pending scroll, and so it can be cleaned up on unmount.
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Client-side weather cache keyed by campsite ID — avoids re-fetching weather
+  // for pins that have been seen this session. Server handles TTL/freshness.
+  const weatherCacheRef = useRef<Map<string, WeatherDay | null>>(new Map());
+  // Mirrors campsites state for stable callbacks (handleMoveEnd AI pan path).
+  const campsitesRef = useRef<Campsite[]>([]);
 
   // Request user geolocation on mount
   useEffect(() => {
@@ -315,6 +320,68 @@ export default function MapView() {
     );
   }, []);
 
+  // Fetches weather only for campsite pins currently visible in the map viewport.
+  // Applies the client-side cache immediately, then fetches uncached visible pins
+  // from the server in the background.
+  // allCampsites: the full list to search — may be larger than the viewport (AI mode).
+  const loadWeatherForViewport = useCallback(
+    (map: mapboxgl.Map, allCampsites: Campsite[]) => {
+      if (allCampsites.length === 0) return;
+
+      const bounds = computeVisibleBounds(map, getDrawerHeightPx(drawerStateRef.current));
+
+      // Only fetch weather for visible pins not already in the client cache.
+      // Longitude check assumes west < east (no antimeridian wrap). This is safe
+      // for Australian coverage — the dateline (180°) sits east of NZ and is
+      // never crossed by a normal AU map viewport.
+      const uncached = allCampsites.filter(
+        (c) =>
+          !weatherCacheRef.current.has(c.id) &&
+          c.lat <= bounds.north &&
+          c.lat >= bounds.south &&
+          c.lng >= bounds.west &&
+          c.lng <= bounds.east
+      );
+
+      // Always set campsites with any cached weather applied. On first load (empty
+      // cache) this is equivalent to setCampsites(allCampsites); on subsequent pans
+      // it surfaces cached badges immediately without waiting for the async fetch.
+      // Skipping this call when nothing is cached would leave browse-mode pins
+      // invisible until the async updater runs against a stale prev list.
+      setCampsites(
+        allCampsites.map((c) =>
+          weatherCacheRef.current.has(c.id)
+            ? { ...c, weather: weatherCacheRef.current.get(c.id) ?? null }
+            : c
+        )
+      );
+
+      if (uncached.length === 0) return;
+
+      const wid = ++weatherFetchCounterRef.current;
+      // fetchWeatherBatch swallows all errors internally and always resolves —
+      // no .catch() needed here.
+      fetchWeatherBatch(uncached).then((fetched) => {
+        if (wid !== weatherFetchCounterRef.current) return; // stale — a newer fetch superseded this
+        // Only cache successful results — null means the fetch failed (network/5xx).
+        // Leaving failed pins out of the cache allows them to be retried on the next pan.
+        for (const c of fetched) {
+          if (c.weather != null) {
+            weatherCacheRef.current.set(c.id, c.weather);
+          }
+        }
+        setCampsites((prev) =>
+          prev.map((c) =>
+            weatherCacheRef.current.has(c.id)
+              ? { ...c, weather: weatherCacheRef.current.get(c.id) ?? null }
+              : c
+          )
+        );
+      });
+    },
+    []
+  );
+
   const loadCampsites = useCallback((map: mapboxgl.Map) => {
     const id = ++fetchCounterRef.current;
     const bounds = computeVisibleBounds(map, getDrawerHeightPx(drawerStateRef.current));
@@ -334,28 +401,24 @@ export default function MapView() {
         map.setPadding({ top: 0, right: 0, bottom: getDrawerHeightPx("half"), left: 0 });
       }
       prevCampsitesLengthRef.current = results.length;
-      setCampsites(results);
       setHasMore(hasMore);
       const newIdx = selectedIdRef.current
         ? results.findIndex((c) => c.id === selectedIdRef.current)
         : -1;
       setSelectedIdx(newIdx >= 0 ? newIdx : null);
       if (newIdx < 0) selectedIdRef.current = null;
-      // Always bump the counter so any in-flight weather fetch from the previous
-      // loadCampsites call is invalidated — even when results are empty.
-      // Without this, a stale fetch resolving after an empty result would ghost-pin
-      // the old campsite list with weather attached.
-      const wid = ++weatherFetchCounterRef.current;
-      // Fetch weather in the background — pins render immediately above; cards
-      // gain weather badges once the batch response arrives.
-      if (results.length > 0) {
-        fetchWeatherBatch(results).then((withWeather) => {
-          if (wid !== weatherFetchCounterRef.current) return; // stale — a newer weather fetch superseded this one
-          setCampsites(withWeather);
-        });
+      // loadWeatherForViewport sets campsites state (with cache applied) for non-empty
+      // results. For empty results it returns early, so clear the list explicitly.
+      if (results.length === 0) {
+        setCampsites([]);
+      } else {
+        // Fetch weather only for visible pins not already cached client-side.
+        // loadWeatherForViewport increments weatherFetchCounterRef internally, so
+        // any in-flight fetch from a previous loadCampsites call is invalidated.
+        loadWeatherForViewport(map, results);
       }
     });
-  }, []);
+  }, [loadWeatherForViewport]);
 
   const loadAmenities = useCallback((map: mapboxgl.Map) => {
     const poiTypes = activeFiltersRef.current.pois;
@@ -404,6 +467,10 @@ export default function MapView() {
     activeFiltersRef.current = activeFilters;
   }, [activeFilters]);
 
+  useEffect(() => {
+    campsitesRef.current = campsites;
+  }, [campsites]);
+
   const handleLoad = useCallback(
     (_e: { target: mapboxgl.Map }) => {
       mapLoadedRef.current = true;
@@ -425,14 +492,11 @@ export default function MapView() {
         suppressGeoFlyRef.current = true;
         fitToCampsites(_e.target, searchPayload.campsites, getDrawerHeightPx("half"));
 
-        // Fetch weather in the background. Guard with the counter so a subsequent
-        // pan (which calls loadCampsites → bumps weatherFetchCounterRef) prevents
-        // this callback from overwriting the browse results with stale AI data.
-        const wid = ++weatherFetchCounterRef.current;
-        fetchWeatherBatch(searchPayload.campsites).then((withWeather) => {
-          if (wid !== weatherFetchCounterRef.current) return;
-          setCampsites(withWeather);
-        });
+        // Fetch weather only for pins visible in the initial viewport.
+        // loadWeatherForViewport increments weatherFetchCounterRef, so a subsequent
+        // pan invalidates this fetch and loadWeatherForViewport runs again for the
+        // new visible set.
+        loadWeatherForViewport(_e.target, searchPayload.campsites);
         return;
       }
 
@@ -460,7 +524,7 @@ export default function MapView() {
         loadAmenities(_e.target);
       }
     },
-    [loadCampsites, loadAmenities]
+    [loadCampsites, loadAmenities, loadWeatherForViewport]
   );
 
   const handleMoveEnd = useCallback(
@@ -469,13 +533,16 @@ export default function MapView() {
         skipNextFetch.current = false;
         return;
       }
-      // While NL search results are active, suppress browse fetches so the map
-      // doesn't silently replace search results when the user pans.
-      if (searchModeRef.current) return;
+      // While NL search results are active, suppress browse fetches but still
+      // fetch weather for any newly visible pins that haven't been cached yet.
+      if (searchModeRef.current) {
+        loadWeatherForViewport(e.target, campsitesRef.current);
+        return;
+      }
       loadCampsites(e.target);
       loadAmenities(e.target);
     },
-    [loadCampsites, loadAmenities]
+    [loadCampsites, loadAmenities, loadWeatherForViewport]
   );
 
   const selectPoi = useCallback(
@@ -592,12 +659,11 @@ export default function MapView() {
         skipNextFetch.current = true;
         suppressGeoFlyRef.current = true;
         fitToCampsites(mapRef.current.getMap(), data.campsites, getDrawerHeightPx("half"));
-        // Fetch weather in the background after displaying results
-        const wid = ++weatherFetchCounterRef.current;
-        fetchWeatherBatch(data.campsites).then((withWeather) => {
-          if (wid !== weatherFetchCounterRef.current) return; // stale — a newer search fired
-          setCampsites(withWeather);
-        });
+        // Fetch weather only for pins visible after fitToCampsites settles.
+        // loadWeatherForViewport uses the bounds at call time — fitToCampsites
+        // fires a camera animation so the visible set may shift slightly, but the
+        // next pan (handleMoveEnd) will fill in any newly revealed pins.
+        loadWeatherForViewport(mapRef.current.getMap(), data.campsites);
       } else {
         // No results — stay in browse mode so handleMoveEnd keeps firing
         searchModeRef.current = false;
