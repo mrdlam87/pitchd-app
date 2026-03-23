@@ -231,52 +231,38 @@ function CampsiteCard({
     );
   }
 
-  // Compact (half / peek): index badge + name + region + drive time + amenity tags
+  // Compact (half / peek): rich card matching prototype — serif name, drive time + blurb, amenity tags
   return (
     <div
       {...sharedInteractionProps}
-      className="relative rounded-xl p-3 cursor-pointer transition-all duration-150"
+      className="cursor-pointer rounded-2xl overflow-hidden transition-all duration-150"
       style={{
-        border: isSelected ? `1.5px solid ${CORAL}` : "1.5px solid #e0dbd0",
-        background: isSelected ? "#fff" : SURFACE,
+        boxShadow: isSelected
+          ? `0 0 0 2px ${CORAL}, 0 2px 12px rgba(0,0,0,0.08)`
+          : "0 2px 12px rgba(0,0,0,0.08)",
+        background: "#fff",
       }}
     >
-      {/* Navigate icon button */}
-      <div className="absolute top-2.5 right-2.5">
-        <NavigateButton lat={campsite.lat} lng={campsite.lng} name={campsite.name} />
-      </div>
-
-      <div className="flex items-start gap-3 pr-8">
-        {/* Index badge */}
-        <div
-          className="flex-shrink-0 flex items-center justify-center rounded-full w-6 h-6 font-extrabold mt-0.5"
-          style={{
-            background: isSelected ? FOREST_GREEN : "transparent",
-            border: `2px solid ${FOREST_GREEN}`,
-            color: isSelected ? "#fff" : FOREST_GREEN,
-            fontSize: 10,
-            fontFamily: "var(--font-dm-sans), sans-serif",
-          }}
-        >
-          {index + 1}
-        </div>
-
-        {/* Name + region + drive time */}
-        <div className="min-w-0 flex-1">
-          <div className="font-semibold text-sm truncate" style={{ color: FOREST_GREEN }}>
-            {campsite.name}
-          </div>
-          <div className="flex items-center gap-1.5 text-xs flex-wrap" style={{ color: SAGE }}>
-            {campsite.region && <span className="truncate">{campsite.region}</span>}
-            {campsite.region && driveTime && (
-              <span className="text-[#e0dbd0]">·</span>
-            )}
-            {driveTime && (
-              <span className="flex-shrink-0">🚗 {driveTime} drive</span>
+      <div className="p-3">
+        <div className="flex items-start justify-between gap-2 mb-1.5">
+          <div className="min-w-0 flex-1">
+            <div
+              className="font-bold text-[15px] leading-snug"
+              style={{ color: FOREST_GREEN, fontFamily: "var(--font-lora), serif" }}
+            >
+              {campsite.name}
+            </div>
+            {(driveTime || campsite.blurb) && (
+              <div className="text-[11px] mt-0.5 leading-relaxed" style={{ color: SAGE }}>
+                {driveTime && <span>🚗 {driveTime}</span>}
+                {driveTime && campsite.blurb && <span> · </span>}
+                {campsite.blurb && <span>{campsite.blurb}</span>}
+              </div>
             )}
           </div>
-          <AmenityTags amenities={campsite.amenities} />
+          <NavigateButton lat={campsite.lat} lng={campsite.lng} name={campsite.name} />
         </div>
+        <AmenityTags amenities={campsite.amenities} />
       </div>
     </div>
   );
@@ -345,7 +331,7 @@ function DrawerContentList({
     : null;
 
   return (
-    <div className="overflow-y-auto flex-1 px-4 pb-4 space-y-2">
+    <div className="overflow-y-auto flex-1 px-4 pt-2 pb-4 space-y-2">
       {/* POI detail card — shown when an amenity pin is selected */}
       {selectedPoi && selectedPoiMeta && (
         <POICard key={selectedPoi.id} poi={selectedPoi} meta={selectedPoiMeta} />
@@ -576,7 +562,7 @@ export default function BottomDrawer({
 
       {/* Peek state — show selected card (or first card) without scrolling */}
       {drawerState === "peek" && (
-        <div className="px-4 pb-4 overflow-hidden">
+        <div className="px-4 pt-2 pb-4 overflow-hidden">
           {selectedPoi && peekPoiMeta
             ? <POICard poi={selectedPoi} meta={peekPoiMeta} />
             : peekCampsite && (
