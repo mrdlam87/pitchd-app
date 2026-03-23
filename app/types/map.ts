@@ -1,11 +1,14 @@
 // Shared map data types — mirror Prisma model shapes but are decoupled from the
 // ORM so they can be used across API routes, server components, and UI layers.
 
-// Extracted first-day weather data from an Open-Meteo forecast response.
+// Per-day weather data extracted from an Open-Meteo forecast response.
 export type WeatherDay = {
+  date: string;               // ISO date e.g. "2024-03-23"
+  dayName: string;            // Short day label e.g. "SAT"
   tempMax: number;
   tempMin: number;
   precipitationSum: number;
+  precipProbability: number | null; // null when absent from cached forecast
   weatherCode: number;
 };
 
@@ -17,8 +20,9 @@ export type Campsite = {
   region: string | null;
   blurb: string | null;
   amenities: { key: string; label: string; icon: string; color: string }[];
-  // Attached client-side after the batch weather fetch — absent on initial load.
-  weather?: WeatherDay | null;
+  // Multi-day forecast attached client-side after the batch weather fetch.
+  // Absent on initial load; null if weather fetch failed.
+  weather?: WeatherDay[] | null;
 };
 
 export type AmenityPOI = {

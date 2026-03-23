@@ -1,4 +1,4 @@
-// Weather scoring — converts a single Open-Meteo daily forecast into a
+// Weather scoring — converts Open-Meteo daily forecasts into a
 // Great / Good / Poor badge matching the prototype's getBadge() design.
 //
 // Thresholds match prototypes/pitchd-light-v2.jsx:
@@ -45,16 +45,19 @@ function precipPenalty(mm: number): number {
 }
 
 /**
- * Returns a 0–100 camping quality score for a single forecast day.
- * Higher is better.
+ * Returns a 0–100 camping quality score for a multi-day forecast.
+ * Penalties are summed across all days — a run of bad days scores lower.
  *
- * With current WMO codes the maximum combined penalty is 28 (thunderstorm) + 8
- * (≥10mm rain) = 36, so the practical floor is 64. The Math.max(0, ...) guard
- * is a safety net for future penalty changes or unexpected input.
+ * Single-element arrays behave identically to the old single-day scoring:
+ * max combined penalty per day is 28 + 8 = 36, so the floor for one day is 64.
+ * The Math.max(0, ...) guard is a safety net for multi-day worst-case inputs.
  */
-export function weatherScore(day: WeatherDay): number {
-  const penalty = wmoCodePenalty(day.weatherCode) + precipPenalty(day.precipitationSum);
-  return Math.max(0, Math.min(100, 100 - penalty));
+export function weatherScore(days: WeatherDay[]): number {
+  let score = 100;
+  for (const day of days) {
+    score -= wmoCodePenalty(day.weatherCode) + precipPenalty(day.precipitationSum);
+  }
+  return Math.max(0, Math.min(100, score));
 }
 
 export type WeatherBadgeInfo = {
@@ -71,4 +74,35 @@ export function getWeatherBadge(score: number): WeatherBadgeInfo {
   if (score >= 75) return { label: "Great", color: "#4a9e6a", bg: "#e8f5ee" };
   if (score >= 45) return { label: "Good",  color: "#c8a040", bg: "#fdf5e0" };
   return              { label: "Poor",  color: "#e8674a", bg: "#fdf0ed" };
+}
+
+/**
+ * Maps a WMO weather code to a weather emoji icon.
+ * Matches prototype getIcon() design.
+ */
+export function wmoCodeToEmoji(code: number): string {
+  if (code >= 95) return "⛈️";  // thunderstorm
+  if (code >= 80) return "🌦️";  // rain showers
+  if (code >= 71) return "🌨️";  // snow
+  if (code >= 61) return "🌧️";  // rain
+  if (code >= 51) return "🌦️";  // drizzle
+  if (code >= 45) return "🌫️";  // fog
+  if (code === 3)  return "☁️";  // overcast
+  if (code === 2)  return "⛅";  // partly cloudy
+  if (code === 1)  return "🌤️";  // mainly clear
+  return "☀️";                   // clear sky (code 0) or unknown
+}
+
+/**
+ * Returns a segment color for WeatherStrip based on WMO code.
+ * Matches prototype condColor() design.
+ */
+export function condColorForCode(code: number): string {
+  if (code >= 95) return "#e8674a";  // thunderstorm — coral
+  if (code >= 65) return "#e8674a";  // heavy rain — coral
+  if (code >= 61) return "#e09060";  // moderate rain — warm orange
+  if (code >= 51) return "#c8a040";  // drizzle — amber
+  if (code === 3 || (code >= 45 && code <= 48)) return "#90a890"; // overcast/fog — muted sage
+  if (code === 1 || code === 2) return "#5a9a5a"; // mainly/partly clear — mid green
+  return "#4a9e6a"; // clear sky — good green
 }

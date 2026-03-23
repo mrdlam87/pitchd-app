@@ -4,85 +4,114 @@ import { weatherScore, getWeatherBadge } from "@/lib/weatherScore";
 import type { WeatherDay } from "@/types/map";
 
 function makeWeatherDay(weatherCode: number, precipitationSum: number): WeatherDay {
-  return { weatherCode, precipitationSum, tempMax: 25, tempMin: 15 };
+  return {
+    weatherCode,
+    precipitationSum,
+    tempMax: 25,
+    tempMin: 15,
+    date: "2024-03-23",
+    dayName: "SAT",
+    precipProbability: null,
+  };
+}
+
+// Wraps a single day in an array — weatherScore now takes WeatherDay[].
+// Single-element arrays produce identical scores to the old single-day API.
+function score(weatherCode: number, precipitationSum: number): number {
+  return weatherScore([makeWeatherDay(weatherCode, precipitationSum)]);
 }
 
 // ── weatherScore ──────────────────────────────────────────────────────────────
 
 describe("weatherScore", () => {
   it("returns 100 for a clear sky with no rain", () => {
-    expect(weatherScore(makeWeatherDay(0, 0))).toBe(100);
+    expect(score(0, 0)).toBe(100);
   });
 
   it("applies a -2 penalty for mainly clear (code 1)", () => {
-    expect(weatherScore(makeWeatherDay(1, 0))).toBe(98);
+    expect(score(1, 0)).toBe(98);
   });
 
   it("applies a -2 penalty for partly cloudy (code 2)", () => {
-    expect(weatherScore(makeWeatherDay(2, 0))).toBe(98);
+    expect(score(2, 0)).toBe(98);
   });
 
   it("applies a -4 penalty for overcast (code 3)", () => {
-    expect(weatherScore(makeWeatherDay(3, 0))).toBe(96);
+    expect(score(3, 0)).toBe(96);
   });
 
   it("applies a -4 penalty for fog (code 45)", () => {
-    expect(weatherScore(makeWeatherDay(45, 0))).toBe(96);
+    expect(score(45, 0)).toBe(96);
   });
 
   it("applies a -10 penalty for drizzle (code 51)", () => {
-    expect(weatherScore(makeWeatherDay(51, 0))).toBe(90);
+    expect(score(51, 0)).toBe(90);
   });
 
   it("applies a -16 penalty for moderate rain (code 63)", () => {
-    expect(weatherScore(makeWeatherDay(63, 0))).toBe(84);
+    expect(score(63, 0)).toBe(84);
   });
 
   it("applies a -22 penalty for heavy rain (code 65)", () => {
-    expect(weatherScore(makeWeatherDay(65, 0))).toBe(78);
+    expect(score(65, 0)).toBe(78);
   });
 
   it("applies a -28 penalty for thunderstorm (code 95)", () => {
-    expect(weatherScore(makeWeatherDay(95, 0))).toBe(72);
+    expect(score(95, 0)).toBe(72);
   });
 
   it("applies a -28 penalty for thunderstorm with hail (code 99)", () => {
-    expect(weatherScore(makeWeatherDay(99, 0))).toBe(72);
+    expect(score(99, 0)).toBe(72);
   });
 
   it("applies a -22 penalty for violent showers (code 82)", () => {
-    expect(weatherScore(makeWeatherDay(82, 0))).toBe(78);
+    expect(score(82, 0)).toBe(78);
   });
 
   // Precipitation penalties
   it("applies a -2 precipitation penalty for >= 2mm", () => {
-    expect(weatherScore(makeWeatherDay(0, 2))).toBe(98);
+    expect(score(0, 2)).toBe(98);
   });
 
   it("applies a -4 precipitation penalty for >= 5mm", () => {
-    expect(weatherScore(makeWeatherDay(0, 5))).toBe(96);
+    expect(score(0, 5)).toBe(96);
   });
 
   it("applies a -8 precipitation penalty for >= 10mm", () => {
-    expect(weatherScore(makeWeatherDay(0, 10))).toBe(92);
+    expect(score(0, 10)).toBe(92);
   });
 
   it("stacks code and precipitation penalties", () => {
     // overcast (-4) + 10mm rain (-8) = 88
-    expect(weatherScore(makeWeatherDay(3, 10))).toBe(88);
+    expect(score(3, 10)).toBe(88);
   });
 
   it("stacks thunderstorm and heavy rain penalties", () => {
     // thunderstorm (-28) + 10mm rain (-8) = 36 total penalty → 64
-    expect(weatherScore(makeWeatherDay(95, 10))).toBe(64);
+    expect(score(95, 10)).toBe(64);
   });
 
   it("never returns a score below 0", () => {
-    expect(weatherScore(makeWeatherDay(99, 100))).toBeGreaterThanOrEqual(0);
+    expect(score(99, 100)).toBeGreaterThanOrEqual(0);
   });
 
   it("never returns a score above 100", () => {
-    expect(weatherScore(makeWeatherDay(0, 0))).toBeLessThanOrEqual(100);
+    expect(score(0, 0)).toBeLessThanOrEqual(100);
+  });
+
+  it("accumulates penalties across multiple days", () => {
+    // Two partly-cloudy days: -2 each = 96
+    const days = [makeWeatherDay(2, 0), makeWeatherDay(2, 0)];
+    expect(weatherScore(days)).toBe(96);
+  });
+
+  it("clamps to 0 for many bad days", () => {
+    const days = Array.from({ length: 5 }, () => makeWeatherDay(95, 10));
+    expect(weatherScore(days)).toBe(0);
+  });
+
+  it("returns 100 for an empty day array", () => {
+    expect(weatherScore([])).toBe(100);
   });
 });
 

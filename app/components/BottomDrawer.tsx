@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
-import { weatherScore, getWeatherBadge } from "@/lib/weatherScore";
+import { weatherScore, getWeatherBadge, wmoCodeToEmoji, condColorForCode } from "@/lib/weatherScore";
 import type { AmenityPOI, Campsite, POIMeta, WeatherDay } from "@/types/map";
 import { haversineKm } from "@/lib/distance";
 
@@ -116,8 +116,7 @@ function ScenicPhoto({ seed }: { seed: number }) {
 
 // ── Weather badge ──────────────────────────────────────────────────────────────
 
-
-function WeatherBadge({ weather }: { weather: WeatherDay }) {
+function WeatherBadge({ weather }: { weather: WeatherDay[] }) {
   const badge = getWeatherBadge(weatherScore(weather));
   return (
     <span
@@ -126,6 +125,60 @@ function WeatherBadge({ weather }: { weather: WeatherDay }) {
     >
       ● {badge.label}
     </span>
+  );
+}
+
+// ── Weather strip ──────────────────────────────────────────────────────────────
+
+// Segmented color bar — one segment per forecast day, colored by condition.
+// Matches prototype WeatherStrip design.
+function WeatherStrip({ weather }: { weather: WeatherDay[] }) {
+  if (weather.length === 0) return null;
+  return (
+    <div className="flex gap-[2px] rounded-[6px] overflow-hidden my-2" style={{ height: 5 }}>
+      {weather.map((d) => (
+        <div
+          key={d.date}
+          className="flex-1"
+          style={{ background: condColorForCode(d.weatherCode) }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ── Day weather cells ──────────────────────────────────────────────────────────
+
+function DayWeatherCells({ weather }: { weather: WeatherDay[] }) {
+  if (weather.length === 0) return null;
+  return (
+    <div className="flex gap-[2px]">
+      {weather.map((d) => (
+        <div
+          key={d.date}
+          className="flex-1 flex flex-col items-center gap-[1px]"
+        >
+          <span
+            className="uppercase font-bold"
+            style={{ fontSize: 7, color: SAGE, fontFamily: "var(--font-dm-sans), sans-serif" }}
+          >
+            {d.dayName}
+          </span>
+          <span style={{ fontSize: 13 }}>{wmoCodeToEmoji(d.weatherCode)}</span>
+          <span
+            className="font-bold"
+            style={{ fontSize: 10, color: FOREST_GREEN, fontFamily: "var(--font-dm-sans), sans-serif" }}
+          >
+            {Math.round(d.tempMax)}°
+          </span>
+          <span
+            style={{ fontSize: 8, color: SAGE, fontFamily: "var(--font-dm-sans), sans-serif" }}
+          >
+            {d.precipProbability !== null ? `${d.precipProbability}%` : `${d.precipitationSum}mm`}
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -212,7 +265,7 @@ function CampsiteCard({
   };
 
   if (!compact) {
-    // Full drawer: rich card with scenic illustration, serif name, blurb
+    // Full drawer: scenic header + name + badge + drive/blurb + weather strip + 4-day cells + amenity tags
     return (
       <div
         {...sharedInteractionProps}
@@ -242,17 +295,27 @@ function CampsiteCard({
                 </div>
               )}
             </div>
-            {campsite.weather && <WeatherBadge weather={campsite.weather} />}
+            {campsite.weather && campsite.weather.length > 0 && (
+              <WeatherBadge weather={campsite.weather} />
+            )}
             <NavigateButton lat={campsite.lat} lng={campsite.lng} name={campsite.name} />
           </div>
+          {campsite.weather && campsite.weather.length > 0 && (
+            <>
+              <WeatherStrip weather={campsite.weather} />
+              <DayWeatherCells weather={campsite.weather} />
+            </>
+          )}
           <AmenityTags amenities={campsite.amenities} />
         </div>
       </div>
     );
   }
 
-  // Compact (half / peek): rich card matching prototype — serif name, drive time + blurb, amenity tags
+  // Compact (half / peek): name + badge | drive/blurb | weather strip | 2-day cells | amenity tags
   const subText = campsite.blurb ?? campsite.region;
+  // Limit to 2 days in compact mode to avoid crowding
+  const compactWeather = campsite.weather?.slice(0, 2) ?? null;
   return (
     <div
       {...sharedInteractionProps}
@@ -295,9 +358,17 @@ function CampsiteCard({
               </div>
             )}
           </div>
-          {campsite.weather && <WeatherBadge weather={campsite.weather} />}
+          {compactWeather && compactWeather.length > 0 && (
+            <WeatherBadge weather={compactWeather} />
+          )}
           <NavigateButton lat={campsite.lat} lng={campsite.lng} name={campsite.name} />
         </div>
+        {compactWeather && compactWeather.length > 0 && (
+          <>
+            <WeatherStrip weather={compactWeather} />
+            <DayWeatherCells weather={compactWeather} />
+          </>
+        )}
         <AmenityTags amenities={campsite.amenities} />
       </div>
     </div>
