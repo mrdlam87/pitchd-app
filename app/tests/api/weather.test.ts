@@ -41,7 +41,9 @@ function makeRequest(params: Record<string, string>) {
   return new Request(url);
 }
 
-// Clean up WeatherCache records created during tests
+// Clean up WeatherCache records created during tests.
+// Note: all tests use SYDNEY_LAT/SYDNEY_LNG — if new tests add different coordinates,
+// extend this cleanup or add a separate afterEach for those coordinates.
 async function cleanupCache(lat: number, lng: number) {
   await prisma.weatherCache.deleteMany({ where: { lat, lng } });
 }
@@ -62,6 +64,7 @@ describe("GET /api/weather", () => {
 
   afterEach(async () => {
     await cleanupCache(SYDNEY_LAT, SYDNEY_LNG);
+    await cleanupCache(0, 0);
     vi.unstubAllGlobals();
     vi.clearAllMocks();
   });
@@ -203,5 +206,26 @@ describe("GET /api/weather", () => {
 
     const res = await GET(makeRequest({ lat: String(SYDNEY_LAT), lng: String(SYDNEY_LNG) }));
     expect(res.status).toBe(502);
+  });
+
+  // --- Cache write failure ---
+
+  it("returns 200 with forecastJson even when cache write fails", async () => {
+    vi.spyOn(prisma.weatherCache, "upsert").mockRejectedValueOnce(new Error("DB error"));
+
+    const res = await GET(makeRequest({ lat: String(SYDNEY_LAT), lng: String(SYDNEY_LNG) }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.forecastJson).toEqual(MOCK_FORECAST);
+  });
+
+  // --- Edge case: equator coordinates (lat=0, lng=0) ---
+  // Guards against accidental regression in the `|| NaN` pattern — "0" is truthy so Number("0") = 0, not NaN
+
+  it("accepts lat=0 and lng=0 (equator/prime meridian)", async () => {
+    const res = await GET(makeRequest({ lat: "0", lng: "0" }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.forecastJson).toEqual(MOCK_FORECAST);
   });
 });
