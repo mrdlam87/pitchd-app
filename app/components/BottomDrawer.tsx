@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
-import { weatherScore, getWeatherBadge, wmoCodeToEmoji, condColorForCode } from "@/lib/weatherScore";
+import { wmoCodeToEmoji, condColorForCode } from "@/lib/weatherScore";
 import type { AmenityPOI, Campsite, POIMeta, WeatherDay } from "@/types/map";
 import { haversineKm } from "@/lib/distance";
 
@@ -111,20 +111,6 @@ function ScenicPhoto({ seed }: { seed: number }) {
       {/* Darkening overlay for readability */}
       <rect width={w} height={h} fill={`url(#ov${sid})`} />
     </svg>
-  );
-}
-
-// ── Weather badge ──────────────────────────────────────────────────────────────
-
-function WeatherBadge({ weather }: { weather: WeatherDay[] }) {
-  const badge = getWeatherBadge(weatherScore(weather));
-  return (
-    <span
-      className="inline-flex items-center gap-[3px] text-[10px] font-bold rounded-full px-[9px] py-[3px] flex-shrink-0"
-      style={{ color: badge.color, background: badge.bg }}
-    >
-      ● {badge.label}
-    </span>
   );
 }
 
@@ -280,10 +266,10 @@ function CampsiteCard({
       >
         <ScenicPhoto seed={index} />
         <div className="p-3">
-          <div className="flex items-start justify-between gap-2 mb-1">
+          <div className="flex items-start gap-2 mb-1">
             <div className="min-w-0 flex-1">
               <div
-                className="text-[15px] font-normal leading-snug font-[family-name:var(--font-lora)]"
+                className="text-[15px] font-semibold leading-snug font-[family-name:var(--font-dm-sans)]"
                 style={{ color: FOREST_GREEN }}
               >
                 {campsite.name}
@@ -296,9 +282,6 @@ function CampsiteCard({
                 </div>
               )}
             </div>
-            {campsite.weather && campsite.weather.length > 0 && (
-              <WeatherBadge weather={campsite.weather} />
-            )}
             <NavigateButton lat={campsite.lat} lng={campsite.lng} name={campsite.name} />
           </div>
           {campsite.weather && campsite.weather.length > 0 && (
@@ -345,7 +328,7 @@ function CampsiteCard({
           )}
           <div className="min-w-0 flex-1">
             <div
-              className="font-bold text-[15px] leading-snug font-[family-name:var(--font-lora)]"
+              className="font-semibold text-[15px] leading-snug font-[family-name:var(--font-dm-sans)]"
               style={{ color: FOREST_GREEN }}
             >
               {campsite.name}
@@ -358,9 +341,6 @@ function CampsiteCard({
               </div>
             )}
           </div>
-          {campsite.weather && campsite.weather.length > 0 && (
-            <WeatherBadge weather={campsite.weather} />
-          )}
           <NavigateButton lat={campsite.lat} lng={campsite.lng} name={campsite.name} />
         </div>
         {compactWeather && compactWeather.length > 0 && (
