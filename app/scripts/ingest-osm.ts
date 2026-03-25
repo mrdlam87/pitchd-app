@@ -7,7 +7,7 @@
 
 import * as https from "https";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient, SyncStatus } from "../lib/generated/prisma/client";
+import { PrismaClient, SyncStatus, State } from "../lib/generated/prisma/client";
 import * as dotenv from "dotenv";
 
 dotenv.config({ path: ".env.local" });
@@ -316,7 +316,7 @@ async function main() {
       select: { id: true, sourceId: true, syncStatus: true, name: true, lat: true, lng: true, state: true },
     });
 
-    interface ExistingRow { id: string; syncStatus: SyncStatus; name: string; lat: number; lng: number; state: string }
+    interface ExistingRow { id: string; syncStatus: SyncStatus; name: string; lat: number; lng: number; state: State }
     const existingMap = new Map<string, ExistingRow>(); // sourceId → db row
     for (const row of existing) {
       if (row.sourceId) existingMap.set(row.sourceId, row);
@@ -414,6 +414,21 @@ async function main() {
       process.stdout.write(`\r  → Updated ${updated}/${toUpdate.length}`);
     }
     if (toUpdate.length > 0) console.log();
+
+    // 6b. Touch lastSyncedAt for unchanged records — field means "last confirmed present in OSM",
+    // so it should advance on every run regardless of whether other fields changed.
+    const toUpdateSourceIds = new Set(toUpdate.map((r) => r.sourceId));
+    const unchangedIds = records
+      .filter((r) => existingMap.has(r.sourceId) && !toUpdateSourceIds.has(r.sourceId))
+      .map((r) => existingMap.get(r.sourceId)!.id);
+    const TOUCH_BATCH = 500;
+    for (let i = 0; i < unchangedIds.length; i += TOUCH_BATCH) {
+      const batch = unchangedIds.slice(i, i + TOUCH_BATCH);
+      await prisma.campsite.updateMany({
+        where: { id: { in: batch } },
+        data: { lastSyncedAt: new Date() },
+      });
+    }
 
     // 7. Sync amenities for ALL existing records — runs independently of field change detection
     // so that amenity tag changes (e.g. toilet added/removed on OSM) are always picked up,
