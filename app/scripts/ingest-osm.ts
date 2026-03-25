@@ -7,7 +7,7 @@
 
 import * as https from "https";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient, SyncStatus, State } from "../lib/generated/prisma/client";
+import { PrismaClient, SyncStatus } from "../lib/generated/prisma/client";
 import * as dotenv from "dotenv";
 
 dotenv.config({ path: ".env.local" });
@@ -316,7 +316,7 @@ async function main() {
       select: { id: true, sourceId: true, syncStatus: true, name: true, lat: true, lng: true, state: true },
     });
 
-    interface ExistingRow { id: string; syncStatus: SyncStatus; name: string; lat: number; lng: number; state: State }
+    interface ExistingRow { id: string; syncStatus: SyncStatus; name: string; lat: number; lng: number; state: string }
     const existingMap = new Map<string, ExistingRow>(); // sourceId → db row
     for (const row of existing) {
       if (row.sourceId) existingMap.set(row.sourceId, row);
