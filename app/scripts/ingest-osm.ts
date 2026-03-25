@@ -304,6 +304,15 @@ function haversineMetres(lat1: number, lng1: number, lat2: number, lng2: number)
 
 type CampsiteRecord = NonNullable<ReturnType<typeof elementToRecord>>;
 
+interface ExistingRow {
+  id: string;
+  syncStatus: SyncStatus;
+  name: string;
+  lat: number;
+  lng: number;
+  state: string;
+}
+
 /**
  * Remove near-duplicate records caused by OSM mapping the same campsite as both a node
  * and a way (or way and relation). Keeps the highest-priority element type when two records
@@ -313,11 +322,12 @@ type CampsiteRecord = NonNullable<ReturnType<typeof elementToRecord>>;
 function deduplicateRecords(records: CampsiteRecord[]): CampsiteRecord[] {
   // Process higher-priority types first so they win when a duplicate is found
   const sorted = [...records].sort((a, b) => {
-    const typeA = a.sourceId.split(":")[1]; // "osm:way:123" → "way"
-    const typeB = b.sourceId.split(":")[1];
+    const [, typeA] = a.sourceId.split(":"); // "osm:way:123" → "way"
+    const [, typeB] = b.sourceId.split(":");
     return (ELEMENT_TYPE_PRIORITY[typeB] ?? 0) - (ELEMENT_TYPE_PRIORITY[typeA] ?? 0);
   });
 
+  // O(n²) scan — acceptable for ~8000 records in a one-off script; don't use in a hot path
   const kept: CampsiteRecord[] = [];
   for (const record of sorted) {
     const isUnnamed = record.name === "Unnamed campsite";
@@ -368,7 +378,6 @@ async function main() {
       select: { id: true, sourceId: true, syncStatus: true, name: true, lat: true, lng: true, state: true },
     });
 
-    interface ExistingRow { id: string; syncStatus: SyncStatus; name: string; lat: number; lng: number; state: string }
     const existingMap = new Map<string, ExistingRow>(); // sourceId → db row
     for (const row of existing) {
       if (row.sourceId) existingMap.set(row.sourceId, row);
@@ -381,6 +390,7 @@ async function main() {
     const toInsert = records.filter((r) => !existingMap.has(r.sourceId));
     // Only update records where something actually changed — avoids ~7000 no-op DB writes per run.
     // Re-activations (syncStatus change) are always included.
+    // Note: slug is derived from name so it's implicitly covered — if name changes, slug changes too.
     const toUpdate = records.filter((r) => {
       const ex = existingMap.get(r.sourceId);
       if (!ex) return false;
@@ -462,6 +472,8 @@ async function main() {
           });
         })
       );
+      // Safe to increment unconditionally — Promise.all throws on any rejection,
+      // so this line is only reached if all updates in the batch succeeded.
       updated += batch.length;
       process.stdout.write(`\r  → Updated ${updated}/${toUpdate.length}`);
     }
@@ -485,6 +497,8 @@ async function main() {
     // 7. Sync amenities for ALL existing records — runs independently of field change detection
     // so that amenity tag changes (e.g. toilet added/removed on OSM) are always picked up,
     // even when name and coordinates haven't changed.
+    // Note: CampsiteAmenity is empty until M4 so this is fast now, but will grow more
+    // expensive once M4 populates the table (~78 delete+insert transactions per run).
     const toSyncAmenities = records.filter((r) => existingMap.has(r.sourceId));
     const AMENITY_BATCH = 100;
     let amenityLinksUpdated = 0;

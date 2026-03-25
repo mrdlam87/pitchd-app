@@ -358,6 +358,8 @@ async function main() {
           })
         )
       );
+      // Safe to increment unconditionally — Promise.all throws on any rejection,
+      // so this line is only reached if all updates in the batch succeeded.
       updated += batch.length;
       process.stdout.write(`\r  → Updated ${updated}/${toUpdate.length}`);
     }
