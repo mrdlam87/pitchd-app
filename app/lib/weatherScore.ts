@@ -1,4 +1,4 @@
-// Weather scoring — converts a single Open-Meteo daily forecast into a
+// Weather scoring — converts Open-Meteo daily forecasts into a
 // Great / Good / Poor badge matching the prototype's getBadge() design.
 //
 // Thresholds match prototypes/pitchd-light-v2.jsx:
@@ -45,16 +45,24 @@ function precipPenalty(mm: number): number {
 }
 
 /**
- * Returns a 0–100 camping quality score for a single forecast day.
- * Higher is better.
+ * Returns a 0–100 camping quality score for a multi-day forecast.
  *
- * With current WMO codes the maximum combined penalty is 28 (thunderstorm) + 8
- * (≥10mm rain) = 36, so the practical floor is 64. The Math.max(0, ...) guard
- * is a safety net for future penalty changes or unexpected input.
+ * Score is based on the **average per-day penalty** so the badge represents
+ * "what is a typical day like on this trip" regardless of how many days are
+ * shown. This keeps the existing Great/Good/Poor thresholds consistent between
+ * the 2-day compact card and the 4-day full card — the same condition (e.g.
+ * moderate rain) produces the same badge in both views.
+ *
+ * Single-element arrays behave identically to the old single-day scoring.
+ * The Math.max/min guards are safety nets for unexpected input.
  */
-export function weatherScore(day: WeatherDay): number {
-  const penalty = wmoCodePenalty(day.weatherCode) + precipPenalty(day.precipitationSum);
-  return Math.max(0, Math.min(100, 100 - penalty));
+export function weatherScore(days: WeatherDay[]): number {
+  if (days.length === 0) return 100;
+  let totalPenalty = 0;
+  for (const day of days) {
+    totalPenalty += wmoCodePenalty(day.weatherCode) + precipPenalty(day.precipitationSum);
+  }
+  return Math.max(0, Math.min(100, 100 - totalPenalty / days.length));
 }
 
 export type WeatherBadgeInfo = {
@@ -71,4 +79,45 @@ export function getWeatherBadge(score: number): WeatherBadgeInfo {
   if (score >= 75) return { label: "Great", color: "#4a9e6a", bg: "#e8f5ee" };
   if (score >= 45) return { label: "Good",  color: "#c8a040", bg: "#fdf5e0" };
   return              { label: "Poor",  color: "#e8674a", bg: "#fdf0ed" };
+}
+
+/**
+ * Maps a WMO weather code to a weather emoji icon.
+ * Matches prototype getIcon() design.
+ */
+export function wmoCodeToEmoji(code: number): string {
+  if (code >= 95) return "⛈️";  // thunderstorm
+  if (code >= 80) return "🌦️";  // rain showers
+  if (code >= 71) return "🌨️";  // snow
+  if (code >= 61) return "🌧️";  // rain
+  if (code >= 51) return "🌦️";  // drizzle
+  if (code >= 45) return "🌫️";  // fog
+  if (code === 3)  return "☁️";  // overcast
+  if (code === 2)  return "⛅";  // partly cloudy
+  if (code === 1)  return "🌤️";  // mainly clear
+  if (code === 0)  return "☀️";  // clear sky
+  // Codes 4–44 are undefined in the WMO standard and not emitted by Open-Meteo.
+  // Return a neutral cloud rather than a misleading clear-sky icon.
+  return "☁️";
+}
+
+/**
+ * Returns a segment color for WeatherStrip based on WMO code.
+ * Matches prototype condColor() design.
+ */
+export function condColorForCode(code: number): string {
+  // All codes >= 65 map to coral — this includes thunderstorms (95+), heavy rain (65),
+  // freezing rain (66–67), snow (71–77), slight/moderate rain showers (80–81), and
+  // heavy/violent showers (82–86). The >= 95 check is intentionally collapsed here
+  // since thunderstorms share the same strip colour as other severe conditions.
+  // Snow is exceedingly rare in AU camping regions; coral signals "not ideal" consistently.
+  if (code >= 65) return "#e8674a";  // severe weather — coral
+  if (code >= 61) return "#e09060";  // moderate rain — warm orange
+  if (code >= 51) return "#c8a040";  // drizzle — amber
+  if (code === 3 || (code >= 45 && code <= 48)) return "#90a890"; // overcast/fog — muted sage
+  if (code === 1 || code === 2) return "#5a9a5a"; // mainly/partly clear — mid green
+  if (code === 0) return "#4a9e6a";  // clear sky — good green
+  // Codes 4–44 are undefined in the WMO standard and not emitted by Open-Meteo.
+  // Return a neutral sage rather than a misleading clear-sky green.
+  return "#90a890";
 }

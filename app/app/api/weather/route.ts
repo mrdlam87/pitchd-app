@@ -59,7 +59,7 @@ export async function GET(req: Request): Promise<Response> {
     url.searchParams.set("longitude", String(lng));
     url.searchParams.set(
       "daily",
-      "temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode"
+      "temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,weathercode"
     );
     url.searchParams.set("timezone", "auto");
     url.searchParams.set("forecast_days", "7");

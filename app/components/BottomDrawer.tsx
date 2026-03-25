@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
-import { weatherScore, getWeatherBadge } from "@/lib/weatherScore";
+import { wmoCodeToEmoji, condColorForCode } from "@/lib/weatherScore";
 import type { AmenityPOI, Campsite, POIMeta, WeatherDay } from "@/types/map";
 import { haversineKm } from "@/lib/distance";
 
@@ -114,18 +114,58 @@ function ScenicPhoto({ seed }: { seed: number }) {
   );
 }
 
-// ── Weather badge ──────────────────────────────────────────────────────────────
+// ── Weather strip ──────────────────────────────────────────────────────────────
 
-
-function WeatherBadge({ weather }: { weather: WeatherDay }) {
-  const badge = getWeatherBadge(weatherScore(weather));
+// Segmented color bar — one segment per forecast day, colored by condition.
+// Matches prototype WeatherStrip design.
+function WeatherStrip({ weather }: { weather: WeatherDay[] }) {
+  if (weather.length === 0) return null;
   return (
-    <span
-      className="inline-flex items-center gap-[3px] text-[10px] font-bold rounded-full px-[9px] py-[3px] flex-shrink-0"
-      style={{ color: badge.color, background: badge.bg }}
-    >
-      ● {badge.label}
-    </span>
+    <div className="flex gap-[2px] rounded-[6px] overflow-hidden my-2 h-[5px]">
+      {weather.map((d) => (
+        <div
+          key={d.date}
+          className="flex-1"
+          style={{ background: condColorForCode(d.weatherCode) }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ── Day weather cells ──────────────────────────────────────────────────────────
+
+function DayWeatherCells({ weather }: { weather: WeatherDay[] }) {
+  if (weather.length === 0) return null;
+  return (
+    <div className="flex gap-[2px]">
+      {weather.map((d) => (
+        <div
+          key={d.date}
+          className="flex-1 flex flex-col items-center gap-[1px]"
+        >
+          <span
+            className="text-[7px] uppercase font-bold font-[family-name:var(--font-dm-sans)]"
+            style={{ color: SAGE }}
+          >
+            {d.dayName}
+          </span>
+          <span className="text-[13px]">{wmoCodeToEmoji(d.weatherCode)}</span>
+          <span
+            className="text-[10px] font-bold font-[family-name:var(--font-dm-sans)]"
+            style={{ color: FOREST_GREEN }}
+          >
+            {Number.isFinite(d.tempMax) ? Math.round(d.tempMax) : "--"}°
+          </span>
+          <span
+            className="text-[8px] font-[family-name:var(--font-dm-sans)]"
+            style={{ color: SAGE }}
+          >
+            {d.precipProbability !== null ? `${d.precipProbability}%` : `${d.precipitationSum}mm`}
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -212,7 +252,7 @@ function CampsiteCard({
   };
 
   if (!compact) {
-    // Full drawer: rich card with scenic illustration, serif name, blurb
+    // Full drawer: scenic header + name + badge + drive/blurb + weather strip + 4-day cells + amenity tags
     return (
       <div
         {...sharedInteractionProps}
@@ -226,10 +266,10 @@ function CampsiteCard({
       >
         <ScenicPhoto seed={index} />
         <div className="p-3">
-          <div className="flex items-start justify-between gap-2 mb-1">
+          <div className="flex items-start gap-2 mb-1">
             <div className="min-w-0 flex-1">
               <div
-                className="text-[15px] font-normal leading-snug font-[family-name:var(--font-lora)]"
+                className="text-[15px] font-semibold leading-snug font-[family-name:var(--font-dm-sans)]"
                 style={{ color: FOREST_GREEN }}
               >
                 {campsite.name}
@@ -242,17 +282,24 @@ function CampsiteCard({
                 </div>
               )}
             </div>
-            {campsite.weather && <WeatherBadge weather={campsite.weather} />}
             <NavigateButton lat={campsite.lat} lng={campsite.lng} name={campsite.name} />
           </div>
+          {campsite.weather && campsite.weather.length > 0 && (
+            <>
+              <WeatherStrip weather={campsite.weather} />
+              <DayWeatherCells weather={campsite.weather} />
+            </>
+          )}
           <AmenityTags amenities={campsite.amenities} />
         </div>
       </div>
     );
   }
 
-  // Compact (half / peek): rich card matching prototype — serif name, drive time + blurb, amenity tags
+  // Compact (half / peek): name + badge | drive/blurb | weather strip | 2-day cells | amenity tags
   const subText = campsite.blurb ?? campsite.region;
+  // Limit to 2 days in compact mode to avoid crowding
+  const compactWeather = campsite.weather?.slice(0, 2) ?? null;
   return (
     <div
       {...sharedInteractionProps}
@@ -268,12 +315,11 @@ function CampsiteCard({
         <div className="flex items-start gap-3 mb-1.5">
           {showIndex && (
             <div
-              className="flex-shrink-0 flex items-center justify-center rounded-full w-6 h-6 font-extrabold mt-0.5"
+              className="flex-shrink-0 flex items-center justify-center rounded-full w-6 h-6 font-extrabold mt-0.5 text-[10px]"
               style={{
                 background: isSelected ? FOREST_GREEN : "transparent",
                 border: `2px solid ${FOREST_GREEN}`,
                 color: isSelected ? "#fff" : FOREST_GREEN,
-                fontSize: 10,
                 fontFamily: "var(--font-dm-sans), sans-serif",
               }}
             >
@@ -282,7 +328,7 @@ function CampsiteCard({
           )}
           <div className="min-w-0 flex-1">
             <div
-              className="font-bold text-[15px] leading-snug font-[family-name:var(--font-lora)]"
+              className="font-semibold text-[15px] leading-snug font-[family-name:var(--font-dm-sans)]"
               style={{ color: FOREST_GREEN }}
             >
               {campsite.name}
@@ -295,9 +341,14 @@ function CampsiteCard({
               </div>
             )}
           </div>
-          {campsite.weather && <WeatherBadge weather={campsite.weather} />}
           <NavigateButton lat={campsite.lat} lng={campsite.lng} name={campsite.name} />
         </div>
+        {compactWeather && compactWeather.length > 0 && (
+          <>
+            <WeatherStrip weather={compactWeather} />
+            <DayWeatherCells weather={compactWeather} />
+          </>
+        )}
         <AmenityTags amenities={campsite.amenities} />
       </div>
     </div>

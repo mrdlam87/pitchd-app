@@ -64,22 +64,54 @@ async function fetchCampsites(bounds: Bounds, amenities: string[] = []): Promise
   }
 }
 
-// Extracts day-0 weather data from an Open-Meteo forecast response.
-// Returns null if the response shape is unexpected.
-function extractWeatherDay(forecast: unknown): WeatherDay | null {
+const DAY_NAMES = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+
+// Extracts up to MAX_DAYS days of weather data from an Open-Meteo forecast response.
+// Returns null if the response shape is unexpected; gracefully handles absent
+// precipitation_probability_max (old cache entries) by setting null.
+const MAX_FORECAST_DAYS = 4;
+function extractWeatherForecast(forecast: unknown): WeatherDay[] | null {
   if (typeof forecast !== "object" || forecast === null) return null;
   const f = forecast as Record<string, unknown>;
   if (typeof f.daily !== "object" || f.daily === null) return null;
   const d = f.daily as Record<string, unknown>;
   if (!Array.isArray(d.temperature_2m_max) || !Array.isArray(d.temperature_2m_min)) return null;
   if (!Array.isArray(d.precipitation_sum) || !Array.isArray(d.weathercode)) return null;
-  const tempMax = d.temperature_2m_max[0];
-  const tempMin = d.temperature_2m_min[0];
-  const precipitationSum = d.precipitation_sum[0];
-  const weatherCode = d.weathercode[0];
-  if (typeof tempMax !== "number" || typeof tempMin !== "number") return null;
-  if (typeof precipitationSum !== "number" || typeof weatherCode !== "number") return null;
-  return { tempMax, tempMin, precipitationSum, weatherCode };
+  if (!Array.isArray(d.time)) return null;
+
+  const probArr = Array.isArray(d.precipitation_probability_max)
+    ? (d.precipitation_probability_max as unknown[])
+    : null;
+
+  const count = Math.min(MAX_FORECAST_DAYS, d.time.length);
+  const days: WeatherDay[] = [];
+  for (let i = 0; i < count; i++) {
+    const tempMax = d.temperature_2m_max[i];
+    const tempMin = d.temperature_2m_min[i];
+    const precipitationSum = d.precipitation_sum[i];
+    const weatherCode = d.weathercode[i];
+    const dateStr = d.time[i];
+    // Skip malformed days rather than aborting the whole array. Day 0 is the
+    // most critical (shown in compact mode); if it is missing, the caller
+    // receives a shorter array and the WeatherStrip shows fewer segments.
+    if (typeof tempMax !== "number" || typeof tempMin !== "number") continue;
+    if (typeof precipitationSum !== "number" || typeof weatherCode !== "number") continue;
+    if (typeof dateStr !== "string") continue;
+    // T00:00:00 forces local-time midnight parsing — without it, `new Date("2024-03-23")`
+    // is parsed as UTC midnight and .getDay() returns the wrong day in UTC+ timezones.
+    const dow = new Date(dateStr + "T00:00:00").getDay();
+    const precipProbRaw = probArr?.[i];
+    days.push({
+      date: dateStr,
+      dayName: DAY_NAMES[dow],
+      tempMax,
+      tempMin,
+      precipitationSum,
+      precipProbability: typeof precipProbRaw === "number" ? precipProbRaw : null,
+      weatherCode,
+    });
+  }
+  return days.length > 0 ? days : null;
 }
 
 // Fetches weather for a batch of campsites from /api/weather/batch.
@@ -101,7 +133,7 @@ async function fetchWeatherBatch(campsites: Campsite[]): Promise<Campsite[]> {
     const data = (await res.json()) as { results: Record<string, unknown> };
     return campsites.map((c) => ({
       ...c,
-      weather: extractWeatherDay(data.results[c.id]) ?? null,
+      weather: extractWeatherForecast(data.results[c.id]) ?? null,
     }));
   } catch (e) {
     console.warn("[fetchWeatherBatch] fetch failed", e);
@@ -294,7 +326,7 @@ export default function MapView() {
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Client-side weather cache keyed by campsite ID — avoids re-fetching weather
   // for pins that have been seen this session. Server handles TTL/freshness.
-  const weatherCacheRef = useRef<Map<string, WeatherDay | null>>(new Map());
+  const weatherCacheRef = useRef<Map<string, WeatherDay[] | null>>(new Map());
   // Mirrors campsites state for stable callbacks (handleMoveEnd AI pan path).
   const campsitesRef = useRef<Campsite[]>([]);
 
