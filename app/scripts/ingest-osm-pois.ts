@@ -48,7 +48,8 @@ const FETCH_REGIONS: Array<{ label: string; bbox: string }> = [
   { label: "QLD-S", bbox: "-29.2,137.9,-20.0,153.6" },
   { label: "QLD-N", bbox: "-20.0,137.9,-10.7,153.6" },
   { label: "NSW-S", bbox: "-37.5,140.9,-33.0,153.6" },
-  { label: "NSW-N", bbox: "-33.0,140.9,-28.2,153.6" },
+  { label: "NSW-N1", bbox: "-33.0,140.9,-30.6,153.6" },
+  { label: "NSW-N2", bbox: "-30.6,140.9,-28.2,153.6" },
 ];
 
 interface OverpassNode {
@@ -339,26 +340,23 @@ async function main() {
     }
     if (toInsert.length > 0) console.log();
 
-    // 7. Update changed records using interactive $transaction with explicit timeout
+    // 7. Update changed records in batches — records are independent, no transaction needed
     const UPDATE_BATCH = 100;
     let updated = 0;
     for (let i = 0; i < toUpdate.length; i += UPDATE_BATCH) {
       const batch = toUpdate.slice(i, i + UPDATE_BATCH);
-      await prisma.$transaction(
-        async (tx) => {
-          for (const r of batch) {
-            await tx.amenityPOI.update({
-              where: { id: existingMap.get(r.sourceId)!.id },
-              data: {
-                name: r.name,
-                lat: r.lat,
-                lng: r.lng,
-                amenityTypeId: amenityTypeMap.get(r.amenityKey)!,
-              },
-            });
-          }
-        },
-        { timeout: 60_000 }
+      await Promise.all(
+        batch.map((r) =>
+          prisma.amenityPOI.update({
+            where: { id: existingMap.get(r.sourceId)!.id },
+            data: {
+              name: r.name,
+              lat: r.lat,
+              lng: r.lng,
+              amenityTypeId: amenityTypeMap.get(r.amenityKey)!,
+            },
+          })
+        )
       );
       updated += batch.length;
       process.stdout.write(`\r  → Updated ${updated}/${toUpdate.length}`);

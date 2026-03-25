@@ -191,7 +191,8 @@ async function fetchStateElements(
           console.log(` attempt ${attempt} failed (${endpoint.includes("kumi") ? "kumi" : "main"}), retrying in 15s...`);
           await new Promise((resolve) => setTimeout(resolve, 15_000));
         } else {
-          console.log(` failed on main, trying mirror...`);
+          console.log(` failed on main, trying mirror in 5s...`);
+          await new Promise((resolve) => setTimeout(resolve, 5_000));
         }
       }
     }
@@ -230,7 +231,10 @@ async function fetchOverpassData(): Promise<OverpassElement[]> {
       }
     }
     console.log(` ${elements.length} returned, ${added} new`);
-    await new Promise((resolve) => setTimeout(resolve, BETWEEN_REQUESTS_MS));
+    // Delay between regions to avoid rate-limiting — skip after the last one
+    if (region !== FETCH_REGIONS.at(-1)) {
+      await new Promise((resolve) => setTimeout(resolve, BETWEEN_REQUESTS_MS));
+    }
   }
 
   return Array.from(allElements.values());
@@ -305,16 +309,17 @@ async function main() {
     const amenityTypes = await prisma.amenityType.findMany({ select: { id: true, key: true } });
     const amenityTypeMap = new Map(amenityTypes.map((a) => [a.key, a.id]));
 
-    // 3. Load existing OSM sourceIds from DB in one query
+    // 3. Load existing OSM records from DB — include fields needed for change detection
     console.log("Loading existing OSM records from DB...");
     const existing = await prisma.campsite.findMany({
       where: { source: "osm", syncStatus: { not: SyncStatus.removed } },
-      select: { id: true, sourceId: true, syncStatus: true },
+      select: { id: true, sourceId: true, syncStatus: true, name: true, lat: true, lng: true, state: true },
     });
 
-    const existingMap = new Map<string, { id: string; syncStatus: SyncStatus }>(); // sourceId → {id, syncStatus}
+    interface ExistingRow { id: string; syncStatus: SyncStatus; name: string; lat: number; lng: number; state: string }
+    const existingMap = new Map<string, ExistingRow>(); // sourceId → db row
     for (const row of existing) {
-      if (row.sourceId) existingMap.set(row.sourceId, { id: row.id, syncStatus: row.syncStatus });
+      if (row.sourceId) existingMap.set(row.sourceId, row);
     }
 
     console.log(`  → ${existingMap.size} existing OSM records in DB`);
@@ -322,14 +327,27 @@ async function main() {
     // 4. Split into inserts, updates, removals, and re-activations
     const fetchedSourceIds = new Set(records.map((r) => r.sourceId));
     const toInsert = records.filter((r) => !existingMap.has(r.sourceId));
-    const toUpdate = records.filter((r) => existingMap.has(r.sourceId));
+    // Only update records where something actually changed — avoids ~7000 no-op DB writes per run.
+    // Re-activations (syncStatus change) are always included.
+    const toUpdate = records.filter((r) => {
+      const ex = existingMap.get(r.sourceId);
+      if (!ex) return false;
+      return (
+        ex.syncStatus !== SyncStatus.active ||
+        r.name !== ex.name ||
+        Math.abs(r.lat - ex.lat) > 1e-6 ||
+        Math.abs(r.lng - ex.lng) > 1e-6 ||
+        r.state !== ex.state
+      );
+    });
     const toRemove = Array.from(existingMap.keys()).filter((id) => !fetchedSourceIds.has(id));
     // Re-activations: previously unverified records that are now back in OSM as active
     const reactivatedCount = toUpdate.filter(
       (r) => existingMap.get(r.sourceId)?.syncStatus !== SyncStatus.active
     ).length;
 
-    console.log(`Processing: ${toInsert.length} to insert, ${toUpdate.length} to update, ${toRemove.length} to mark removed...`);
+    const unchanged = records.filter((r) => existingMap.has(r.sourceId)).length - toUpdate.length;
+    console.log(`Processing: ${toInsert.length} to insert, ${toUpdate.length} to update, ${unchanged} unchanged, ${toRemove.length} to mark removed...`);
 
     // 5. Insert new records in batches, then link their amenities
     const INSERT_BATCH = 500;
@@ -370,45 +388,49 @@ async function main() {
     }
     if (toInsert.length > 0) console.log(); // newline after progress
 
-    // 6. Update existing records in batches using transactions (also syncs amenities)
+    // 6. Update existing records in batches (also syncs amenities)
     const UPDATE_BATCH = 100;
     let updated = 0;
     let amenityLinksUpdated = 0;
     for (let i = 0; i < toUpdate.length; i += UPDATE_BATCH) {
       const batch = toUpdate.slice(i, i + UPDATE_BATCH);
-      const batchAmenityCount = await prisma.$transaction(
-        async (tx) => {
-          let count = 0;
-          for (const r of batch) {
-            const dbId = existingMap.get(r.sourceId)!.id;
-            await tx.campsite.update({
-              where: { id: dbId },
-              data: {
-                name: r.name,
-                slug: r.slug,
-                lat: r.lat,
-                lng: r.lng,
-                state: r.state,
-                syncStatus: r.syncStatus,
-                lastSyncedAt: r.lastSyncedAt,
-              },
-            });
-            // Sync amenities: delete all existing links then re-insert from current OSM tags.
-            // This ensures stale amenity data is removed when OSM tags change.
-            await tx.campsiteAmenity.deleteMany({ where: { campsiteId: dbId } });
-            for (const key of r.amenityKeys) {
-              const typeId = amenityTypeMap.get(key);
-              if (typeId) {
-                await tx.campsiteAmenity.create({ data: { campsiteId: dbId, amenityTypeId: typeId } });
-                count++;
-              }
-            }
-          }
-          return count;
-        },
-        { timeout: 60_000 }
+      const dbIds = batch.map((r) => existingMap.get(r.sourceId)!.id);
+
+      // Parallel campsite updates — records are independent, no need for a single transaction
+      await Promise.all(
+        batch.map((r) => {
+          const dbId = existingMap.get(r.sourceId)!.id;
+          return prisma.campsite.update({
+            where: { id: dbId },
+            data: {
+              name: r.name,
+              slug: r.slug,
+              lat: r.lat,
+              lng: r.lng,
+              state: r.state,
+              syncStatus: r.syncStatus,
+              lastSyncedAt: r.lastSyncedAt,
+            },
+          });
+        })
       );
-      amenityLinksUpdated += batchAmenityCount;
+
+      // Sync amenities: bulk-delete all existing links for the batch, then bulk-insert current OSM tags.
+      // This ensures stale amenity data is removed when OSM tags change.
+      await prisma.campsiteAmenity.deleteMany({ where: { campsiteId: { in: dbIds } } });
+      const amenityRows: { campsiteId: string; amenityTypeId: string }[] = [];
+      for (const r of batch) {
+        const dbId = existingMap.get(r.sourceId)!.id;
+        for (const key of r.amenityKeys) {
+          const typeId = amenityTypeMap.get(key);
+          if (typeId) amenityRows.push({ campsiteId: dbId, amenityTypeId: typeId });
+        }
+      }
+      if (amenityRows.length > 0) {
+        await prisma.campsiteAmenity.createMany({ data: amenityRows, skipDuplicates: true });
+      }
+      amenityLinksUpdated += amenityRows.length;
+
       updated += batch.length;
       process.stdout.write(`\r  → Updated ${updated}/${toUpdate.length}`);
     }
@@ -434,6 +456,7 @@ async function main() {
     console.log(`  Inserted     : ${inserted}`);
     console.log(`  Updated      : ${updated}`);
     console.log(`  Reactivated  : ${reactivatedCount}`);
+    console.log(`  Unchanged    : ${unchanged}`);
     console.log(`  Removed      : ${removed}`);
     console.log(`  Skipped      : ${skipped} (no coordinate)`);
     console.log(`  Amenity links: ${amenityLinksCreated} created (new), ${amenityLinksUpdated} synced (updated)`);
