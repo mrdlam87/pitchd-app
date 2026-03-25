@@ -135,7 +135,7 @@ function WeatherBadge({ weather }: { weather: WeatherDay[] }) {
 function WeatherStrip({ weather }: { weather: WeatherDay[] }) {
   if (weather.length === 0) return null;
   return (
-    <div className="flex gap-[2px] rounded-[6px] overflow-hidden my-2" style={{ height: 5 }}>
+    <div className="flex gap-[2px] rounded-[6px] overflow-hidden my-2 h-[5px]">
       {weather.map((d) => (
         <div
           key={d.date}
@@ -332,12 +332,11 @@ function CampsiteCard({
         <div className="flex items-start gap-3 mb-1.5">
           {showIndex && (
             <div
-              className="flex-shrink-0 flex items-center justify-center rounded-full w-6 h-6 font-extrabold mt-0.5"
+              className="flex-shrink-0 flex items-center justify-center rounded-full w-6 h-6 font-extrabold mt-0.5 text-[10px]"
               style={{
                 background: isSelected ? FOREST_GREEN : "transparent",
                 border: `2px solid ${FOREST_GREEN}`,
                 color: isSelected ? "#fff" : FOREST_GREEN,
-                fontSize: 10,
                 fontFamily: "var(--font-dm-sans), sans-serif",
               }}
             >

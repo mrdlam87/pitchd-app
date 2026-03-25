@@ -91,6 +91,9 @@ function extractWeatherForecast(forecast: unknown): WeatherDay[] | null {
     const precipitationSum = d.precipitation_sum[i];
     const weatherCode = d.weathercode[i];
     const dateStr = d.time[i];
+    // Skip malformed days rather than aborting the whole array. Day 0 is the
+    // most critical (shown in compact mode); if it is missing, the caller
+    // receives a shorter array and the WeatherStrip shows fewer segments.
     if (typeof tempMax !== "number" || typeof tempMin !== "number") continue;
     if (typeof precipitationSum !== "number" || typeof weatherCode !== "number") continue;
     if (typeof dateStr !== "string") continue;

@@ -1,6 +1,6 @@
 // Unit tests for lib/weatherScore — covers scoring edge cases and badge thresholds.
 import { describe, it, expect } from "vitest";
-import { weatherScore, getWeatherBadge } from "@/lib/weatherScore";
+import { weatherScore, getWeatherBadge, wmoCodeToEmoji, condColorForCode } from "@/lib/weatherScore";
 import type { WeatherDay } from "@/types/map";
 
 function makeWeatherDay(weatherCode: number, precipitationSum: number): WeatherDay {
@@ -111,7 +111,7 @@ describe("weatherScore", () => {
     expect(weatherScore(days)).toBe(86);
   });
 
-  it("never returns a score below 0", () => {
+  it("never returns a score below 0 across many days with extreme conditions", () => {
     // Extreme: thunderstorm + max rain across many days — avg penalty = 36
     const days = Array.from({ length: 7 }, () => makeWeatherDay(95, 10));
     expect(weatherScore(days)).toBeGreaterThanOrEqual(0);
@@ -156,5 +156,85 @@ describe("getWeatherBadge", () => {
     const badge = getWeatherBadge(20);
     expect(badge.color).toBe("#e8674a");
     expect(badge.bg).toBe("#fdf0ed");
+  });
+});
+
+// ── wmoCodeToEmoji ────────────────────────────────────────────────────────────
+
+describe("wmoCodeToEmoji", () => {
+  it("returns sun for code 0 (clear sky)", () => {
+    expect(wmoCodeToEmoji(0)).toBe("☀️");
+  });
+
+  it("returns mainly-clear for code 1", () => {
+    expect(wmoCodeToEmoji(1)).toBe("🌤️");
+  });
+
+  it("returns partly-cloudy for code 2", () => {
+    expect(wmoCodeToEmoji(2)).toBe("⛅");
+  });
+
+  it("returns overcast for code 3", () => {
+    expect(wmoCodeToEmoji(3)).toBe("☁️");
+  });
+
+  it("returns fog for code 45", () => {
+    expect(wmoCodeToEmoji(45)).toBe("🌫️");
+  });
+
+  it("returns drizzle for code 51 (boundary)", () => {
+    expect(wmoCodeToEmoji(51)).toBe("🌦️");
+  });
+
+  it("returns rain for code 61 (boundary)", () => {
+    expect(wmoCodeToEmoji(61)).toBe("🌧️");
+  });
+
+  it("returns snow for code 71 (boundary)", () => {
+    expect(wmoCodeToEmoji(71)).toBe("🌨️");
+  });
+
+  it("returns showers for code 80 (boundary)", () => {
+    expect(wmoCodeToEmoji(80)).toBe("🌦️");
+  });
+
+  it("returns thunderstorm for code 95 (boundary)", () => {
+    expect(wmoCodeToEmoji(95)).toBe("⛈️");
+  });
+});
+
+// ── condColorForCode ──────────────────────────────────────────────────────────
+
+describe("condColorForCode", () => {
+  it("returns good green for code 0 (clear sky)", () => {
+    expect(condColorForCode(0)).toBe("#4a9e6a");
+  });
+
+  it("returns mid green for code 1 (mainly clear)", () => {
+    expect(condColorForCode(1)).toBe("#5a9a5a");
+  });
+
+  it("returns muted sage for code 45 (fog, boundary)", () => {
+    expect(condColorForCode(45)).toBe("#90a890");
+  });
+
+  it("returns amber for code 51 (drizzle, boundary)", () => {
+    expect(condColorForCode(51)).toBe("#c8a040");
+  });
+
+  it("returns warm orange for code 61 (moderate rain, boundary)", () => {
+    expect(condColorForCode(61)).toBe("#e09060");
+  });
+
+  it("returns coral for code 65 (heavy rain, boundary)", () => {
+    expect(condColorForCode(65)).toBe("#e8674a");
+  });
+
+  it("returns coral for code 80 (slight showers — absorbed by >= 65 branch)", () => {
+    expect(condColorForCode(80)).toBe("#e8674a");
+  });
+
+  it("returns coral for code 95 (thunderstorm, boundary)", () => {
+    expect(condColorForCode(95)).toBe("#e8674a");
   });
 });

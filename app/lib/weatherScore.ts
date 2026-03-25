@@ -104,10 +104,11 @@ export function wmoCodeToEmoji(code: number): string {
  */
 export function condColorForCode(code: number): string {
   if (code >= 95) return "#e8674a";  // thunderstorm — coral
-  // Snow (71–77) and heavy showers (82–86) intentionally map to coral here.
-  // Snow is exceedingly rare in AU camping regions; the coral colour signals
-  // "not ideal" consistently with the rest of the bad-weather palette.
-  if (code >= 65) return "#e8674a";  // heavy rain / snow / heavy showers — coral
+  // All codes 65–94 intentionally map to coral. This includes heavy rain (65),
+  // freezing rain (66–67), snow (71–77), slight/moderate rain showers (80–81),
+  // and heavy/violent showers (82–86). Snow is exceedingly rare in AU camping
+  // regions; coral signals "not ideal" consistently across the bad-weather range.
+  if (code >= 65) return "#e8674a";  // heavy rain / freezing rain / snow / showers — coral
   if (code >= 61) return "#e09060";  // moderate rain — warm orange
   if (code >= 51) return "#c8a040";  // drizzle — amber
   if (code === 3 || (code >= 45 && code <= 48)) return "#90a890"; // overcast/fog — muted sage
