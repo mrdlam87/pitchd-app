@@ -341,7 +341,7 @@ async function main() {
     if (toInsert.length > 0) console.log();
 
     // 7. Update changed records in batches — records are independent, no transaction needed
-    const UPDATE_BATCH = 100;
+    const UPDATE_BATCH = 25;
     let updated = 0;
     for (let i = 0; i < toUpdate.length; i += UPDATE_BATCH) {
       const batch = toUpdate.slice(i, i + UPDATE_BATCH);

@@ -388,15 +388,11 @@ async function main() {
     }
     if (toInsert.length > 0) console.log(); // newline after progress
 
-    // 6. Update existing records in batches (also syncs amenities)
-    const UPDATE_BATCH = 100;
+    // 6. Update campsite fields for changed records only
+    const UPDATE_BATCH = 25;
     let updated = 0;
-    let amenityLinksUpdated = 0;
     for (let i = 0; i < toUpdate.length; i += UPDATE_BATCH) {
       const batch = toUpdate.slice(i, i + UPDATE_BATCH);
-      const dbIds = batch.map((r) => existingMap.get(r.sourceId)!.id);
-
-      // Parallel campsite updates — records are independent, no need for a single transaction
       await Promise.all(
         batch.map((r) => {
           const dbId = existingMap.get(r.sourceId)!.id;
@@ -414,10 +410,20 @@ async function main() {
           });
         })
       );
+      updated += batch.length;
+      process.stdout.write(`\r  → Updated ${updated}/${toUpdate.length}`);
+    }
+    if (toUpdate.length > 0) console.log();
 
-      // Sync amenities: bulk-delete all existing links for the batch, then bulk-insert current OSM tags.
-      // This ensures stale amenity data is removed when OSM tags change.
-      await prisma.campsiteAmenity.deleteMany({ where: { campsiteId: { in: dbIds } } });
+    // 7. Sync amenities for ALL existing records — runs independently of field change detection
+    // so that amenity tag changes (e.g. toilet added/removed on OSM) are always picked up,
+    // even when name and coordinates haven't changed.
+    const toSyncAmenities = records.filter((r) => existingMap.has(r.sourceId));
+    const AMENITY_BATCH = 100;
+    let amenityLinksUpdated = 0;
+    for (let i = 0; i < toSyncAmenities.length; i += AMENITY_BATCH) {
+      const batch = toSyncAmenities.slice(i, i + AMENITY_BATCH);
+      const dbIds = batch.map((r) => existingMap.get(r.sourceId)!.id);
       const amenityRows: { campsiteId: string; amenityTypeId: string }[] = [];
       for (const r of batch) {
         const dbId = existingMap.get(r.sourceId)!.id;
@@ -426,17 +432,17 @@ async function main() {
           if (typeId) amenityRows.push({ campsiteId: dbId, amenityTypeId: typeId });
         }
       }
-      if (amenityRows.length > 0) {
-        await prisma.campsiteAmenity.createMany({ data: amenityRows, skipDuplicates: true });
-      }
+      // Static (array) transaction — atomic delete+insert with no timeout risk
+      await prisma.$transaction([
+        prisma.campsiteAmenity.deleteMany({ where: { campsiteId: { in: dbIds } } }),
+        prisma.campsiteAmenity.createMany({ data: amenityRows, skipDuplicates: true }),
+      ]);
       amenityLinksUpdated += amenityRows.length;
-
-      updated += batch.length;
-      process.stdout.write(`\r  → Updated ${updated}/${toUpdate.length}`);
+      process.stdout.write(`\r  → Synced amenities ${Math.min(i + AMENITY_BATCH, toSyncAmenities.length)}/${toSyncAmenities.length}`);
     }
-    if (toUpdate.length > 0) console.log();
+    if (toSyncAmenities.length > 0) console.log();
 
-    // 7. Mark stale OSM records as removed in batches
+    // 8. Mark stale OSM records as removed in batches
     const REMOVE_BATCH = 500;
     let removed = 0;
     for (let i = 0; i < toRemove.length; i += REMOVE_BATCH) {
