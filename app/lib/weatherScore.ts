@@ -46,18 +46,23 @@ function precipPenalty(mm: number): number {
 
 /**
  * Returns a 0–100 camping quality score for a multi-day forecast.
- * Penalties are summed across all days — a run of bad days scores lower.
  *
- * Single-element arrays behave identically to the old single-day scoring:
- * max combined penalty per day is 28 + 8 = 36, so the floor for one day is 64.
- * The Math.max(0, ...) guard is a safety net for multi-day worst-case inputs.
+ * Score is based on the **average per-day penalty** so the badge represents
+ * "what is a typical day like on this trip" regardless of how many days are
+ * shown. This keeps the existing Great/Good/Poor thresholds consistent between
+ * the 2-day compact card and the 4-day full card — the same condition (e.g.
+ * moderate rain) produces the same badge in both views.
+ *
+ * Single-element arrays behave identically to the old single-day scoring.
+ * The Math.max/min guards are safety nets for unexpected input.
  */
 export function weatherScore(days: WeatherDay[]): number {
-  let score = 100;
+  if (days.length === 0) return 100;
+  let totalPenalty = 0;
   for (const day of days) {
-    score -= wmoCodePenalty(day.weatherCode) + precipPenalty(day.precipitationSum);
+    totalPenalty += wmoCodePenalty(day.weatherCode) + precipPenalty(day.precipitationSum);
   }
-  return Math.max(0, Math.min(100, score));
+  return Math.max(0, Math.min(100, 100 - totalPenalty / days.length));
 }
 
 export type WeatherBadgeInfo = {
@@ -99,7 +104,10 @@ export function wmoCodeToEmoji(code: number): string {
  */
 export function condColorForCode(code: number): string {
   if (code >= 95) return "#e8674a";  // thunderstorm — coral
-  if (code >= 65) return "#e8674a";  // heavy rain — coral
+  // Snow (71–77) and heavy showers (82–86) intentionally map to coral here.
+  // Snow is exceedingly rare in AU camping regions; the coral colour signals
+  // "not ideal" consistently with the rest of the bad-weather palette.
+  if (code >= 65) return "#e8674a";  // heavy rain / snow / heavy showers — coral
   if (code >= 61) return "#e09060";  // moderate rain — warm orange
   if (code >= 51) return "#c8a040";  // drizzle — amber
   if (code === 3 || (code >= 45 && code <= 48)) return "#90a890"; // overcast/fog — muted sage

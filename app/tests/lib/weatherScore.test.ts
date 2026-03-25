@@ -99,15 +99,22 @@ describe("weatherScore", () => {
     expect(score(0, 0)).toBeLessThanOrEqual(100);
   });
 
-  it("accumulates penalties across multiple days", () => {
-    // Two partly-cloudy days: -2 each = 96
+  it("averages penalties — two partly-cloudy days score the same as one", () => {
+    // avg penalty = (2 + 2) / 2 = 2, score = 98 (same as a single partly-cloudy day)
     const days = [makeWeatherDay(2, 0), makeWeatherDay(2, 0)];
-    expect(weatherScore(days)).toBe(96);
+    expect(weatherScore(days)).toBe(98);
   });
 
-  it("clamps to 0 for many bad days", () => {
-    const days = Array.from({ length: 5 }, () => makeWeatherDay(95, 10));
-    expect(weatherScore(days)).toBe(0);
+  it("averages penalties — mixed good and bad days reflect the mean", () => {
+    // one clear (penalty 0) + one thunderstorm (penalty 28) = avg 14, score = 86
+    const days = [makeWeatherDay(0, 0), makeWeatherDay(95, 0)];
+    expect(weatherScore(days)).toBe(86);
+  });
+
+  it("never returns a score below 0", () => {
+    // Extreme: thunderstorm + max rain across many days — avg penalty = 36
+    const days = Array.from({ length: 7 }, () => makeWeatherDay(95, 10));
+    expect(weatherScore(days)).toBeGreaterThanOrEqual(0);
   });
 
   it("returns 100 for an empty day array", () => {

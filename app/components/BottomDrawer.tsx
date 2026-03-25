@@ -159,20 +159,21 @@ function DayWeatherCells({ weather }: { weather: WeatherDay[] }) {
           className="flex-1 flex flex-col items-center gap-[1px]"
         >
           <span
-            className="uppercase font-bold"
-            style={{ fontSize: 7, color: SAGE, fontFamily: "var(--font-dm-sans), sans-serif" }}
+            className="text-[7px] uppercase font-bold font-[family-name:var(--font-dm-sans)]"
+            style={{ color: SAGE }}
           >
             {d.dayName}
           </span>
-          <span style={{ fontSize: 13 }}>{wmoCodeToEmoji(d.weatherCode)}</span>
+          <span className="text-[13px]">{wmoCodeToEmoji(d.weatherCode)}</span>
           <span
-            className="font-bold"
-            style={{ fontSize: 10, color: FOREST_GREEN, fontFamily: "var(--font-dm-sans), sans-serif" }}
+            className="text-[10px] font-bold font-[family-name:var(--font-dm-sans)]"
+            style={{ color: FOREST_GREEN }}
           >
             {Math.round(d.tempMax)}°
           </span>
           <span
-            style={{ fontSize: 8, color: SAGE, fontFamily: "var(--font-dm-sans), sans-serif" }}
+            className="text-[8px] font-[family-name:var(--font-dm-sans)]"
+            style={{ color: SAGE }}
           >
             {d.precipProbability !== null ? `${d.precipProbability}%` : `${d.precipitationSum}mm`}
           </span>
@@ -358,8 +359,8 @@ function CampsiteCard({
               </div>
             )}
           </div>
-          {compactWeather && compactWeather.length > 0 && (
-            <WeatherBadge weather={compactWeather} />
+          {campsite.weather && campsite.weather.length > 0 && (
+            <WeatherBadge weather={campsite.weather} />
           )}
           <NavigateButton lat={campsite.lat} lng={campsite.lng} name={campsite.name} />
         </div>
