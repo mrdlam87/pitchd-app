@@ -237,4 +237,16 @@ describe("condColorForCode", () => {
   it("returns coral for code 95 (thunderstorm, boundary)", () => {
     expect(condColorForCode(95)).toBe("#e8674a");
   });
+
+  it("returns neutral sage for unknown code in 4–44 range (WMO undefined)", () => {
+    expect(condColorForCode(10)).toBe("#90a890");
+  });
+});
+
+// ── unknown code fallbacks ─────────────────────────────────────────────────────
+
+describe("wmoCodeToEmoji — unknown code fallback", () => {
+  it("returns neutral cloud for unknown code in 4–44 range (WMO undefined)", () => {
+    expect(wmoCodeToEmoji(10)).toBe("☁️");
+  });
 });

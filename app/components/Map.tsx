@@ -97,6 +97,8 @@ function extractWeatherForecast(forecast: unknown): WeatherDay[] | null {
     if (typeof tempMax !== "number" || typeof tempMin !== "number") continue;
     if (typeof precipitationSum !== "number" || typeof weatherCode !== "number") continue;
     if (typeof dateStr !== "string") continue;
+    // T00:00:00 forces local-time midnight parsing — without it, `new Date("2024-03-23")`
+    // is parsed as UTC midnight and .getDay() returns the wrong day in UTC+ timezones.
     const dow = new Date(dateStr + "T00:00:00").getDay();
     const precipProbRaw = probArr?.[i];
     days.push({

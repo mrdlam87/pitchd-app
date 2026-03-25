@@ -95,7 +95,10 @@ export function wmoCodeToEmoji(code: number): string {
   if (code === 3)  return "☁️";  // overcast
   if (code === 2)  return "⛅";  // partly cloudy
   if (code === 1)  return "🌤️";  // mainly clear
-  return "☀️";                   // clear sky (code 0) or unknown
+  if (code === 0)  return "☀️";  // clear sky
+  // Codes 4–44 are undefined in the WMO standard and not emitted by Open-Meteo.
+  // Return a neutral cloud rather than a misleading clear-sky icon.
+  return "☁️";
 }
 
 /**
@@ -103,15 +106,18 @@ export function wmoCodeToEmoji(code: number): string {
  * Matches prototype condColor() design.
  */
 export function condColorForCode(code: number): string {
-  if (code >= 95) return "#e8674a";  // thunderstorm — coral
-  // All codes 65–94 intentionally map to coral. This includes heavy rain (65),
-  // freezing rain (66–67), snow (71–77), slight/moderate rain showers (80–81),
-  // and heavy/violent showers (82–86). Snow is exceedingly rare in AU camping
-  // regions; coral signals "not ideal" consistently across the bad-weather range.
-  if (code >= 65) return "#e8674a";  // heavy rain / freezing rain / snow / showers — coral
+  // All codes >= 65 map to coral — this includes thunderstorms (95+), heavy rain (65),
+  // freezing rain (66–67), snow (71–77), slight/moderate rain showers (80–81), and
+  // heavy/violent showers (82–86). The >= 95 check is intentionally collapsed here
+  // since thunderstorms share the same strip colour as other severe conditions.
+  // Snow is exceedingly rare in AU camping regions; coral signals "not ideal" consistently.
+  if (code >= 65) return "#e8674a";  // severe weather — coral
   if (code >= 61) return "#e09060";  // moderate rain — warm orange
   if (code >= 51) return "#c8a040";  // drizzle — amber
   if (code === 3 || (code >= 45 && code <= 48)) return "#90a890"; // overcast/fog — muted sage
   if (code === 1 || code === 2) return "#5a9a5a"; // mainly/partly clear — mid green
-  return "#4a9e6a"; // clear sky — good green
+  if (code === 0) return "#4a9e6a";  // clear sky — good green
+  // Codes 4–44 are undefined in the WMO standard and not emitted by Open-Meteo.
+  // Return a neutral sage rather than a misleading clear-sky green.
+  return "#90a890";
 }

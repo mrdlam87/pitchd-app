@@ -169,7 +169,7 @@ function DayWeatherCells({ weather }: { weather: WeatherDay[] }) {
             className="text-[10px] font-bold font-[family-name:var(--font-dm-sans)]"
             style={{ color: FOREST_GREEN }}
           >
-            {Math.round(d.tempMax)}°
+            {Number.isFinite(d.tempMax) ? Math.round(d.tempMax) : "--"}°
           </span>
           <span
             className="text-[8px] font-[family-name:var(--font-dm-sans)]"
