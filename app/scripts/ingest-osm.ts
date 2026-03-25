@@ -19,6 +19,9 @@ const OVERPASS_ENDPOINTS = [
 const OVERPASS_TIMEOUT_MS = 120_000; // 2 minutes per state query
 // Delay between region queries to avoid rate-limiting
 const BETWEEN_REQUESTS_MS = 10_000;
+// Proximity dedup radius — OSM often maps the same site as both a node and a way;
+// any two records within this distance (same/absent name) are treated as duplicates.
+const DEDUP_RADIUS_M = 100;
 
 // State bounding boxes — checked in priority order (smaller/more specific first)
 const STATE_BOXES: Array<{
@@ -286,6 +289,50 @@ function elementToRecord(el: OverpassElement): {
   };
 }
 
+// Element type preference when deduplicating — ways carry more geometry data than nodes
+const ELEMENT_TYPE_PRIORITY: Record<string, number> = { way: 2, relation: 1, node: 0 };
+
+function haversineMetres(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6_371_000;
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lng2 - lng1) * Math.PI) / 180;
+  const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+type CampsiteRecord = NonNullable<ReturnType<typeof elementToRecord>>;
+
+/**
+ * Remove near-duplicate records caused by OSM mapping the same campsite as both a node
+ * and a way (or way and relation). Keeps the highest-priority element type when two records
+ * are within DEDUP_RADIUS_M metres and have the same name (or at least one is unnamed).
+ * Records with distinct non-default names are kept even if close — they're likely different sites.
+ */
+function deduplicateRecords(records: CampsiteRecord[]): CampsiteRecord[] {
+  // Process higher-priority types first so they win when a duplicate is found
+  const sorted = [...records].sort((a, b) => {
+    const typeA = a.sourceId.split(":")[1]; // "osm:way:123" → "way"
+    const typeB = b.sourceId.split(":")[1];
+    return (ELEMENT_TYPE_PRIORITY[typeB] ?? 0) - (ELEMENT_TYPE_PRIORITY[typeA] ?? 0);
+  });
+
+  const kept: CampsiteRecord[] = [];
+  for (const record of sorted) {
+    const isUnnamed = record.name === "Unnamed campsite";
+    const isDuplicate = kept.some((k) => {
+      if (haversineMetres(record.lat, record.lng, k.lat, k.lng) > DEDUP_RADIUS_M) return false;
+      // Both have distinct real names → probably two different sites close together
+      const kUnnamed = k.name === "Unnamed campsite";
+      if (!isUnnamed && !kUnnamed && record.name !== k.name) return false;
+      return true;
+    });
+    if (!isDuplicate) kept.push(record);
+  }
+  return kept;
+}
+
 async function main() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not set");
@@ -299,11 +346,16 @@ async function main() {
     const elements = await fetchOverpassData();
 
     // 2. Map elements to records (skip elements without a usable coordinate)
-    const records = elements
+    const mapped = elements
       .map(elementToRecord)
-      .filter((r): r is NonNullable<typeof r> => r !== null);
+      .filter((r): r is CampsiteRecord => r !== null);
 
-    console.log(`  → ${records.length} records to process (${elements.length - records.length} skipped — no center coordinate)`);
+    // 2b. Proximity dedup — OSM often has both a node and a way for the same campsite;
+    //     keep the higher-priority element type when two records are within DEDUP_RADIUS_M metres.
+    const records = deduplicateRecords(mapped);
+    const dedupedCount = mapped.length - records.length;
+
+    console.log(`  → ${records.length} records to process (${elements.length - mapped.length} skipped — no center coordinate, ${dedupedCount} deduped — proximity)`);
 
     // 3a. Load AmenityType key → id map (needed for CampsiteAmenity inserts)
     const amenityTypes = await prisma.amenityType.findMany({ select: { id: true, key: true } });
@@ -472,13 +524,14 @@ async function main() {
     }
     if (toRemove.length > 0) console.log();
 
-    const skipped = elements.length - records.length;
+    const skipped = elements.length - mapped.length;
     console.log("\nDone.");
     console.log(`  Inserted     : ${inserted}`);
     console.log(`  Updated      : ${updated}`);
     console.log(`  Reactivated  : ${reactivatedCount}`);
     console.log(`  Unchanged    : ${unchanged}`);
     console.log(`  Removed      : ${removed}`);
+    console.log(`  Deduped      : ${dedupedCount} (proximity — kept higher-priority element type)`);
     console.log(`  Skipped      : ${skipped} (no coordinate)`);
     console.log(`  Amenity links: ${amenityLinksCreated} created (new), ${amenityLinksUpdated} synced (updated)`);
   } finally {
