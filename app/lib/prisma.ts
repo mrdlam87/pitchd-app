@@ -8,8 +8,9 @@ function createPrismaClient() {
   if (!url) throw new Error("DATABASE_URL is not set");
   // max: 1 prevents connection pool exhaustion in serverless (Vercel).
   // Each function invocation is short-lived; a single connection per instance is sufficient.
-  // The real fix is to use Supabase's transaction mode URL (port 6543) in DATABASE_URL,
-  // which releases connections after each transaction instead of holding them for the session.
+  // TODO: switch DATABASE_URL to Supabase's transaction mode URL (port 6543), which releases
+  // connections after each transaction instead of holding them for the session — tracked in
+  // https://github.com/mrdlam87/pitchd-app/issues/115
   const adapter = new PrismaPg({
     connectionString: url,
     max: 1,

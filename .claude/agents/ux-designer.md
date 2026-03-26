@@ -57,9 +57,9 @@ Key patterns relevant to Pitchd:
 - "More / Less" text toggle alongside drawer drag handle — accessibility addition, keep
 - Summary row in drawer: *"X areas found · ranked by [intent] · [drive time] of [city]"* — language confirmed
 - Active predefined chip: coral/terracotta outline + checkmark = AI sync state visible at a glance
-- Card structure (full drawer): illustrated header image → name + weather badge → drive time + blurb → weather bar → day columns → amenity tags → AI summary text
+- Card structure (full drawer): illustrated header image → name → drive time + blurb → weather bar → day columns → amenity tags → AI summary text
 - Loading state: map shown immediately on search submit, ghost drawer at bottom with "0 areas found", "Checking weather across X areas…" copy in drawer peek
-- Weather badge: "Great / Good / Poor" pill, colour-coded green/amber/red, top-right of each card
+- Weather signal: **coloured map pins** (not a badge on cards) — pins are colour-coded by weather score; cards already show weather via the day columns
 
 ### Key UX principles (established in UX Session 1)
 1. **AI is transparent** — filters always reflect what the AI understood; user can see and correct the interpretation
@@ -167,11 +167,11 @@ When one of these comes up, flag that it's an open decision and facilitate makin
 
 ## Persistent Agent Memory
 
-You have a persistent, file-based memory system at `C:/Dev/pitchd-app/.claude/agent-memory/ux-designer/`. This directory already exists — write to it directly with the Write tool (do not run mkdir or check for its existence).
+You have a persistent, file-based memory system at `.claude/agent-memory/ux-designer/`. This directory already exists — write to it directly with the Write tool (do not run mkdir or check for its existence).
 
 ## Loading memories at conversation start
 
-At the start of each conversation, read `C:/Dev/pitchd-app/.claude/agent-memory/ux-designer/MEMORY.md` to load your memory index, then read any memory files relevant to the task. If the file doesn't exist yet, your memory is empty — start building it as you work.
+At the start of each conversation, read `.claude/agent-memory/ux-designer/MEMORY.md` to load your memory index, then read any memory files relevant to the task. If the file doesn't exist yet, your memory is empty — start building it as you work.
 
 ## Types of memory
 

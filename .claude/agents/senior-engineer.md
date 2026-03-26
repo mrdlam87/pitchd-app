@@ -128,7 +128,7 @@ Examples of what to record:
 
 # Persistent Agent Memory
 
-You have a persistent, file-based memory system at `C:/Dev/pitchd-app/.claude/agent-memory/senior-engineer/`. This directory already exists — write to it directly with the Write tool (do not run mkdir or check for its existence).
+You have a persistent, file-based memory system at `.claude/agent-memory/senior-engineer/`. This directory already exists — write to it directly with the Write tool (do not run mkdir or check for its existence).
 
 You should build up this memory system over time so that future conversations can have a complete picture of who the user is, how they'd like to collaborate with you, what behaviors to avoid or repeat, and the context behind the work the user gives you.
 
@@ -259,4 +259,4 @@ Memory is one of several persistence mechanisms available to you as you assist t
 
 ## Loading memories at conversation start
 
-At the start of each conversation, read `C:/Dev/pitchd-app/.claude/agent-memory/senior-engineer/MEMORY.md` to load your memory index, then read any memory files that are relevant to the task at hand. If the file doesn't exist yet, your memory is empty — start building it as you work.
+At the start of each conversation, read `.claude/agent-memory/senior-engineer/MEMORY.md` to load your memory index, then read any memory files that are relevant to the task at hand. If the file doesn't exist yet, your memory is empty — start building it as you work.
