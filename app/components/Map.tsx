@@ -11,6 +11,7 @@ import BottomDrawer, {
   DRAWER_TRANSITION_MS,
   getDrawerHeightPx,
 } from "./BottomDrawer";
+import { DAY_NAMES } from "@/types/map";
 import type { AmenityPOI, Campsite, WeatherDay } from "@/types/map";
 import { CORAL, FOREST_GREEN } from "@/lib/tokens";
 import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayload, type AISearchPayload } from "@/lib/searchResults";
@@ -64,13 +65,21 @@ async function fetchCampsites(bounds: Bounds, amenities: string[] = []): Promise
   }
 }
 
-const DAY_NAMES = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-
-// Extracts up to MAX_DAYS days of weather data from an Open-Meteo forecast response.
+// Extracts weather data from an Open-Meteo forecast response.
+// When startDate/endDate are provided, only days within that range are included
+// (matching the date window used for ranking). Without dates, falls back to the
+// first MAX_FORECAST_DAYS (4) days — intentionally wider than the server-side
+// extractForecastDays default (today+tomorrow) because browse-mode cards show
+// more days than the 2-day ranking window needs.
+// See also: extractForecastDays in app/lib/weatherRanking.ts (server-side counterpart).
 // Returns null if the response shape is unexpected; gracefully handles absent
 // precipitation_probability_max (old cache entries) by setting null.
 const MAX_FORECAST_DAYS = 4;
-function extractWeatherForecast(forecast: unknown): WeatherDay[] | null {
+function extractWeatherForecast(
+  forecast: unknown,
+  startDate?: string | null,
+  endDate?: string | null,
+): WeatherDay[] | null {
   if (typeof forecast !== "object" || forecast === null) return null;
   const f = forecast as Record<string, unknown>;
   if (typeof f.daily !== "object" || f.daily === null) return null;
@@ -83,20 +92,33 @@ function extractWeatherForecast(forecast: unknown): WeatherDay[] | null {
     ? (d.precipitation_probability_max as unknown[])
     : null;
 
-  const count = Math.min(MAX_FORECAST_DAYS, d.time.length);
   const days: WeatherDay[] = [];
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < (d.time as unknown[]).length; i++) {
+    const dateStr = d.time[i];
+    if (typeof dateStr !== "string") continue;
+
+    // Date range filter:
+    // - Full range supplied: show only days within [startDate, endDate].
+    // - startDate only (partial range): show MAX_FORECAST_DAYS days from startDate.
+    // - No dates (browse mode): show first MAX_FORECAST_DAYS days of the forecast.
+    if (startDate && endDate) {
+      if (dateStr < startDate || dateStr > endDate) continue;
+    } else if (startDate) {
+      if (dateStr < startDate) continue;
+      if (days.length >= MAX_FORECAST_DAYS) break;
+    } else if (days.length >= MAX_FORECAST_DAYS) {
+      break;
+    }
+
     const tempMax = d.temperature_2m_max[i];
     const tempMin = d.temperature_2m_min[i];
     const precipitationSum = d.precipitation_sum[i];
     const weatherCode = d.weathercode[i];
-    const dateStr = d.time[i];
     // Skip malformed days rather than aborting the whole array. Day 0 is the
     // most critical (shown in compact mode); if it is missing, the caller
     // receives a shorter array and the WeatherStrip shows fewer segments.
     if (typeof tempMax !== "number" || typeof tempMin !== "number") continue;
     if (typeof precipitationSum !== "number" || typeof weatherCode !== "number") continue;
-    if (typeof dateStr !== "string") continue;
     // T00:00:00 forces local-time midnight parsing — without it, `new Date("2024-03-23")`
     // is parsed as UTC midnight and .getDay() returns the wrong day in UTC+ timezones.
     const dow = new Date(dateStr + "T00:00:00").getDay();
@@ -115,9 +137,14 @@ function extractWeatherForecast(forecast: unknown): WeatherDay[] | null {
 }
 
 // Fetches weather for a batch of campsites from /api/weather/batch.
+// startDate/endDate filter the displayed days to the search date window (when supplied).
 // Returns the same array with weather attached — failures result in weather: null.
 // Never throws; errors are logged and each campsite gets weather: null.
-async function fetchWeatherBatch(campsites: Campsite[]): Promise<Campsite[]> {
+async function fetchWeatherBatch(
+  campsites: Campsite[],
+  startDate?: string | null,
+  endDate?: string | null,
+): Promise<Campsite[]> {
   if (campsites.length === 0) return campsites;
   const locations = campsites.map((c) => ({ id: c.id, lat: c.lat, lng: c.lng }));
   try {
@@ -133,7 +160,7 @@ async function fetchWeatherBatch(campsites: Campsite[]): Promise<Campsite[]> {
     const data = (await res.json()) as { results: Record<string, unknown> };
     return campsites.map((c) => ({
       ...c,
-      weather: extractWeatherForecast(data.results[c.id]) ?? null,
+      weather: extractWeatherForecast(data.results[c.id], startDate, endDate) ?? null,
     }));
   } catch (e) {
     console.warn("[fetchWeatherBatch] fetch failed", e);
@@ -197,7 +224,7 @@ function computeVisibleBounds(map: mapboxgl.Map, drawerHeightPx: number): Bounds
 }
 
 
-const EMPTY_FILTERS: FilterState = { activities: [], pois: [] };
+const EMPTY_FILTERS: FilterState = { activities: [], pois: [], startDate: null, endDate: null };
 
 
 // Fit the map to the bounding box of a set of campsites.
@@ -255,6 +282,11 @@ export default function MapView() {
   const [activeChip, setActiveChip] = useState<string | null>(
     initialSearch?.kind === "ai" ? (initialSearch.chipKey ?? "pitchd") : null
   );
+  // Ref mirrors activeChip so stable useCallback closures (e.g. loadWeatherForViewport)
+  // can read the current chip key without needing it in their dependency array.
+  const activeChipRef = useRef<string | null>(
+    initialSearch?.kind === "ai" ? (initialSearch.chipKey ?? "pitchd") : null
+  );
   // Query string shown as context below the map search input (AI searches only)
   const [searchContextQuery, setSearchContextQuery] = useState<string | null>(
     initialSearch?.kind === "ai" ? (initialSearch.query ?? null) : null
@@ -277,16 +309,16 @@ export default function MapView() {
   const [showFilters, setShowFilters] = useState(false);
   // Lazy initialiser runs once on mount — avoids recomputing the conditional on every render.
   const [activeFilters, setActiveFilters] = useState<FilterState>(() =>
-    initialSearch?.kind === "direct" ? initialSearch.filters :
-    initialSearch?.kind === "ai"     ? { activities: initialSearch.parsedIntent.amenities, pois: [] } :
+    initialSearch?.kind === "direct" ? { ...initialSearch.filters, startDate: null, endDate: null } :
+    initialSearch?.kind === "ai"     ? { activities: initialSearch.parsedIntent.amenities, pois: [], startDate: initialSearch.parsedIntent.startDate, endDate: initialSearch.parsedIntent.endDate } :
     EMPTY_FILTERS
   );
   // Ref mirrors state so loadCampsites always reads the latest filters without
   // needing activeFilters as a dependency (the callback is stable).
   // useRef has no lazy form — the ternary is cheap and the value is ignored after mount.
   const activeFiltersRef = useRef<FilterState>(
-    initialSearch?.kind === "direct" ? initialSearch.filters :
-    initialSearch?.kind === "ai"     ? { activities: initialSearch.parsedIntent.amenities, pois: [] } :
+    initialSearch?.kind === "direct" ? { ...initialSearch.filters, startDate: null, endDate: null } :
+    initialSearch?.kind === "ai"     ? { activities: initialSearch.parsedIntent.amenities, pois: [], startDate: initialSearch.parsedIntent.startDate, endDate: initialSearch.parsedIntent.endDate } :
     EMPTY_FILTERS
   );
   // Activities that Claude inferred from the last AI search — shown in FilterPanel as "Pitchd suggested".
@@ -390,10 +422,14 @@ export default function MapView() {
 
       if (uncached.length === 0) return;
 
+      // Pass the current date range so displayed weather days match the search window.
+      // null/null in browse mode → extractWeatherForecast falls back to MAX_FORECAST_DAYS.
+      const { startDate, endDate } = activeFiltersRef.current;
+
       const wid = ++weatherFetchCounterRef.current;
       // fetchWeatherBatch swallows all errors internally and always resolves —
       // no .catch() needed here.
-      fetchWeatherBatch(uncached).then((fetched) => {
+      fetchWeatherBatch(uncached, startDate, endDate).then((fetched) => {
         if (wid !== weatherFetchCounterRef.current) return; // stale — a newer fetch superseded this
         // Only cache successful results — null means the fetch failed (network/5xx).
         // Leaving failed pins out of the cache allows them to be retried on the next pan.
@@ -402,13 +438,19 @@ export default function MapView() {
             weatherCacheRef.current.set(c.id, c.weather);
           }
         }
-        setCampsites((prev) =>
-          prev.map((c) =>
+        setCampsites((prev) => {
+          const updated = prev.map((c) =>
             weatherCacheRef.current.has(c.id)
               ? { ...c, weather: weatherCacheRef.current.get(c.id) ?? null }
               : c
-          )
-        );
+          );
+          // When "Good weather" chip is active, only show campsites we have weather
+          // data for — sites with no data (weather === null or undefined) can't be
+          // confirmed as good-weather destinations, so they're excluded from the list.
+          return activeChipRef.current === "weather"
+            ? updated.filter((c) => c.weather != null)
+            : updated;
+        });
       });
     },
     []
@@ -638,6 +680,7 @@ export default function MapView() {
       searchModeRef.current = false;
       suppressGeoFlyRef.current = false;
       setActiveChip(null);
+      activeChipRef.current = null;
       setSearchContextQuery(null);
       setAiSyncedActivities([]);
       setShowFilters(false);
@@ -655,6 +698,12 @@ export default function MapView() {
     if (!q.trim() || mapSearchLoading) return;
     setMapSearchLoading(true);
     setMapSearchError(null);
+    // Highlight the chip immediately so it reflects the pending search state.
+    // Reverted to null in the catch block (error) or the no-results branch.
+    if (chipKey !== null) {
+      setActiveChip(chipKey);
+      activeChipRef.current = chipKey;
+    }
     // Use the current map centre as the search origin so chip searches stay in the
     // area you're viewing — not the user's GPS location which may be far away.
     const mapCenter = mapRef.current?.getMap().getCenter();
@@ -664,13 +713,28 @@ export default function MapView() {
       const res = await fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: q.trim(), lat, lng }),
+        body: JSON.stringify({
+          query: q.trim(),
+          lat,
+          lng,
+          // Pass filter panel dates so manual date selection feeds into weather ranking
+          startDate: activeFiltersRef.current.startDate ?? undefined,
+          endDate: activeFiltersRef.current.endDate ?? undefined,
+        }),
       });
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };
         throw new Error(data.error ?? "Search failed");
       }
       const data = (await res.json()) as Pick<AISearchPayload, "campsites" | "parsedIntent">;
+      // Pre-populate client weather cache from search response weather so
+      // loadWeatherForViewport finds all campsites already cached and skips
+      // the extra round-trip to /api/weather/batch.
+      for (const c of data.campsites) {
+        if (c.weather != null) {
+          weatherCacheRef.current.set(c.id, c.weather);
+        }
+      }
       setCampsites(data.campsites);
       prevCampsitesLengthRef.current = data.campsites.length;
       setMapQuery("");
@@ -680,11 +744,22 @@ export default function MapView() {
         drawerStateRef.current = "half";
         searchModeRef.current = true;
         setActiveChip(chipKey ?? "pitchd");
+        activeChipRef.current = chipKey ?? "pitchd";
         setAiSyncedActivities(data.parsedIntent.amenities);
         // Intentionally replace activities (not merge) — the new query redefines
         // intent and any prior activity selection is stale. pois are preserved
         // because the AI doesn't infer POI types.
-        const aiFilters: FilterState = { ...activeFiltersRef.current, activities: data.parsedIntent.amenities };
+        // Replace activities and dates from AI intent — new query redefines intent.
+        // pois are preserved (explicit user choices, not AI-inferred).
+        // Dates: always take AI-inferred dates from parsedIntent for a new search so
+        // that e.g. "camping next weekend" isn't silently overridden by dates the user
+        // set in the filter panel during a previous search session.
+        const aiFilters: FilterState = {
+          ...activeFiltersRef.current,
+          activities: data.parsedIntent.amenities,
+          startDate: data.parsedIntent.startDate,
+          endDate: data.parsedIntent.endDate,
+        };
         setActiveFilters(aiFilters);
         activeFiltersRef.current = aiFilters;
         setSearchContextQuery(q.trim());
@@ -701,11 +776,14 @@ export default function MapView() {
         searchModeRef.current = false;
         suppressGeoFlyRef.current = false;
         setActiveChip(null);
+        activeChipRef.current = null;
         setSearchContextQuery(null);
       }
     } catch (e) {
       console.error("[MapSearch]", e);
       suppressGeoFlyRef.current = false;
+      setActiveChip(null);
+      activeChipRef.current = null;
       setMapSearchError(e instanceof Error ? e.message : "Search failed. Please try again.");
     } finally {
       setMapSearchLoading(false);
@@ -716,13 +794,14 @@ export default function MapView() {
     searchModeRef.current = false;
     suppressGeoFlyRef.current = false;
     setActiveChip(null);
+    activeChipRef.current = null;
     setSearchContextQuery(null);
     setMapSearchError(null);
     setAiSyncedActivities([]);
-    // Reset AI-inferred activities so browse results aren't silently filtered
-    // after the user exits search mode. pois are preserved — they reflect
+    // Reset AI-inferred activities and dates so browse results aren't silently
+    // filtered after the user exits search mode. pois are preserved — they reflect
     // explicit user choices (amenity chips / filter panel) not AI inference.
-    const resetFilters: FilterState = { ...activeFiltersRef.current, activities: [] };
+    const resetFilters: FilterState = { ...activeFiltersRef.current, activities: [], startDate: null, endDate: null };
     setActiveFilters(resetFilters);
     activeFiltersRef.current = resetFilters;
     if (mapRef.current) {
@@ -759,6 +838,7 @@ export default function MapView() {
       setSearchContextQuery(null);
       setMapSearchError(null);
       setActiveChip(null);
+      activeChipRef.current = null;
       setAiSyncedActivities([]);
       const next = baseActivities.includes(filterKey)
         ? baseActivities.filter((a: string) => a !== filterKey)
