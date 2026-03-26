@@ -12,7 +12,7 @@ import {
 import { hashQuery, getCachedIntent, setCachedIntent } from "@/lib/searchCache";
 import { haversineKm } from "@/lib/distance";
 import { requireAuth } from "@/lib/apiAuth";
-import { fetchWeatherForCandidates, combinedScore } from "@/lib/weatherRanking";
+import { fetchWeatherForCandidates, combinedScore, extractForecastDays } from "@/lib/weatherRanking";
 
 // Re-export for callers that import from the route rather than from the lib directly.
 // The route is the public API surface for search — keeping this here avoids breaking
@@ -217,6 +217,8 @@ export async function POST(req: Request): Promise<Response> {
     );
 
     // Step 3: Re-rank by combined proximity + weather score, return top RESULT_LIMIT.
+    // Attach the filtered WeatherDay[] to each campsite so the client can render
+    // weather badges immediately — no extra round-trip to /api/weather/batch needed.
     const ranked = candidates
       .map((c) => ({
         campsite: c,
@@ -224,7 +226,10 @@ export async function POST(req: Request): Promise<Response> {
       }))
       .sort((a, b) => b.score - a.score)
       .slice(0, RESULT_LIMIT)
-      .map(({ campsite }) => campsite);
+      .map(({ campsite }) => {
+        const days = extractForecastDays(weatherMap.get(campsite.id) ?? null, rankStartDate, rankEndDate);
+        return { ...campsite, weather: days.length > 0 ? days : null };
+      });
 
     return Response.json({ campsites: ranked, parsedIntent });
   } catch (e) {

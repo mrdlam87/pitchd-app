@@ -720,6 +720,14 @@ export default function MapView() {
         throw new Error(data.error ?? "Search failed");
       }
       const data = (await res.json()) as Pick<AISearchPayload, "campsites" | "parsedIntent">;
+      // Pre-populate client weather cache from search response weather so
+      // loadWeatherForViewport finds all campsites already cached and skips
+      // the extra round-trip to /api/weather/batch.
+      for (const c of data.campsites) {
+        if (c.weather != null) {
+          weatherCacheRef.current.set(c.id, c.weather);
+        }
+      }
       setCampsites(data.campsites);
       prevCampsitesLengthRef.current = data.campsites.length;
       setMapQuery("");
