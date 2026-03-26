@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { CORAL, CORAL_LIGHT, FOREST_GREEN, TEXT, SURFACE, BORDER, TEXT_MUTED } from "@/lib/tokens";
 
 export type FilterState = {
@@ -117,14 +117,18 @@ export default function FilterPanel({
     return isNaN(d.getTime()) ? null : d;
   });
 
-  // Build the 7-day strip starting from today
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const dateStrip = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    return d;
-  });
+  // Build the 7-day strip starting from today — memoised so it isn't rebuilt on
+  // every re-render triggered by date-pick state changes.
+  const { today, dateStrip } = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dateStrip = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      return d;
+    });
+    return { today, dateStrip };
+  }, []);
 
   function pickDate(d: Date) {
     if (!d0 || (d0 && d1)) {

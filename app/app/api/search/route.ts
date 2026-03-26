@@ -220,16 +220,18 @@ export async function POST(req: Request): Promise<Response> {
     // Attach the filtered WeatherDay[] to each campsite so the client can render
     // weather badges immediately — no extra round-trip to /api/weather/batch needed.
     const ranked = candidates
-      .map((c) => ({
-        campsite: c,
-        score: combinedScore(c.distanceKm, radiusKm, weatherMap.get(c.id) ?? null, rankStartDate, rankEndDate),
-      }))
+      .map((c) => {
+        const forecast = weatherMap.get(c.id) ?? null;
+        const days = extractForecastDays(forecast, rankStartDate, rankEndDate);
+        return {
+          campsite: c,
+          score: combinedScore(c.distanceKm, radiusKm, forecast, rankStartDate, rankEndDate),
+          days,
+        };
+      })
       .sort((a, b) => b.score - a.score)
       .slice(0, RESULT_LIMIT)
-      .map(({ campsite }) => {
-        const days = extractForecastDays(weatherMap.get(campsite.id) ?? null, rankStartDate, rankEndDate);
-        return { ...campsite, weather: days.length > 0 ? days : null };
-      });
+      .map(({ campsite, days }) => ({ ...campsite, weather: days.length > 0 ? days : null }));
 
     return Response.json({ campsites: ranked, parsedIntent });
   } catch (e) {

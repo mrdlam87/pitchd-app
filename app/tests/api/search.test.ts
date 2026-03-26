@@ -601,7 +601,7 @@ describe("POST /api/search", () => {
   }
 
   const GREAT_FORECAST = makeForecast(0, 0);      // clear sky, no rain → score 100
-  const TERRIBLE_FORECAST = makeForecast(95, 20); // thunderstorm + heavy rain → score 64
+  const TERRIBLE_FORECAST = makeForecast(95, 20); // thunderstorm + heavy rain
 
   it("ranks a farther campsite with great weather above a closer one with terrible weather", async () => {
     const query = "weather ranking test remote area";
@@ -698,7 +698,6 @@ describe("POST /api/search", () => {
     const today = new Date().toISOString().split("T")[0];
     const tomorrow = new Date(Date.now() + 86_400_000).toISOString().split("T")[0];
 
-    let capturedDates: { startDate: string | null; endDate: string | null } | null = null;
     mockFetchWeather.mockImplementationOnce(
       async (locations: { id: string }[]) =>
         new Map(locations.map((l) => [l.id, GREAT_FORECAST])),
@@ -707,7 +706,7 @@ describe("POST /api/search", () => {
     // the campsite should appear. We can't easily spy on the internal date param,
     // but we verify the end-to-end result returns the campsite (i.e. it didn't crash
     // on the future parsedIntent date override).
-    capturedDates = { startDate: today, endDate: tomorrow };
+    const capturedDates = { startDate: today, endDate: tomorrow };
 
     const res = await POST(makeRequest({
       query,

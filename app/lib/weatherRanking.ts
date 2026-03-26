@@ -7,8 +7,8 @@ import { weatherScore } from "@/lib/weatherScore";
 import type { WeatherDay } from "@/types/map";
 import type { Prisma } from "@/lib/generated/prisma/client";
 
-// Raw JSON value from the DB or Open-Meteo — treated as opaque by the scoring layer.
-type ForecastJson = Prisma.JsonValue | Prisma.InputJsonValue | null;
+// Raw JSON value read from the DB or Open-Meteo — treated as opaque by the scoring layer.
+type ForecastJson = Prisma.JsonValue | null;
 
 const OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast";
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -135,7 +135,7 @@ export function combinedScore(
 
 type Location = { id: string; lat: number; lng: number };
 
-async function fetchOneOpenMeteo(lat: number, lng: number): Promise<Prisma.InputJsonValue | null> {
+async function fetchOneOpenMeteo(lat: number, lng: number): Promise<Prisma.JsonValue | null> {
   const url = new URL(OPEN_METEO_URL);
   url.searchParams.set("latitude", String(lat));
   url.searchParams.set("longitude", String(lng));
@@ -154,7 +154,7 @@ async function fetchOneOpenMeteo(lat: number, lng: number): Promise<Prisma.Input
       console.error("[weatherRanking] Open-Meteo error", res.status, lat, lng);
       return null;
     }
-    return (await res.json()) as Prisma.InputJsonValue;
+    return (await res.json()) as Prisma.JsonValue;
   } catch (err) {
     console.error("[weatherRanking] Open-Meteo fetch failed", lat, lng, err);
     return null;
@@ -263,7 +263,11 @@ export async function fetchWeatherForCandidates(
 
   // Race: if the fetch step finishes first, great. If the timeout fires,
   // we return whatever has been populated in resultMap so far.
+  // fetchTask may continue running after we return — any remaining resultMap.set()
+  // calls are harmless (caller already has a snapshot copy), and the Prisma upserts
+  // are intentional fire-and-forget cache warming for subsequent requests.
   await Promise.race([fetchTask, timeoutPromise]);
 
-  return resultMap;
+  // Return a snapshot so background fetchTask mutations don't affect the caller.
+  return new Map(resultMap);
 }

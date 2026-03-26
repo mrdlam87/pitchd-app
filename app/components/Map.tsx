@@ -438,10 +438,10 @@ export default function MapView() {
               : c
           );
           // When "Good weather" chip is active, only show campsites we have weather
-          // data for — sites with no data (weather === undefined) can't be confirmed
-          // as good-weather destinations, so they're excluded from the list.
+          // data for — sites with no data (weather === null or undefined) can't be
+          // confirmed as good-weather destinations, so they're excluded from the list.
           return activeChipRef.current === "weather"
-            ? updated.filter((c) => c.weather !== undefined)
+            ? updated.filter((c) => c.weather != null)
             : updated;
         });
       });
@@ -744,13 +744,14 @@ export default function MapView() {
         // because the AI doesn't infer POI types.
         // Replace activities and dates from AI intent — new query redefines intent.
         // pois are preserved (explicit user choices, not AI-inferred).
-        // Dates: prefer body-supplied dates (user explicitly set in filter panel) if they
-        // were passed to the search; otherwise take AI-inferred dates from parsedIntent.
+        // Dates: always take AI-inferred dates from parsedIntent for a new search so
+        // that e.g. "camping next weekend" isn't silently overridden by dates the user
+        // set in the filter panel during a previous search session.
         const aiFilters: FilterState = {
           ...activeFiltersRef.current,
           activities: data.parsedIntent.amenities,
-          startDate: activeFiltersRef.current.startDate ?? data.parsedIntent.startDate,
-          endDate: activeFiltersRef.current.endDate ?? data.parsedIntent.endDate,
+          startDate: data.parsedIntent.startDate,
+          endDate: data.parsedIntent.endDate,
         };
         setActiveFilters(aiFilters);
         activeFiltersRef.current = aiFilters;
