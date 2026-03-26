@@ -154,7 +154,7 @@ describe("combinedScore", () => {
     expect(score).toBe(80);
   });
 
-  it("returns 100 for radiusKm = 0 regardless of distance", () => {
+  it("returns 80 for radiusKm = 0 regardless of distance (proximityScore=100, neutral weather=50)", () => {
     // proximityScore always 100 when radiusKm = 0; neutral weather → 0.6*100 + 0.4*50 = 80
     expect(combinedScore(999, 0, null, null, null)).toBe(80);
   });

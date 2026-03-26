@@ -71,6 +71,7 @@ async function fetchCampsites(bounds: Bounds, amenities: string[] = []): Promise
 // first MAX_FORECAST_DAYS (4) days — intentionally wider than the server-side
 // extractForecastDays default (today+tomorrow) because browse-mode cards show
 // more days than the 2-day ranking window needs.
+// See also: extractForecastDays in app/lib/weatherRanking.ts (server-side counterpart).
 // Returns null if the response shape is unexpected; gracefully handles absent
 // precipitation_probability_max (old cache entries) by setting null.
 const MAX_FORECAST_DAYS = 4;

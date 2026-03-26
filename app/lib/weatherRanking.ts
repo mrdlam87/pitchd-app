@@ -40,6 +40,7 @@ const NEUTRAL_WEATHER_SCORE = 50;
  * 2-day window used for ranking when no trip dates are known. This intentionally
  * differs from the client-side extractWeatherForecast (Map.tsx) which defaults
  * to MAX_FORECAST_DAYS (4) for browse-mode card display.
+ * See also: extractWeatherForecast in app/components/Map.tsx (client-side counterpart).
  * Returns an empty array if the shape is unexpected.
  */
 export function extractForecastDays(
@@ -63,11 +64,16 @@ export function extractForecastDays(
     ? (d.precipitation_probability_max as unknown[])
     : null;
 
-  // Default window: today + tomorrow (matching half-drawer card display)
-  const today = new Date().toISOString().split("T")[0];
-  const tomorrow = new Date(Date.now() + 86_400_000).toISOString().split("T")[0];
-  const from = startDate ?? today;
-  const to = endDate ?? tomorrow;
+  // Default window: today + tomorrow in Australian local time.
+  // toISOString() returns UTC — for Australian users (UTC+8→+11) that resolves
+  // to yesterday for the first 8–11 hours of their day. Using Intl.DateTimeFormat
+  // with the app's primary timezone gives the correct local date instead.
+  const aestDate = (offsetDays = 0) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Sydney" }).format(
+      new Date(Date.now() + offsetDays * 86_400_000),
+    );
+  const from = startDate ?? aestDate(0);
+  const to = endDate ?? aestDate(1);
 
   const days: WeatherDay[] = [];
   for (let i = 0; i < (d.time as unknown[]).length; i++) {
