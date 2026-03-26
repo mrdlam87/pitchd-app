@@ -119,15 +119,14 @@ export default function FilterPanel({
 
   // Build the 7-day strip starting from today — memoised so it isn't rebuilt on
   // every re-render triggered by date-pick state changes.
-  const { today, dateStrip } = useMemo(() => {
+  const dateStrip = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const dateStrip = Array.from({ length: 7 }, (_, i) => {
+    return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(today);
       d.setDate(today.getDate() + i);
       return d;
     });
-    return { today, dateStrip };
   }, []);
 
   function pickDate(d: Date) {
@@ -280,6 +279,16 @@ export default function FilterPanel({
           <span className={sectionLabel} style={{ color: TEXT_MUTED }}>
             Dates
           </span>
+          {/* When AI infers dates beyond the 7-day strip, no chip is highlighted.
+              Show the active range as a text banner so it isn't invisible. */}
+          {d0 !== null && d0.getTime() > dateStrip[dateStrip.length - 1].getTime() && (
+            <p
+              className="text-[11px] mb-2 px-2 py-1.5 rounded-lg"
+              style={{ color: CORAL, background: "rgba(232,103,74,0.08)", border: `1px solid rgba(232,103,74,0.2)` }}
+            >
+              {rangeLabel()} — tap below to change
+            </p>
+          )}
           {/* 7-day grid */}
           <div className="grid grid-cols-7 gap-1.5 mb-2">
             {dateStrip.map((d) => {

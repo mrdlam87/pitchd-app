@@ -95,10 +95,15 @@ function extractWeatherForecast(
     const dateStr = d.time[i];
     if (typeof dateStr !== "string") continue;
 
-    // Date range filter: when dates are supplied, skip days outside the window.
-    // Without dates, cap at MAX_FORECAST_DAYS (browse mode default).
+    // Date range filter:
+    // - Full range supplied: show only days within [startDate, endDate].
+    // - startDate only (partial range): show MAX_FORECAST_DAYS days from startDate.
+    // - No dates (browse mode): show first MAX_FORECAST_DAYS days of the forecast.
     if (startDate && endDate) {
       if (dateStr < startDate || dateStr > endDate) continue;
+    } else if (startDate) {
+      if (dateStr < startDate) continue;
+      if (days.length >= MAX_FORECAST_DAYS) break;
     } else if (days.length >= MAX_FORECAST_DAYS) {
       break;
     }

@@ -144,7 +144,7 @@ async function fetchOneOpenMeteo(lat: number, lng: number): Promise<Prisma.JsonV
     "temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,weathercode",
   );
   url.searchParams.set("timezone", "auto");
-  url.searchParams.set("forecast_days", "7");
+  url.searchParams.set("forecast_days", "16");
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);

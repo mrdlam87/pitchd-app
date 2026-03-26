@@ -719,6 +719,8 @@ describe("POST /api/search", () => {
     const body = await res.json();
     const found = body.campsites.find((c: { id: string }) => c.id === campsite.id);
     expect(found).toBeDefined();
+    // body dates were used for scoring — great forecast should produce non-null weather
+    expect(found.weather).not.toBeNull();
     // parsedIntent still reflects AI-parsed dates (not overridden in response)
     expect(body.parsedIntent.startDate).toBe("2099-01-01");
   });
