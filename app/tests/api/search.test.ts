@@ -584,10 +584,17 @@ describe("POST /api/search", () => {
 
   // --- Weather-aware ranking ---
 
+  // Use AEST dates to match extractForecastDays' Intl.DateTimeFormat default window.
+  // toISOString() returns UTC and diverges from AEST for the first 8–11 h of each day.
+  const aestDate = (offsetDays = 0) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Sydney" }).format(
+      new Date(Date.now() + offsetDays * 86_400_000),
+    );
+
   // Forecast helpers — two days matching today + tomorrow (the default window)
   function makeForecast(weatherCode: number, precipSum: number) {
-    const today = new Date().toISOString().split("T")[0];
-    const tomorrow = new Date(Date.now() + 86_400_000).toISOString().split("T")[0];
+    const today = aestDate(0);
+    const tomorrow = aestDate(1);
     return {
       daily: {
         time: [today, tomorrow],
@@ -694,9 +701,9 @@ describe("POST /api/search", () => {
     const BASE_LNG = 141.47;
     const campsite = await seedCampsite({ lat: -32.00, lng: BASE_LNG });
 
-    // Body supplies today + tomorrow — forecast days WILL match
-    const today = new Date().toISOString().split("T")[0];
-    const tomorrow = new Date(Date.now() + 86_400_000).toISOString().split("T")[0];
+    // Body supplies today + tomorrow in AEST — forecast days WILL match
+    const today = aestDate(0);
+    const tomorrow = aestDate(1);
 
     mockFetchWeather.mockImplementationOnce(
       async (locations: { id: string }[]) =>

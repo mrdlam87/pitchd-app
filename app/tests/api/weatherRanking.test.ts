@@ -3,9 +3,16 @@ import { extractForecastDays, proximityScore, combinedScore } from "@/lib/weathe
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const today = new Date().toISOString().split("T")[0];
-const tomorrow = new Date(Date.now() + 86_400_000).toISOString().split("T")[0];
-const yesterday = new Date(Date.now() - 86_400_000).toISOString().split("T")[0];
+// Use AEST dates to match extractForecastDays' Intl.DateTimeFormat default window.
+// toISOString() returns UTC, which diverges from AEST (UTC+8→+11) for the first
+// 8–11 hours of each day — causing the default-window tests to fail in CI.
+const aestDate = (offsetDays = 0) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Sydney" }).format(
+    new Date(Date.now() + offsetDays * 86_400_000),
+  );
+const today = aestDate(0);
+const tomorrow = aestDate(1);
+const yesterday = aestDate(-1);
 
 /** Builds a minimal valid Open-Meteo daily response for a single date. */
 function makeSingleDayForecast(
