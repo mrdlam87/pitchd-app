@@ -275,6 +275,11 @@ export default function MapView() {
   const [activeChip, setActiveChip] = useState<string | null>(
     initialSearch?.kind === "ai" ? (initialSearch.chipKey ?? "pitchd") : null
   );
+  // Ref mirrors activeChip so stable useCallback closures (e.g. loadWeatherForViewport)
+  // can read the current chip key without needing it in their dependency array.
+  const activeChipRef = useRef<string | null>(
+    initialSearch?.kind === "ai" ? (initialSearch.chipKey ?? "pitchd") : null
+  );
   // Query string shown as context below the map search input (AI searches only)
   const [searchContextQuery, setSearchContextQuery] = useState<string | null>(
     initialSearch?.kind === "ai" ? (initialSearch.query ?? null) : null
@@ -426,13 +431,19 @@ export default function MapView() {
             weatherCacheRef.current.set(c.id, c.weather);
           }
         }
-        setCampsites((prev) =>
-          prev.map((c) =>
+        setCampsites((prev) => {
+          const updated = prev.map((c) =>
             weatherCacheRef.current.has(c.id)
               ? { ...c, weather: weatherCacheRef.current.get(c.id) ?? null }
               : c
-          )
-        );
+          );
+          // When "Good weather" chip is active, only show campsites we have weather
+          // data for — sites with no data (weather === undefined) can't be confirmed
+          // as good-weather destinations, so they're excluded from the list.
+          return activeChipRef.current === "weather"
+            ? updated.filter((c) => c.weather !== undefined)
+            : updated;
+        });
       });
     },
     []
@@ -662,6 +673,7 @@ export default function MapView() {
       searchModeRef.current = false;
       suppressGeoFlyRef.current = false;
       setActiveChip(null);
+      activeChipRef.current = null;
       setSearchContextQuery(null);
       setAiSyncedActivities([]);
       setShowFilters(false);
@@ -679,6 +691,12 @@ export default function MapView() {
     if (!q.trim() || mapSearchLoading) return;
     setMapSearchLoading(true);
     setMapSearchError(null);
+    // Highlight the chip immediately so it reflects the pending search state.
+    // Reverted to null in the catch block (error) or the no-results branch.
+    if (chipKey !== null) {
+      setActiveChip(chipKey);
+      activeChipRef.current = chipKey;
+    }
     // Use the current map centre as the search origin so chip searches stay in the
     // area you're viewing — not the user's GPS location which may be far away.
     const mapCenter = mapRef.current?.getMap().getCenter();
@@ -711,6 +729,7 @@ export default function MapView() {
         drawerStateRef.current = "half";
         searchModeRef.current = true;
         setActiveChip(chipKey ?? "pitchd");
+        activeChipRef.current = chipKey ?? "pitchd";
         setAiSyncedActivities(data.parsedIntent.amenities);
         // Intentionally replace activities (not merge) — the new query redefines
         // intent and any prior activity selection is stale. pois are preserved
@@ -741,11 +760,14 @@ export default function MapView() {
         searchModeRef.current = false;
         suppressGeoFlyRef.current = false;
         setActiveChip(null);
+        activeChipRef.current = null;
         setSearchContextQuery(null);
       }
     } catch (e) {
       console.error("[MapSearch]", e);
       suppressGeoFlyRef.current = false;
+      setActiveChip(null);
+      activeChipRef.current = null;
       setMapSearchError(e instanceof Error ? e.message : "Search failed. Please try again.");
     } finally {
       setMapSearchLoading(false);
@@ -756,6 +778,7 @@ export default function MapView() {
     searchModeRef.current = false;
     suppressGeoFlyRef.current = false;
     setActiveChip(null);
+    activeChipRef.current = null;
     setSearchContextQuery(null);
     setMapSearchError(null);
     setAiSyncedActivities([]);
@@ -799,6 +822,7 @@ export default function MapView() {
       setSearchContextQuery(null);
       setMapSearchError(null);
       setActiveChip(null);
+      activeChipRef.current = null;
       setAiSyncedActivities([]);
       const next = baseActivities.includes(filterKey)
         ? baseActivities.filter((a: string) => a !== filterKey)
