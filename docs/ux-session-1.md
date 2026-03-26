@@ -173,6 +173,11 @@
 - These will need real location photography or location-specific illustrations in production — placeholder illustrations used in Figma
 - AI weather summary text appears below amenity tags in full view ("Clear skies and warm sunshine — perfect camping weather all weekend") — confirms the full drawer is the right place for AI-generated copy
 
+### Weather signal (updated Mar 2026)
+- Weather day columns (strip + day cells) are the card-level weather signal
+- A separate "Great/Good/Poor" badge pill was built then removed as redundant with the day columns
+- Planned for M7: colour-code map pins by weather score (great/good/poor) for spatial weather awareness at a glance — gives Matt instant signal without opening a card
+
 ### Filter panel
 - Activities and Amenities are separated into two distinct sections — cleaner than prototype
 - Active filter shown with terracotta/coral outline and checkmark — clearly communicates AI sync state
@@ -191,7 +196,7 @@
 
 | Topic | Notes |
 |---|---|
-| Weather fetching in browse mode | Viewport-based fetch, zoom-level granularity — impacts data architecture |
+| Weather fetching in browse mode | ✅ Implemented — viewport-based fetch, re-fetches on pan (Mar 2026). |
 | Area-level weather overlays | Google Maps "local vibe" style — zoomed out = region weather, zoomed in = site weather |
 | Pin clustering solution | Merge at low zoom, expand at high zoom — post-MVP |
 | Pitchd pick personalisation | Learned preferences, usage history — post-MVP |

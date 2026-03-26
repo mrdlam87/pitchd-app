@@ -10,7 +10,7 @@
 **Domain:** pitchd.app (to confirm)
 **GitHub:** github.com/mrdlam87/pitchd-app
 **Type:** Full-stack Web App
-**Stage:** Pre-development — Design & Architecture phase
+**Stage:** Phase 5 — M7 in progress. M1–M6 complete. App live at https://pitchd-app.vercel.app.
 **Target Market:** Australia (primary), with potential to expand
 
 ### Vision
@@ -155,7 +155,7 @@ Pitchd solves this with a single natural language query. Describe your trip — 
 - [x] **Phase 2** — Define user personas & problem statement ✅
 - [x] **Phase 3** — Prototyping & design ✅
 - [x] **Phase 4** — Technical planning (architecture, data models, milestones) ✅
-- [ ] **Phase 5** — Build & ship (iterative development) — M1 complete ✅, M2 in progress
+- [x] **Phase 5** — Build & ship — M1–M6 complete ✅, M7 in progress
 
 ---
 
@@ -265,20 +265,27 @@ Full technical detail lives in `docs/technical/technical-design.md`.
 | Mar 15, 2026 | Phase 3 | UI design complete (Figma via Claude Code). UX Session 1 completed — core search flow, map interactions, pin behaviour, drawer interactions, filters, predefined searches and Pitchd pick defined. Full decisions in ux-session-1.md. |
 | Mar 16, 2026 | Phase 5 — M1 | M1 complete. Scaffolded Next.js app (#13), configured Prisma + Supabase (#14), set up Auth.js + Google OAuth (#15), implemented protected routes with beta/admin access control (#16), deployed to Vercel with all env vars configured (#17). App live at pitchd-app.vercel.app. |
 | Mar 18, 2026 | Phase 5 — M2 | M2 started. Wrote Prisma schema for all data models (#18). Seeded AmenityType lookup table with 8 records — 4 activities (dog_friendly, fishing, hiking, swimming) and 4 POIs (dump_point, water_fill, laundromat, toilets) (#19). Fixed CI claude-code-review workflow — now posts as claude[bot] in the PR Reviews section using the Claude GitHub App. Added .gitattributes for consistent line endings. |
+| Mar 19, 2026 | Phase 5 — M3 | M3 complete. Rendered campsite pins from DB on Mapbox map, user device location, viewport-based fetching, navigate button (Google Maps URL). |
+| Mar 19, 2026 | Phase 5 — M4 | M4 complete. Filter panel wired to DB, AmenityPOI pins on map, bottom drawer with campsite cards, amenity quick chips. |
+| Mar 20, 2026 | Phase 5 — M5 | M5 complete. POST /api/search, NL query parsing with Claude Haiku, SearchCache, home screen with NL search input. |
+| Mar 23–26, 2026 | Phase 5 — M6 | M6 complete. GET /api/weather, weather fetching for results, weather day columns on cards, viewport-based weather fetching, weather-aware ranking. Weather badge pill built then removed — cards use day columns; coloured pins by weather score planned for M7. |
+| Mar 25–26, 2026 | Phase 5 — M7 | M7 started. Full campsite card design and drawer improvements. DB connection pool fix (Supabase exhaustion). In progress: loading states, empty states, mobile QA, beta invites. |
 
 ---
 
 ## 10. Current Status & Next Steps
 
-**Current Phase:** Phase 5 — Build & ship (M2 in progress)
+**Current Phase:** Phase 5 — M7 (Polish & beta launch)
 
 **Completed:**
-- M1 fully complete — app boots, Google sign-in works, protected routes active, deployed to Vercel
-- M2 started — Prisma schema written (#18), AmenityType lookup table seeded (#19)
+- M1–M6 fully complete — app has map, browse mode, filters, AI search, and weather-aware ranking live
 - CI: claude-code-review workflow working — posts as `claude[bot]` reviewer via Claude GitHub App
 
 **Next Actions:**
-- M2 — Build OSM ingestion script (Overpass API → Postgres) to seed campsite data
+- Loading states, empty states, error handling
+- Coloured map pins by weather score
+- Mobile QA
+- Beta user invites
 
 ---
 

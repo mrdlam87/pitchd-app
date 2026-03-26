@@ -36,7 +36,7 @@ Browser
 | Weather | Open-Meteo | Free, no API key, good AU coverage |
 | Database | PostgreSQL + Prisma ORM | Battle-tested, type-safe, approachable |
 | Hosted DB | Supabase | Managed Postgres, generous free tier |
-| Map | Mapbox (tentative) | Polished tiles, customisable styles — confirm at Phase 5 start |
+| Map | Mapbox | Polished tiles, customisable styles, confirmed and in use |
 | Deployment | Vercel | Native Next.js integration, preview deployments |
 | Data Sources | OpenStreetMap, data.gov.au, state park APIs | Free, open AU camping data |
 
@@ -221,7 +221,7 @@ Both caches use `expiresAt` on the DB record — expired records are treated as 
 
 ---
 
-## 9. API Routes
+## 10. API Routes
 
 All routes are protected — user must be authenticated.
 
@@ -257,7 +257,7 @@ Handled automatically by Auth.js — no custom implementation needed.
 
 ---
 
-## 10. Development Milestones
+## 11. Development Milestones
 
 Each milestone produces a usable, evolving product. AI search is introduced at M5 — early enough to test the core experience before weather is layered on.
 
@@ -316,12 +316,12 @@ Each milestone produces a usable, evolving product. AI search is introduced at M
 
 ### M6 — Weather integration
 - Open-Meteo integration
-- Weather badges on campsite cards
+- Weather day columns on campsite cards (strip + day cells)
 - WeatherCache
 - Weather-aware result ranking
 - Viewport-based weather fetching
 
-**End state:** Weather-aware results — full MVP feature set complete.
+**End state:** Weather-aware results — full MVP feature set complete. Note: weather badge pill was built then removed; cards use weather day columns instead. Coloured map pins by weather score deferred to M7.
 
 ---
 

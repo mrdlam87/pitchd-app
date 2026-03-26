@@ -9,14 +9,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Core differentiator:** Natural language search with live weather-awareness.
 **Target market:** Australian campers (primary), architecture should allow future expansion.
-**Current stage:** Phase 5 — M3 in progress. M1 (foundation) and M2 (campsite pipeline, DB seeded) complete. App live at https://pitchd-app.vercel.app.
+**Current stage:** Phase 5 — M7 in progress (polish & beta launch). M1–M6 complete. App live at https://pitchd-app.vercel.app.
 **GitHub:** github.com/mrdlam87/pitchd-app
 
 ---
 
 ## Key docs
 - `docs/project-context.md` — project overview, personas, MVP features, phases, session log
-- `docs/technical/technical-design.md` — architecture, data models, API routes, milestones
+- `docs/technical/system-architecture.md` — **how the system is actually built**: components, API routes, data flows, gotchas
+- `docs/technical/technical-design.md` — original architecture decisions and milestone definitions
 - `docs/ux-session-1.md` — UX decisions from prototype phase
 
 ---
@@ -88,6 +89,8 @@ PitchdLight          ← root, owns all state (screen, results, searchState, etc
 - Environment variables in `.env.local`
 
 ### UI conventions
+- **Weather signal = coloured map pins** — pins are colour-coded by weather score; no badge on cards (cards already have weather day columns). Do not add weather badges to campsite cards.
+- Design tokens are centralised in `app/lib/tokens.ts` — import from there, don't hardcode hex values
 - **Always reference the prototype before writing UI code** — check `prototypes/pitchd-light-v2.jsx` for colours, spacing, typography, component behaviour, and design patterns
 - **Figma is the source of truth for visual design** — use the Figma MCP (`get_design_context`, `get_screenshot`) when a Figma URL is available
 - **Design tokens from the prototype** (use these, don't invent new values):
@@ -130,6 +133,16 @@ PitchdLight          ← root, owns all state (screen, results, searchState, etc
 | M5 | AI search — Claude integration, Pitchd pick |
 | M6 | Weather — Open-Meteo, badges, weather-aware ranking |
 | M7 | Polish & beta launch |
+
+---
+
+## Claude Code agents
+
+Two custom agents live in `.claude/agents/` — invoke by asking Claude directly:
+- `senior-engineer` — architecture decisions, TypeScript/Next.js debugging, performance optimisation
+- `ux-designer` — UI/UX design decisions, interaction patterns, design critique; draws on Google Maps and AllTrails patterns
+
+Agent memory (accumulated across sessions) lives in `.claude/agent-memory/<agent-name>/MEMORY.md`.
 
 ---
 
