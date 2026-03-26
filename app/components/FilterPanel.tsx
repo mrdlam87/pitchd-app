@@ -6,6 +6,8 @@ import { CORAL, CORAL_LIGHT, FOREST_GREEN, TEXT, SURFACE, BORDER, TEXT_MUTED } f
 export type FilterState = {
   activities: string[];
   pois: string[];
+  startDate: string | null;
+  endDate: string | null;
 };
 
 type FilterPanelProps = {
@@ -29,6 +31,14 @@ const POI_OPTIONS = [
   { key: "laundromat", label: "Laundromat", emoji: "🧺" },
   { key: "toilets", label: "Toilets", emoji: "🚻" },
 ];
+
+const SHORT_DAYS = ["S", "M", "T", "W", "T", "F", "S"];
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const FULL_DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+function isoDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 function ToggleChip({
   item,
@@ -92,10 +102,55 @@ export default function FilterPanel({
   onApply,
   onClose,
 }: FilterPanelProps) {
-  const [activities, setActivities] = useState<string[]>(
-    initialFilters.activities,
-  );
+  const [activities, setActivities] = useState<string[]>(initialFilters.activities);
   const [pois, setPois] = useState<string[]>(initialFilters.pois);
+
+  // Date state: d0 = start, d1 = end (both as Date objects or null for easy comparison)
+  const [d0, setD0] = useState<Date | null>(() => {
+    if (!initialFilters.startDate) return null;
+    const d = new Date(initialFilters.startDate + "T00:00:00");
+    return isNaN(d.getTime()) ? null : d;
+  });
+  const [d1, setD1] = useState<Date | null>(() => {
+    if (!initialFilters.endDate) return null;
+    const d = new Date(initialFilters.endDate + "T00:00:00");
+    return isNaN(d.getTime()) ? null : d;
+  });
+
+  // Build the 7-day strip starting from today
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dateStrip = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    return d;
+  });
+
+  function pickDate(d: Date) {
+    if (!d0 || (d0 && d1)) {
+      // No start selected, or range already complete — start fresh
+      setD0(d);
+      setD1(null);
+    } else if (d.getTime() === d0.getTime()) {
+      // Tapping the start again clears it
+      setD0(null);
+    } else if (d < d0) {
+      // Tapped before start — swap
+      setD1(d0);
+      setD0(d);
+    } else {
+      // Tapped after start — set end
+      setD1(d);
+    }
+  }
+
+  function rangeLabel(): string {
+    if (!d0) return "Select start date";
+    const s = `${FULL_DAYS[d0.getDay()]} ${d0.getDate()} ${MONTHS[d0.getMonth()]}`;
+    if (!d1) return `${s} — select end date`;
+    const nights = Math.round((d1.getTime() - d0.getTime()) / 86_400_000);
+    return `${s} → ${FULL_DAYS[d1.getDay()]} ${d1.getDate()} ${MONTHS[d1.getMonth()]} · ${nights} ${nights === 1 ? "night" : "nights"}`;
+  }
 
   function toggleActivity(key: string) {
     setActivities((prev) =>
@@ -109,12 +164,24 @@ export default function FilterPanel({
     );
   }
 
-  function handleApply() {
-    onApply({ activities, pois });
+  function handleClearAll() {
+    setActivities([]);
+    setPois([]);
+    setD0(null);
+    setD1(null);
   }
 
-  const sectionLabel =
-    "text-[10px] font-bold uppercase tracking-[1.8px] mb-2.5 block";
+  function handleApply() {
+    onApply({
+      activities,
+      pois,
+      startDate: d0 ? isoDate(d0) : null,
+      endDate: d1 ? isoDate(d1) : null,
+    });
+  }
+
+  const hasAnyFilter = activities.length > 0 || pois.length > 0 || d0 !== null;
+  const sectionLabel = "text-[10px] font-bold uppercase tracking-[1.8px] mb-2.5 block";
 
   return (
     <div
@@ -137,13 +204,10 @@ export default function FilterPanel({
           Filters
         </span>
         <div className="flex items-center gap-3">
-          {(activities.length > 0 || pois.length > 0) && (
+          {hasAnyFilter && (
             <button
               type="button"
-              onClick={() => {
-                setActivities([]);
-                setPois([]);
-              }}
+              onClick={handleClearAll}
               className="text-xs transition-opacity hover:opacity-70 active:opacity-50"
               style={{ color: CORAL, fontWeight: 600 }}
             >
@@ -205,6 +269,73 @@ export default function FilterPanel({
               These will appear as pins alongside campsites on the map.
             </p>
           )}
+        </div>
+
+        {/* Dates */}
+        <div className="mb-6">
+          <span className={sectionLabel} style={{ color: TEXT_MUTED }}>
+            Dates
+          </span>
+          {/* 7-day grid */}
+          <div className="grid grid-cols-7 gap-1.5 mb-2">
+            {dateStrip.map((d) => {
+              const isStart = d0 !== null && d.getTime() === d0.getTime();
+              const isEnd = d1 !== null && d.getTime() === d1.getTime();
+              const isSelected = isStart || isEnd;
+              const inRange = d0 !== null && d1 !== null && d > d0 && d < d1;
+
+              return (
+                <button
+                  key={d.getTime()}
+                  type="button"
+                  onClick={() => pickDate(d)}
+                  className="flex flex-col items-center py-2 rounded-[10px] transition-all duration-150 cursor-pointer"
+                  style={{
+                    border: `1.5px solid ${
+                      isSelected
+                        ? CORAL
+                        : inRange
+                          ? "rgba(232,103,74,0.3)"
+                          : BORDER
+                    }`,
+                    background: isSelected ? CORAL : inRange ? CORAL_LIGHT : "#fff",
+                    boxShadow: isSelected
+                      ? "0 2px 8px rgba(232,103,74,0.3)"
+                      : "0 1px 3px rgba(0,0,0,0.06)",
+                  }}
+                  aria-pressed={isSelected}
+                  aria-label={`${FULL_DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`}
+                >
+                  <span
+                    className="text-[8px] font-bold uppercase leading-none"
+                    style={{
+                      letterSpacing: "0.3px",
+                      color: isSelected
+                        ? "rgba(255,255,255,0.8)"
+                        : inRange
+                          ? CORAL
+                          : TEXT_MUTED,
+                    }}
+                  >
+                    {SHORT_DAYS[d.getDay()]}
+                  </span>
+                  <span
+                    className="text-[15px] font-bold leading-none mt-0.5"
+                    style={{ color: isSelected ? "#fff" : FOREST_GREEN }}
+                  >
+                    {d.getDate()}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {/* Range label */}
+          <p
+            className="text-[11px]"
+            style={{ color: d0 && d1 ? CORAL : TEXT_MUTED }}
+          >
+            {rangeLabel()}
+          </p>
         </div>
       </div>
 

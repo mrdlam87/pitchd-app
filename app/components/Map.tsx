@@ -197,7 +197,7 @@ function computeVisibleBounds(map: mapboxgl.Map, drawerHeightPx: number): Bounds
 }
 
 
-const EMPTY_FILTERS: FilterState = { activities: [], pois: [] };
+const EMPTY_FILTERS: FilterState = { activities: [], pois: [], startDate: null, endDate: null };
 
 
 // Fit the map to the bounding box of a set of campsites.
@@ -277,16 +277,16 @@ export default function MapView() {
   const [showFilters, setShowFilters] = useState(false);
   // Lazy initialiser runs once on mount — avoids recomputing the conditional on every render.
   const [activeFilters, setActiveFilters] = useState<FilterState>(() =>
-    initialSearch?.kind === "direct" ? initialSearch.filters :
-    initialSearch?.kind === "ai"     ? { activities: initialSearch.parsedIntent.amenities, pois: [] } :
+    initialSearch?.kind === "direct" ? { ...initialSearch.filters, startDate: null, endDate: null } :
+    initialSearch?.kind === "ai"     ? { activities: initialSearch.parsedIntent.amenities, pois: [], startDate: initialSearch.parsedIntent.startDate, endDate: initialSearch.parsedIntent.endDate } :
     EMPTY_FILTERS
   );
   // Ref mirrors state so loadCampsites always reads the latest filters without
   // needing activeFilters as a dependency (the callback is stable).
   // useRef has no lazy form — the ternary is cheap and the value is ignored after mount.
   const activeFiltersRef = useRef<FilterState>(
-    initialSearch?.kind === "direct" ? initialSearch.filters :
-    initialSearch?.kind === "ai"     ? { activities: initialSearch.parsedIntent.amenities, pois: [] } :
+    initialSearch?.kind === "direct" ? { ...initialSearch.filters, startDate: null, endDate: null } :
+    initialSearch?.kind === "ai"     ? { activities: initialSearch.parsedIntent.amenities, pois: [], startDate: initialSearch.parsedIntent.startDate, endDate: initialSearch.parsedIntent.endDate } :
     EMPTY_FILTERS
   );
   // Activities that Claude inferred from the last AI search — shown in FilterPanel as "Pitchd suggested".
@@ -664,7 +664,14 @@ export default function MapView() {
       const res = await fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: q.trim(), lat, lng }),
+        body: JSON.stringify({
+          query: q.trim(),
+          lat,
+          lng,
+          // Pass filter panel dates so manual date selection feeds into weather ranking
+          startDate: activeFiltersRef.current.startDate ?? undefined,
+          endDate: activeFiltersRef.current.endDate ?? undefined,
+        }),
       });
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };
@@ -684,7 +691,16 @@ export default function MapView() {
         // Intentionally replace activities (not merge) — the new query redefines
         // intent and any prior activity selection is stale. pois are preserved
         // because the AI doesn't infer POI types.
-        const aiFilters: FilterState = { ...activeFiltersRef.current, activities: data.parsedIntent.amenities };
+        // Replace activities and dates from AI intent — new query redefines intent.
+        // pois are preserved (explicit user choices, not AI-inferred).
+        // Dates: prefer body-supplied dates (user explicitly set in filter panel) if they
+        // were passed to the search; otherwise take AI-inferred dates from parsedIntent.
+        const aiFilters: FilterState = {
+          ...activeFiltersRef.current,
+          activities: data.parsedIntent.amenities,
+          startDate: activeFiltersRef.current.startDate ?? data.parsedIntent.startDate,
+          endDate: activeFiltersRef.current.endDate ?? data.parsedIntent.endDate,
+        };
         setActiveFilters(aiFilters);
         activeFiltersRef.current = aiFilters;
         setSearchContextQuery(q.trim());
@@ -719,10 +735,10 @@ export default function MapView() {
     setSearchContextQuery(null);
     setMapSearchError(null);
     setAiSyncedActivities([]);
-    // Reset AI-inferred activities so browse results aren't silently filtered
-    // after the user exits search mode. pois are preserved — they reflect
+    // Reset AI-inferred activities and dates so browse results aren't silently
+    // filtered after the user exits search mode. pois are preserved — they reflect
     // explicit user choices (amenity chips / filter panel) not AI inference.
-    const resetFilters: FilterState = { ...activeFiltersRef.current, activities: [] };
+    const resetFilters: FilterState = { ...activeFiltersRef.current, activities: [], startDate: null, endDate: null };
     setActiveFilters(resetFilters);
     activeFiltersRef.current = resetFilters;
     if (mapRef.current) {

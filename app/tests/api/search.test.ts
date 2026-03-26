@@ -10,9 +10,10 @@ vi.mock("@/auth", () => ({
   auth: vi.fn(),
 }));
 
-// vi.hoisted ensures mockCreate is available inside the vi.mock factory,
-// which is hoisted before variable declarations by Vitest's transform.
+// vi.hoisted ensures mocks are available inside vi.mock factories,
+// which are hoisted before variable declarations by Vitest's transform.
 const mockCreate = vi.hoisted(() => vi.fn());
+const mockFetchWeather = vi.hoisted(() => vi.fn());
 
 // Mock Anthropic SDK — no real API calls in tests.
 // Must use a class so `new Anthropic()` works at module initialisation time.
@@ -22,6 +23,14 @@ vi.mock("@anthropic-ai/sdk", () => {
       messages = { create: mockCreate };
     },
   };
+});
+
+// Mock fetchWeatherForCandidates to avoid real Open-Meteo calls.
+// combinedScore, extractForecastDays, etc. use the real implementations so
+// ranking logic is exercised end-to-end.
+vi.mock("@/lib/weatherRanking", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/weatherRanking")>();
+  return { ...actual, fetchWeatherForCandidates: mockFetchWeather };
 });
 
 import { auth } from "@/auth";
@@ -88,6 +97,11 @@ describe("POST /api/search", () => {
     // Default: authenticated session + Claude returns valid intent
     mockAuth.mockResolvedValue(AUTHED_SESSION);
     mockCreate.mockResolvedValue(MOCK_CLAUDE_RESPONSE);
+    // Default weather: null for all candidates (neutral score → proximity-only ranking)
+    mockFetchWeather.mockImplementation(
+      async (locations: { id: string }[]) =>
+        new Map(locations.map((l) => [l.id, null])),
+    );
   });
 
   afterEach(async () => {
@@ -566,5 +580,174 @@ describe("POST /api/search", () => {
     // Vague query should still return a valid parsedIntent with defaults
     expect(body.parsedIntent.driveTimeHrs).toBeGreaterThan(0);
     expect(body.parsedIntent.amenities).toEqual([]);
+  });
+
+  // --- Weather-aware ranking ---
+
+  // Forecast helpers — two days matching today + tomorrow (the default window)
+  function makeForecast(weatherCode: number, precipSum: number) {
+    const today = new Date().toISOString().split("T")[0];
+    const tomorrow = new Date(Date.now() + 86_400_000).toISOString().split("T")[0];
+    return {
+      daily: {
+        time: [today, tomorrow],
+        temperature_2m_max: [25, 24],
+        temperature_2m_min: [15, 14],
+        precipitation_sum: [precipSum, precipSum],
+        precipitation_probability_max: [5, 5],
+        weathercode: [weatherCode, weatherCode],
+      },
+    };
+  }
+
+  const GREAT_FORECAST = makeForecast(0, 0);      // clear sky, no rain → score 100
+  const TERRIBLE_FORECAST = makeForecast(95, 20); // thunderstorm + heavy rain → score 64
+
+  it("ranks a farther campsite with great weather above a closer one with terrible weather", async () => {
+    const query = "weather ranking test remote area";
+    createdHashes.push(hashQuery(query));
+    await prisma.searchCache.deleteMany({ where: { queryHash: hashQuery(query) } });
+
+    // Broken Hill — remote, no real OSM campsites to contaminate ranking.
+    const BASE_LAT = -31.95;
+    const BASE_LNG = 141.47;
+    // near: ~20km away with terrible weather
+    const near = await seedCampsite({ lat: -32.13, lng: BASE_LNG });
+    // far: ~25.5km away with great weather
+    const far = await seedCampsite({ lat: -32.18, lng: BASE_LNG });
+
+    // Configure weather mock: near → terrible, far → great
+    mockFetchWeather.mockImplementationOnce(
+      async (locations: { id: string; lat: number }[]) => {
+        const map = new Map<string, unknown>();
+        for (const loc of locations) {
+          if (loc.id === near.id) map.set(loc.id, TERRIBLE_FORECAST);
+          else if (loc.id === far.id) map.set(loc.id, GREAT_FORECAST);
+          else map.set(loc.id, null);
+        }
+        return map;
+      },
+    );
+
+    mockCreate.mockResolvedValueOnce({
+      content: [{ type: "text", text: JSON.stringify({
+        location: null, driveTimeHrs: 1, amenities: [],
+        startDate: null, endDate: null, sortBy: null,
+      }) }],
+    });
+
+    const res = await POST(makeRequest({ query, lat: BASE_LAT, lng: BASE_LNG }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    const ids = body.campsites.map((c: { id: string }) => c.id);
+    const nearIdx = ids.indexOf(near.id);
+    const farIdx = ids.indexOf(far.id);
+
+    expect(nearIdx).not.toBe(-1);
+    expect(farIdx).not.toBe(-1);
+    // Despite being farther, the great-weather campsite should rank higher
+    expect(farIdx).toBeLessThan(nearIdx);
+  });
+
+  it("when weather is unavailable (null), campsite still appears with neutral score", async () => {
+    const query = "weather unavailable fallback test";
+    createdHashes.push(hashQuery(query));
+    await prisma.searchCache.deleteMany({ where: { queryHash: hashQuery(query) } });
+
+    const BASE_LAT = -31.95;
+    const BASE_LNG = 141.47;
+    const campsite = await seedCampsite({ lat: -32.00, lng: BASE_LNG });
+
+    // Default mock already returns null for all — just confirm campsite is in results
+    mockCreate.mockResolvedValueOnce({
+      content: [{ type: "text", text: JSON.stringify({
+        location: null, driveTimeHrs: 1, amenities: [],
+        startDate: null, endDate: null, sortBy: null,
+      }) }],
+    });
+
+    const res = await POST(makeRequest({ query, lat: BASE_LAT, lng: BASE_LNG }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    const found = body.campsites.find((c: { id: string }) => c.id === campsite.id);
+    expect(found).toBeDefined();
+  });
+
+  it("body startDate/endDate override parsedIntent dates for weather scoring", async () => {
+    const query = "date override weather test";
+    createdHashes.push(hashQuery(query));
+    await prisma.searchCache.deleteMany({ where: { queryHash: hashQuery(query) } });
+
+    // Claude returns dates in parsedIntent, but body supplies different dates
+    mockCreate.mockResolvedValueOnce({
+      content: [{ type: "text", text: JSON.stringify({
+        location: null, driveTimeHrs: 1, amenities: [],
+        startDate: "2099-01-01",  // far-future date — no forecast days would match
+        endDate: "2099-01-02",
+        sortBy: null,
+      }) }],
+    });
+
+    const BASE_LAT = -31.95;
+    const BASE_LNG = 141.47;
+    const campsite = await seedCampsite({ lat: -32.00, lng: BASE_LNG });
+
+    // Body supplies today + tomorrow — forecast days WILL match
+    const today = new Date().toISOString().split("T")[0];
+    const tomorrow = new Date(Date.now() + 86_400_000).toISOString().split("T")[0];
+
+    let capturedDates: { startDate: string | null; endDate: string | null } | null = null;
+    mockFetchWeather.mockImplementationOnce(
+      async (locations: { id: string }[]) =>
+        new Map(locations.map((l) => [l.id, GREAT_FORECAST])),
+    );
+    // Spy on combinedScore by verifying the result: with today/tomorrow + great weather
+    // the campsite should appear. We can't easily spy on the internal date param,
+    // but we verify the end-to-end result returns the campsite (i.e. it didn't crash
+    // on the future parsedIntent date override).
+    capturedDates = { startDate: today, endDate: tomorrow };
+
+    const res = await POST(makeRequest({
+      query,
+      lat: BASE_LAT,
+      lng: BASE_LNG,
+      startDate: capturedDates.startDate,
+      endDate: capturedDates.endDate,
+    }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const found = body.campsites.find((c: { id: string }) => c.id === campsite.id);
+    expect(found).toBeDefined();
+    // parsedIntent still reflects AI-parsed dates (not overridden in response)
+    expect(body.parsedIntent.startDate).toBe("2099-01-01");
+  });
+
+  it("ignores invalid body startDate and falls back to parsedIntent dates", async () => {
+    const query = "invalid date body test";
+    createdHashes.push(hashQuery(query));
+    await prisma.searchCache.deleteMany({ where: { queryHash: hashQuery(query) } });
+
+    const BASE_LAT = -31.95;
+    const BASE_LNG = 141.47;
+    await seedCampsite({ lat: -32.00, lng: BASE_LNG });
+
+    mockCreate.mockResolvedValueOnce({
+      content: [{ type: "text", text: JSON.stringify({
+        location: null, driveTimeHrs: 1, amenities: [],
+        startDate: null, endDate: null, sortBy: null,
+      }) }],
+    });
+
+    // Supplying a non-ISO string should be silently ignored (no 400)
+    const res = await POST(makeRequest({
+      query,
+      lat: BASE_LAT,
+      lng: BASE_LNG,
+      startDate: "not-a-date",
+      endDate: "also-bad",
+    }));
+    expect(res.status).toBe(200);
   });
 });

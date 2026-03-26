@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { SyncStatus } from "@/lib/generated/prisma/enums";
 import {
   parseIntentWithClaude,
+  isValidIsoDate,
   MAX_DRIVE_TIME_HRS,
   KM_PER_HOUR,
   type ParsedIntent,
@@ -11,6 +12,7 @@ import {
 import { hashQuery, getCachedIntent, setCachedIntent } from "@/lib/searchCache";
 import { haversineKm } from "@/lib/distance";
 import { requireAuth } from "@/lib/apiAuth";
+import { fetchWeatherForCandidates, combinedScore } from "@/lib/weatherRanking";
 
 // Re-export for callers that import from the route rather than from the lib directly.
 // The route is the public API surface for search — keeping this here avoids breaking
@@ -58,11 +60,14 @@ async function geocodeLocation(location: string): Promise<{ lat: number; lng: nu
   }
 }
 
-// Number of campsites to return after proximity ranking
+// Number of campsites to return after final combined ranking
 const RESULT_LIMIT = 20;
 // Max rows fetched from DB before Haversine sort — guards against large bounding boxes
 // pulling thousands of rows into memory. Well above RESULT_LIMIT to preserve ranking quality.
 const DB_FETCH_LIMIT = 200;
+// Number of proximity candidates passed to weather enrichment. Larger than RESULT_LIMIT
+// so weather can promote great-weather sites that would otherwise just miss the cut.
+const WEATHER_CANDIDATES = 50;
 // MAX_DRIVE_TIME_HRS and KM_PER_HOUR imported from @/lib/parseIntent
 // hashQuery, getCachedIntent, setCachedIntent imported from @/lib/searchCache
 
@@ -77,7 +82,7 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { query, lat, lng } = body as Record<string, unknown>;
+  const { query, lat, lng, startDate: bodyStartDate, endDate: bodyEndDate } = body as Record<string, unknown>;
 
   if (!query || typeof query !== "string" || query.trim() === "") {
     return Response.json({ error: "query is required" }, { status: 400 });
@@ -183,15 +188,43 @@ export async function POST(req: Request): Promise<Response> {
       take: DB_FETCH_LIMIT,
     });
 
-    // Rank by proximity to the search centre (geocoded location if provided, else user GPS)
-    const ranked = campsites
+    // Body-supplied dates override the AI-inferred dates for weather scoring.
+    // This lets the filter panel pass explicit dates when the user selects them manually.
+    // Invalid or missing body dates fall back to parsedIntent dates (or today+tomorrow default).
+    const rankStartDate: string | null =
+      typeof bodyStartDate === "string" && isValidIsoDate(bodyStartDate)
+        ? bodyStartDate
+        : parsedIntent.startDate;
+    const rankEndDate: string | null =
+      typeof bodyEndDate === "string" && isValidIsoDate(bodyEndDate)
+        ? bodyEndDate
+        : parsedIntent.endDate;
+
+    // Step 1: Proximity-rank all DB results
+    const withDistance = campsites.map((c) => ({
+      ...c,
+      amenities: c.amenities.map((a) => a.amenityType),
+      distanceKm: haversineKm(searchLat, searchLng, c.lat, c.lng),
+    }));
+    withDistance.sort((a, b) => a.distanceKm - b.distanceKm);
+
+    // Step 2: Fetch weather for the top WEATHER_CANDIDATES proximity candidates.
+    // Using more than RESULT_LIMIT gives weather a chance to promote great-weather
+    // sites that would otherwise just miss the cut.
+    const candidates = withDistance.slice(0, WEATHER_CANDIDATES);
+    const weatherMap = await fetchWeatherForCandidates(
+      candidates.map((c) => ({ id: c.id, lat: c.lat, lng: c.lng })),
+    );
+
+    // Step 3: Re-rank by combined proximity + weather score, return top RESULT_LIMIT.
+    const ranked = candidates
       .map((c) => ({
-        ...c,
-        amenities: c.amenities.map((a) => a.amenityType),
-        distanceKm: haversineKm(searchLat, searchLng, c.lat, c.lng),
+        campsite: c,
+        score: combinedScore(c.distanceKm, radiusKm, weatherMap.get(c.id) ?? null, rankStartDate, rankEndDate),
       }))
-      .sort((a, b) => a.distanceKm - b.distanceKm)
-      .slice(0, RESULT_LIMIT);
+      .sort((a, b) => b.score - a.score)
+      .slice(0, RESULT_LIMIT)
+      .map(({ campsite }) => campsite);
 
     return Response.json({ campsites: ranked, parsedIntent });
   } catch (e) {
