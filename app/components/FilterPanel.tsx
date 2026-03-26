@@ -32,7 +32,7 @@ const POI_OPTIONS = [
   { key: "toilets", label: "Toilets", emoji: "🚻" },
 ];
 
-const SHORT_DAYS = ["S", "M", "T", "W", "T", "F", "S"];
+const SHORT_DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const FULL_DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
@@ -130,7 +130,7 @@ export default function FilterPanel({
   }, []);
 
   function pickDate(d: Date) {
-    if (!d0 || (d0 && d1)) {
+    if (!d0 || d1) {
       // No start selected, or range already complete — start fresh
       setD0(d);
       setD1(null);

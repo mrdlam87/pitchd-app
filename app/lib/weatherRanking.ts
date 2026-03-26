@@ -4,6 +4,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { weatherScore } from "@/lib/weatherScore";
+import { DAY_NAMES } from "@/types/map";
 import type { WeatherDay } from "@/types/map";
 import type { Prisma } from "@/lib/generated/prisma/client";
 
@@ -30,15 +31,15 @@ const WEATHER_WEIGHT = 0.4;
 // 50 represents "unknown" — neither penalised nor boosted.
 const NEUTRAL_WEATHER_SCORE = 50;
 
-const DAY_NAMES = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-
 // ─── Open-Meteo parsing ──────────────────────────────────────────────────────
 
 /**
  * Parses an Open-Meteo forecast JSON blob into an array of WeatherDay objects.
  * Optionally filters to days within [startDate, endDate] (inclusive, ISO strings).
- * Falls back to today + tomorrow when no date range is supplied — matching the
- * half-drawer card display.
+ * Falls back to today + tomorrow when no date range is supplied — a narrow
+ * 2-day window used for ranking when no trip dates are known. This intentionally
+ * differs from the client-side extractWeatherForecast (Map.tsx) which defaults
+ * to MAX_FORECAST_DAYS (4) for browse-mode card display.
  * Returns an empty array if the shape is unexpected.
  */
 export function extractForecastDays(
@@ -266,6 +267,10 @@ export async function fetchWeatherForCandidates(
   // fetchTask may continue running after we return — any remaining resultMap.set()
   // calls are harmless (caller already has a snapshot copy), and the Prisma upserts
   // are intentional fire-and-forget cache warming for subsequent requests.
+  // NOTE: on serverless platforms (e.g. Vercel), execution is frozen once the
+  // response is sent, so any Prisma upserts still in flight when the timeout
+  // fires will be silently dropped. This is acceptable — they'll be re-fetched
+  // on the next cache miss — but means cache warming is best-effort only.
   await Promise.race([fetchTask, timeoutPromise]);
 
   // Return a snapshot so background fetchTask mutations don't affect the caller.

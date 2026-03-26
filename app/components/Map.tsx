@@ -11,6 +11,7 @@ import BottomDrawer, {
   DRAWER_TRANSITION_MS,
   getDrawerHeightPx,
 } from "./BottomDrawer";
+import { DAY_NAMES } from "@/types/map";
 import type { AmenityPOI, Campsite, WeatherDay } from "@/types/map";
 import { CORAL, FOREST_GREEN } from "@/lib/tokens";
 import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayload, type AISearchPayload } from "@/lib/searchResults";
@@ -64,12 +65,12 @@ async function fetchCampsites(bounds: Bounds, amenities: string[] = []): Promise
   }
 }
 
-const DAY_NAMES = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-
 // Extracts weather data from an Open-Meteo forecast response.
 // When startDate/endDate are provided, only days within that range are included
 // (matching the date window used for ranking). Without dates, falls back to the
-// first MAX_FORECAST_DAYS days so browse mode cards still show 4 days.
+// first MAX_FORECAST_DAYS (4) days — intentionally wider than the server-side
+// extractForecastDays default (today+tomorrow) because browse-mode cards show
+// more days than the 2-day ranking window needs.
 // Returns null if the response shape is unexpected; gracefully handles absent
 // precipitation_probability_max (old cache entries) by setting null.
 const MAX_FORECAST_DAYS = 4;

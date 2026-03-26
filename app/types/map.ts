@@ -1,6 +1,10 @@
 // Shared map data types — mirror Prisma model shapes but are decoupled from the
 // ORM so they can be used across API routes, server components, and UI layers.
 
+// Short day-of-week labels used when building WeatherDay objects.
+// Index matches Date.getDay() (0 = Sunday).
+export const DAY_NAMES = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] as const;
+
 // Per-day weather data extracted from an Open-Meteo forecast response.
 export type WeatherDay = {
   date: string;               // ISO date e.g. "2024-03-23"
