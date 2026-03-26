@@ -21,10 +21,12 @@ const HALF_VH = 0.52;
 
 // Height of the top spacer in full state — clears the floating search bar + chips
 // that remain absolutely positioned above the drawer (z-[60]).
-// Accounts for: top-3 (12px) + search bar (~44px) + gap-2 (8px) + chips row (~32px) + breathing room.
+// Accounts for: top-3 (12px) + search bar with context text (~56px) + gap-2 (8px) + chips row (~32px) + breathing room.
+// Sized for the taller two-line search bar (input + AI context query) so the
+// borderTop handle strip never overlaps the chips row when a search is active.
 // TODO: make dynamic via ResizeObserver if the SearchBar or QuickFilterChips
-// padding/height changes (e.g. during M4/M5 search bar evolution).
-const FULL_STATE_SPACER_PX = 108;
+// padding/height changes further.
+const FULL_STATE_SPACER_PX = 120;
 
 /**
  * Returns the drawer height in px for a given state.
