@@ -492,6 +492,76 @@ export default function BottomDrawer({
   // onClick that fires after touchEnd when the gesture was a drag, not a tap.
   const wasDragRef = useRef(false);
 
+  // ── position: fixed ↔ absolute decoupling ──────────────────────────────────
+  // Switching position is NOT an animatable CSS property — it takes effect
+  // instantly and causes the drawer to visually jump if we toggle it in the same
+  // render as the height transition starts (which is what isFull = drawerState ===
+  // "full" would do). Instead we track `isFixed` as a separate piece of state:
+  //   • Going TO full:   set isFixed=true immediately (same render as height grows)
+  //   • Leaving full:    keep isFixed=true until the shrink animation finishes,
+  //                      then set isFixed=false after DRAWER_TRANSITION_MS.
+  // This means the position flip always happens after the CSS transition, not
+  // before it, eliminating the layout jump.
+  const [isFixed, setIsFixed] = useState(false);
+  const positionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (positionTimerRef.current !== null) {
+      clearTimeout(positionTimerRef.current);
+      positionTimerRef.current = null;
+    }
+    if (drawerState === "full") {
+      // Snap to fixed immediately so the full-height drawer is correctly
+      // positioned before the height animation reaches 100dvh.
+      setIsFixed(true);
+    } else {
+      // Delay the position revert until the height CSS transition has finished.
+      // Using DRAWER_TRANSITION_MS + a 10ms buffer to avoid racing the browser
+      // paint at exactly the transition boundary.
+      positionTimerRef.current = setTimeout(() => {
+        setIsFixed(false);
+        positionTimerRef.current = null;
+      }, DRAWER_TRANSITION_MS + 10);
+    }
+    return () => {
+      if (positionTimerRef.current !== null) {
+        clearTimeout(positionTimerRef.current);
+        positionTimerRef.current = null;
+      }
+    };
+  }, [drawerState]);
+
+  // ── DrawerContentList mount/unmount decoupling ─────────────────────────────
+  // Swapping DrawerContentList ↔ peek-card in the same render as the height
+  // change forces a layout recalculation mid-animation and causes a content
+  // flash. Instead, `showContent` trails drawerState on the way down to peek:
+  //   • Going away from peek: show list immediately (same render)
+  //   • Going to peek:        keep list mounted until animation finishes, then
+  //                           unmount so the peek card can render cleanly.
+  const [showContent, setShowContent] = useState(drawerState !== "peek");
+  const contentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (contentTimerRef.current !== null) {
+      clearTimeout(contentTimerRef.current);
+      contentTimerRef.current = null;
+    }
+    if (drawerState !== "peek") {
+      setShowContent(true);
+    } else {
+      contentTimerRef.current = setTimeout(() => {
+        setShowContent(false);
+        contentTimerRef.current = null;
+      }, DRAWER_TRANSITION_MS + 10);
+    }
+    return () => {
+      if (contentTimerRef.current !== null) {
+        clearTimeout(contentTimerRef.current);
+        contentTimerRef.current = null;
+      }
+    };
+  }, [drawerState]);
+
   const selectedPoi = selectedPoiId
     ? amenityPois.find((p) => p.id === selectedPoiId) ?? null
     : null;
@@ -562,6 +632,9 @@ export default function BottomDrawer({
     ? `${HALF_VH * 100}vh`
     : `${PEEK_HEIGHT_PX}px`;
 
+  // borderRadius and borderTop still track isFull (not isFixed) so they
+  // animate in sync with the height transition, not the delayed position flip.
+
   // Peek state: show selected card (or first card) without scrolling
   const peekIdx = selectedIdx ?? 0;
   const peekCampsite = campsites[peekIdx];
@@ -573,8 +646,12 @@ export default function BottomDrawer({
     <div
       className="flex flex-col shadow-2xl z-50"
       style={{
-        position: isFull ? "fixed" : "absolute",
-        top: isFull ? 0 : "auto",
+        // isFixed trails drawerState on close (delayed by DRAWER_TRANSITION_MS)
+        // so the position flip happens after the height animation, not before.
+        // On open it matches immediately so the fixed viewport anchor is ready
+        // before the height grows to 100dvh.
+        position: isFixed ? "fixed" : "absolute",
+        top: isFixed ? 0 : "auto",
         bottom: 0,
         left: 0,
         right: 0,
@@ -586,9 +663,17 @@ export default function BottomDrawer({
         background: SURFACE,
       }}
     >
-      {/* Spacer in full state — pushes content below the floating search bar + chips (z-[60]).
-          Intentionally opaque (inherits SURFACE background) to occlude map tiles beneath it. */}
-      {isFull && <div style={{ height: FULL_STATE_SPACER_PX, flexShrink: 0 }} />}
+      {/* Spacer — pushes content below the floating search bar + chips (z-[60]) in full state.
+          Always mounted so it can animate height rather than mount/unmount abruptly.
+          height transitions in sync with the drawer height animation. */}
+      <div
+        style={{
+          height: isFull ? FULL_STATE_SPACER_PX : 0,
+          flexShrink: 0,
+          overflow: "hidden",
+          transition: `height ${DRAWER_TRANSITION_MS}ms ease-in-out`,
+        }}
+      />
 
       {/* Peek strip — drag handle + summary row.
           Touch handlers live here so only dragging the handle strip moves the drawer;
@@ -637,8 +722,11 @@ export default function BottomDrawer({
         </div>
       </div>
 
-      {/* Scrollable card list — visible in half and full states */}
-      {drawerState !== "peek" && (
+      {/* Scrollable card list — visible in half and full states.
+          showContent stays true for DRAWER_TRANSITION_MS after collapsing to peek
+          so the list remains mounted during the shrink animation and doesn't
+          cause a content flash mid-transition. */}
+      {showContent && (
         <DrawerContentList
           campsites={campsites}
           selectedPoi={selectedPoi}
@@ -651,8 +739,10 @@ export default function BottomDrawer({
         />
       )}
 
-      {/* Peek state — show selected card (or first card) without scrolling */}
-      {drawerState === "peek" && (
+      {/* Peek state — show selected card (or first card) without scrolling.
+          Only rendered once showContent is false (after the close animation),
+          so there is no moment where both the list and the peek card exist. */}
+      {!showContent && drawerState === "peek" && (
         <div className="px-4 pt-2 pb-4 overflow-hidden">
           {selectedPoi && peekPoiMeta
             ? <POICard poi={selectedPoi} meta={peekPoiMeta} />
