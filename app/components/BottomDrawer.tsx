@@ -539,8 +539,9 @@ export default function BottomDrawer({
     if (touchStartY.current === null) return;
     const dy = e.touches[0].clientY - touchStartY.current;
     setIsDragging(true);
-    // Constrain: don't drag past drawer's natural height (upward only)
-    setDragOffsetY(Math.max(0, dy));
+    // Downward: full rubber-band. Upward: 20% resistance capped at 20px —
+    // communicates that flicking up is possible without the drawer flying off-screen.
+    setDragOffsetY(dy < 0 ? Math.max(-20, dy * 0.2) : dy);
   }
 
   function handleTouchEnd(e: React.TouchEvent) {
@@ -604,7 +605,7 @@ export default function BottomDrawer({
         transform: isDragging ? `translateY(${dragOffsetY}px)` : "none",
         transition: isDragging
           ? "none"
-          : `top ${DRAWER_TRANSITION_MS}ms ease-in-out, height ${DRAWER_TRANSITION_MS}ms ease-in-out, border-radius ${DRAWER_TRANSITION_MS}ms ease-in-out`,
+          : `top ${DRAWER_TRANSITION_MS}ms cubic-bezier(0.32, 0.72, 0, 1), height ${DRAWER_TRANSITION_MS}ms cubic-bezier(0.32, 0.72, 0, 1), border-radius ${DRAWER_TRANSITION_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`,
         background: SURFACE,
         overflow: "hidden",
       }}
