@@ -491,129 +491,8 @@ export default function BottomDrawer({
   // Track whether the last touch was a drag (vs a tap) so we can suppress the
   // onClick that fires after touchEnd when the gesture was a drag, not a tap.
   const wasDragRef = useRef(false);
-
-  // ── position: fixed ↔ absolute decoupling ──────────────────────────────────
-  // Switching position is NOT an animatable CSS property — it takes effect
-  // instantly and causes the drawer to visually jump if we toggle it in the same
-  // render as the height transition starts (which is what isFull = drawerState ===
-  // "full" would do). Instead we track `isFixed` as a separate piece of state:
-  //   • Going TO full:   set isFixed=true immediately (same render as height grows)
-  //   • Leaving full:    keep isFixed=true until the shrink animation finishes,
-  //                      then set isFixed=false after DRAWER_TRANSITION_MS.
-  // This means the position flip always happens after the CSS transition, not
-  // before it, eliminating the layout jump.
-  const [isFixed, setIsFixed] = useState(false);
-  const positionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (positionTimerRef.current !== null) {
-      clearTimeout(positionTimerRef.current);
-      positionTimerRef.current = null;
-    }
-    if (drawerState === "full") {
-      // Snap to fixed immediately so the full-height drawer is correctly
-      // positioned before the height animation reaches 100dvh.
-      setIsFixed(true);
-    } else {
-      // Delay the position revert until the height CSS transition has finished.
-      // Using DRAWER_TRANSITION_MS + a 10ms buffer to avoid racing the browser
-      // paint at exactly the transition boundary.
-      positionTimerRef.current = setTimeout(() => {
-        setIsFixed(false);
-        positionTimerRef.current = null;
-      }, DRAWER_TRANSITION_MS + 10);
-    }
-    return () => {
-      if (positionTimerRef.current !== null) {
-        clearTimeout(positionTimerRef.current);
-        positionTimerRef.current = null;
-      }
-    };
-  }, [drawerState]);
-
-  // ── DrawerContentList mount/unmount decoupling ─────────────────────────────
-  // Swapping DrawerContentList ↔ peek-card in the same render as the height
-  // change forces a layout recalculation mid-animation and causes a content
-  // flash. Instead, `showContent` trails drawerState on the way down to peek:
-  //   • Going away from peek: show list immediately (same render)
-  //   • Going to peek:        keep list mounted until animation finishes, then
-  //                           unmount so the peek card can render cleanly.
-  const [showContent, setShowContent] = useState(drawerState !== "peek");
-  const contentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (contentTimerRef.current !== null) {
-      clearTimeout(contentTimerRef.current);
-      contentTimerRef.current = null;
-    }
-    if (drawerState !== "peek") {
-      setShowContent(true);
-    } else {
-      contentTimerRef.current = setTimeout(() => {
-        setShowContent(false);
-        contentTimerRef.current = null;
-      }, DRAWER_TRANSITION_MS + 10);
-    }
-    return () => {
-      if (contentTimerRef.current !== null) {
-        clearTimeout(contentTimerRef.current);
-        contentTimerRef.current = null;
-      }
-    };
-  }, [drawerState]);
-
-  // ── compact layout decoupling ──────────────────────────────────────────────
-  // The `compact` prop on DrawerContentList controls whether cards render with
-  // their full layout (scenic photo header + 4-day weather + full blurb) or a
-  // compact layout (no photo, 2-day weather). Switching this prop in the same
-  // render as the height animation starts causes React to reflow all card DOM
-  // nodes mid-transition, producing the visible stutter on close.
-  //
-  // The fix mirrors the `isFixed` pattern: `isCompact` trails drawerState when
-  // leaving full so the full-size card layout stays in place for the entire
-  // shrink animation, then flips to compact once the drawer has settled.
-  //   • Going TO full:      set isCompact=false immediately so full cards are
-  //                         ready before the height animation reaches 100dvh.
-  //   • Leaving full:       keep isCompact=false until the animation finishes,
-  //                         then flip to true after DRAWER_TRANSITION_MS.
-  //   • half ↔ peek:        flip isCompact immediately — both states already
-  //                         use compact cards so there is no layout change.
-  const [isCompact, setIsCompact] = useState(drawerState !== "full");
-  const compactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Tracks the previous drawerState so we can detect full → non-full transitions
-  // inside the effect without relying on a stale closure over `isCompact`.
-  const prevDrawerStateRef = useRef<DrawerState>(drawerState);
-
-  useEffect(() => {
-    if (compactTimerRef.current !== null) {
-      clearTimeout(compactTimerRef.current);
-      compactTimerRef.current = null;
-    }
-    const prev = prevDrawerStateRef.current;
-    prevDrawerStateRef.current = drawerState;
-
-    if (drawerState === "full") {
-      // Snap to full-size cards immediately so they're ready as the drawer grows.
-      setIsCompact(false);
-    } else if (prev === "full") {
-      // Leaving full — keep full-size cards for the duration of the shrink animation
-      // so the card reflow doesn't happen mid-transition. Only flip to compact once
-      // the drawer has settled at its new (half or peek) height.
-      compactTimerRef.current = setTimeout(() => {
-        setIsCompact(true);
-        compactTimerRef.current = null;
-      }, DRAWER_TRANSITION_MS + 10);
-    } else {
-      // half ↔ peek transition — cards are already compact, no layout change needed.
-      setIsCompact(true);
-    }
-    return () => {
-      if (compactTimerRef.current !== null) {
-        clearTimeout(compactTimerRef.current);
-        compactTimerRef.current = null;
-      }
-    };
-  }, [drawerState]);
+  // Timestamp of touch start — used for velocity-based snap decisions.
+  const touchStartTimeRef = useRef<number | null>(null);
 
   const selectedPoi = selectedPoiId
     ? amenityPois.find((p) => p.id === selectedPoiId) ?? null
@@ -651,6 +530,7 @@ export default function BottomDrawer({
     wasDragRef.current = false;
     if (e.touches.length !== 1) return;
     touchStartY.current = e.touches[0].clientY;
+    touchStartTimeRef.current = Date.now();
     setIsDragging(false);
     setDragOffsetY(0);
   }
@@ -666,27 +546,38 @@ export default function BottomDrawer({
   function handleTouchEnd(e: React.TouchEvent) {
     if (touchStartY.current === null) return;
     const dy = e.changedTouches[0].clientY - touchStartY.current;
+    const dt = touchStartTimeRef.current !== null ? Date.now() - touchStartTimeRef.current : 999;
+    // velocity: px/ms, positive = downward
+    const velocity = dy / Math.max(dt, 1);
     touchStartY.current = null;
-    const wasDrag = Math.abs(dy) > DRAG_THRESHOLD_PX;
-    wasDragRef.current = wasDrag;
+    touchStartTimeRef.current = null;
+    // Suppress post-drag tap if any meaningful motion occurred
+    wasDragRef.current = Math.abs(dy) > 8;
     setIsDragging(false);
     setDragOffsetY(0);
-    if (dy < -DRAG_THRESHOLD_PX) {
+    // Snap decision: velocity check first (fast flick), then displacement fallback
+    const VELOCITY_THRESHOLD = 0.4; // px/ms
+    if (velocity < -VELOCITY_THRESHOLD || dy < -DRAG_THRESHOLD_PX) {
       onDrawerStateChange(cycleUp(drawerState));
-    } else if (dy > DRAG_THRESHOLD_PX) {
+    } else if (velocity > VELOCITY_THRESHOLD || dy > DRAG_THRESHOLD_PX) {
       onDrawerStateChange(cycleDown(drawerState));
     }
   }
 
   const isFull = drawerState === "full";
-  const drawerHeightStyle = isFull
+  // Height and top are both animated so the bottom edge stays fixed at 100dvh
+  // throughout every transition — no jumping or detaching from the bottom.
+  // position is always fixed (no switching) so no layout jump on state change.
+  const drawerHeight = isFull
     ? "100dvh"
     : drawerState === "half"
-    ? `${HALF_VH * 100}vh`
+    ? `${HALF_VH * 100}dvh`
     : `${PEEK_HEIGHT_PX}px`;
-
-  // borderRadius and borderTop still track isFull (not isFixed) so they
-  // animate in sync with the height transition, not the delayed position flip.
+  const drawerTop = isFull
+    ? "0px"
+    : drawerState === "half"
+    ? `${(1 - HALF_VH) * 100}dvh`
+    : `calc(100dvh - ${PEEK_HEIGHT_PX}px)`;
 
   // Peek state: show selected card (or first card) without scrolling
   const peekIdx = selectedIdx ?? 0;
@@ -699,34 +590,28 @@ export default function BottomDrawer({
     <div
       className="flex flex-col shadow-2xl z-50"
       style={{
-        // isFixed trails drawerState on close (delayed by DRAWER_TRANSITION_MS)
-        // so the position flip happens after the height animation, not before.
-        // On open it matches immediately so the fixed viewport anchor is ready
-        // before the height grows to 100dvh.
-        position: isFixed ? "fixed" : "absolute",
-        top: isFull ? 0 : "auto",
-        bottom: 0,
+        // Always fixed — no position switching so no layout jump.
+        // top + height both animate; since top = 100dvh - height for all states,
+        // the bottom edge stays pinned at the viewport bottom throughout every transition.
+        position: "fixed",
+        top: drawerTop,
         left: 0,
         right: 0,
-        height: drawerHeightStyle,
+        height: drawerHeight,
         borderRadius: isFull ? 0 : "1rem 1rem 0 0",
         borderTop: isFull ? "none" : "1.5px solid #e0dbd0",
-        transform: isDragging ? `translateY(${dragOffsetY}px)` : "translateY(0)",
-        transition: isDragging ? "none" : `height ${DRAWER_TRANSITION_MS}ms ease-in-out, border-radius ${DRAWER_TRANSITION_MS}ms ease-in-out`,
+        // transform is used only for live drag rubber-banding; cleared on release.
+        transform: isDragging ? `translateY(${dragOffsetY}px)` : "none",
+        transition: isDragging
+          ? "none"
+          : `top ${DRAWER_TRANSITION_MS}ms ease-in-out, height ${DRAWER_TRANSITION_MS}ms ease-in-out, border-radius ${DRAWER_TRANSITION_MS}ms ease-in-out`,
         background: SURFACE,
+        overflow: "hidden",
       }}
     >
-      {/* Spacer — pushes content below the floating search bar + chips (z-[60]) in full state.
-          Always mounted so it can animate height rather than mount/unmount abruptly.
-          height transitions in sync with the drawer height animation. */}
-      <div
-        style={{
-          height: isFull ? FULL_STATE_SPACER_PX : 0,
-          flexShrink: 0,
-          overflow: "hidden",
-          transition: `height ${DRAWER_TRANSITION_MS}ms ease-in-out`,
-        }}
-      />
+      {/* Spacer in full state — pushes content below the floating search bar + chips (z-[60]).
+          Intentionally opaque (inherits SURFACE background) to occlude map tiles beneath it. */}
+      {isFull && <div style={{ height: FULL_STATE_SPACER_PX, flexShrink: 0 }} />}
 
       {/* Peek strip — drag handle + summary row.
           Touch handlers live here so only dragging the handle strip moves the drawer;
@@ -738,7 +623,8 @@ export default function BottomDrawer({
         onClick={() => {
           // Suppress click when the touch gesture was a drag (not a tap)
           if (wasDragRef.current) { wasDragRef.current = false; return; }
-          onDrawerStateChange(drawerState === "peek" ? "half" : cycleDown(drawerState));
+          // Tap cycles upward: peek → half → full → peek (AllTrails pattern)
+          onDrawerStateChange(drawerState === "full" ? "peek" : cycleUp(drawerState));
         }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -775,11 +661,8 @@ export default function BottomDrawer({
         </div>
       </div>
 
-      {/* Scrollable card list — visible in half and full states.
-          showContent stays true for DRAWER_TRANSITION_MS after collapsing to peek
-          so the list remains mounted during the shrink animation and doesn't
-          cause a content flash mid-transition. */}
-      {showContent && (
+      {/* Scrollable card list — visible in half and full states */}
+      {drawerState !== "peek" && (
         <DrawerContentList
           campsites={campsites}
           selectedPoi={selectedPoi}
@@ -787,15 +670,13 @@ export default function BottomDrawer({
           selectedIdx={selectedIdx}
           userLocation={userLocation}
           cardRefs={cardRefs}
-          compact={isCompact}
+          compact={drawerState !== "full"}
           onSelectPin={onSelectPin}
         />
       )}
 
-      {/* Peek state — show selected card (or first card) without scrolling.
-          Only rendered once showContent is false (after the close animation),
-          so there is no moment where both the list and the peek card exist. */}
-      {!showContent && drawerState === "peek" && (
+      {/* Peek state — show selected card (or first card) without scrolling */}
+      {drawerState === "peek" && (
         <div className="px-4 pt-2 pb-4 overflow-hidden">
           {selectedPoi && peekPoiMeta
             ? <POICard poi={selectedPoi} meta={peekPoiMeta} />
