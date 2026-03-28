@@ -704,7 +704,7 @@ export default function BottomDrawer({
         // On open it matches immediately so the fixed viewport anchor is ready
         // before the height grows to 100dvh.
         position: isFixed ? "fixed" : "absolute",
-        top: isFixed ? 0 : "auto",
+        top: isFull ? 0 : "auto",
         bottom: 0,
         left: 0,
         right: 0,
