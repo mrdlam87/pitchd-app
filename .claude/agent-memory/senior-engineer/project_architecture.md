@@ -5,12 +5,12 @@ type: project
 ---
 
 ## Repository layout
-The production Next.js app lives at `/home/user/pitchd-app/app/` — NOT the root. All imports use path alias `@/` which resolves to `app/` subdirectory. Key paths:
-- API routes: `app/app/api/<route>/route.ts`
-- Pages: `app/app/<page>/page.tsx`
-- Components: `app/components/`
-- Lib: `app/lib/`
-- Prisma schema: `app/prisma/schema.prisma`
+The production Next.js app lives in `/app/` — NOT the repo root. All imports use path alias `@/` which resolves to the `app/` subdirectory. Key paths:
+- API routes: `app/api/<route>/route.ts`
+- Pages: `app/<page>/page.tsx`
+- Components: `components/`
+- Lib: `lib/`
+- Prisma schema: `prisma/schema.prisma`
 
 ## Prisma
 - Uses `@prisma/adapter-pg` (not the default connector) — serverless-compatible pg adapter
