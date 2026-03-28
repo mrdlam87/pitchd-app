@@ -562,6 +562,59 @@ export default function BottomDrawer({
     };
   }, [drawerState]);
 
+  // ── compact layout decoupling ──────────────────────────────────────────────
+  // The `compact` prop on DrawerContentList controls whether cards render with
+  // their full layout (scenic photo header + 4-day weather + full blurb) or a
+  // compact layout (no photo, 2-day weather). Switching this prop in the same
+  // render as the height animation starts causes React to reflow all card DOM
+  // nodes mid-transition, producing the visible stutter on close.
+  //
+  // The fix mirrors the `isFixed` pattern: `isCompact` trails drawerState when
+  // leaving full so the full-size card layout stays in place for the entire
+  // shrink animation, then flips to compact once the drawer has settled.
+  //   • Going TO full:      set isCompact=false immediately so full cards are
+  //                         ready before the height animation reaches 100dvh.
+  //   • Leaving full:       keep isCompact=false until the animation finishes,
+  //                         then flip to true after DRAWER_TRANSITION_MS.
+  //   • half ↔ peek:        flip isCompact immediately — both states already
+  //                         use compact cards so there is no layout change.
+  const [isCompact, setIsCompact] = useState(drawerState !== "full");
+  const compactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks the previous drawerState so we can detect full → non-full transitions
+  // inside the effect without relying on a stale closure over `isCompact`.
+  const prevDrawerStateRef = useRef<DrawerState>(drawerState);
+
+  useEffect(() => {
+    if (compactTimerRef.current !== null) {
+      clearTimeout(compactTimerRef.current);
+      compactTimerRef.current = null;
+    }
+    const prev = prevDrawerStateRef.current;
+    prevDrawerStateRef.current = drawerState;
+
+    if (drawerState === "full") {
+      // Snap to full-size cards immediately so they're ready as the drawer grows.
+      setIsCompact(false);
+    } else if (prev === "full") {
+      // Leaving full — keep full-size cards for the duration of the shrink animation
+      // so the card reflow doesn't happen mid-transition. Only flip to compact once
+      // the drawer has settled at its new (half or peek) height.
+      compactTimerRef.current = setTimeout(() => {
+        setIsCompact(true);
+        compactTimerRef.current = null;
+      }, DRAWER_TRANSITION_MS + 10);
+    } else {
+      // half ↔ peek transition — cards are already compact, no layout change needed.
+      setIsCompact(true);
+    }
+    return () => {
+      if (compactTimerRef.current !== null) {
+        clearTimeout(compactTimerRef.current);
+        compactTimerRef.current = null;
+      }
+    };
+  }, [drawerState]);
+
   const selectedPoi = selectedPoiId
     ? amenityPois.find((p) => p.id === selectedPoiId) ?? null
     : null;
@@ -734,7 +787,7 @@ export default function BottomDrawer({
           selectedIdx={selectedIdx}
           userLocation={userLocation}
           cardRefs={cardRefs}
-          compact={drawerState !== "full"}
+          compact={isCompact}
           onSelectPin={onSelectPin}
         />
       )}
