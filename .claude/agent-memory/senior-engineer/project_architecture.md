@@ -5,12 +5,12 @@ type: project
 ---
 
 ## Repository layout
-The production Next.js app lives in `/app/` — NOT the repo root. All imports use path alias `@/` which resolves to the `app/` subdirectory. Key paths:
-- API routes: `app/api/<route>/route.ts`
-- Pages: `app/<page>/page.tsx`
-- Components: `components/`
-- Lib: `lib/`
-- Prisma schema: `prisma/schema.prisma`
+The production Next.js app lives in the `app/` directory — NOT the repo root. All imports use path alias `@/` which resolves to the `app/` subdirectory. Key paths (repo-root-relative):
+- API routes: `app/app/api/<route>/route.ts`
+- Pages: `app/app/<page>/page.tsx`
+- Components: `app/components/`
+- Lib: `app/lib/`
+- Prisma schema: `app/prisma/schema.prisma`
 
 ## Prisma
 - Uses `@prisma/adapter-pg` (not the default connector) — serverless-compatible pg adapter
@@ -34,7 +34,8 @@ The production Next.js app lives in `/app/` — NOT the repo root. All imports u
 
 ## Auth flow
 - Two auth configs: `auth.config.ts` (edge-compatible, no Prisma, for middleware) and `auth.ts` (full, Prisma callbacks, for API routes)
-- JWT callback queries DB on every token refresh — no caching of role within JWT lifespan
+- JWT callback only queries DB at initial sign-in (when `user` param is present) — role is then cached in the JWT for the session lifetime (default 30 days)
+- Role changes (e.g. promoting a user to `beta`) do NOT take effect until the user signs out and back in
 - signIn callback upserts user; jwt callback does a second findUnique — two DB queries per sign-in
 
 ## Caching architecture
