@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
 import { wmoCodeToEmoji, condColorForCode } from "@/lib/weatherScore";
 import type { AmenityPOI, Campsite, POIMeta, WeatherDay } from "@/types/map";
@@ -481,9 +481,9 @@ export default function BottomDrawer({
 }: Props) {
   // Touch drag tracking
   const touchStartY = useRef<number | null>(null);
-  // Whether we are currently mid-drag (suppresses CSS transition during drag)
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragOffsetY, setDragOffsetY] = useState(0);
+  // Ref to the drawer div — used for direct DOM manipulation during drag so
+  // we never trigger React re-renders on every touchmove frame.
+  const drawerRef = useRef<HTMLDivElement | null>(null);
   // Ref to the handle strip so we can attach a non-passive native touchmove
   // listener (React registers touch handlers as passive by default, which
   // silently ignores e.preventDefault() and spams console warnings).
@@ -491,6 +491,8 @@ export default function BottomDrawer({
   // Track whether the last touch was a drag (vs a tap) so we can suppress the
   // onClick that fires after touchEnd when the gesture was a drag, not a tap.
   const wasDragRef = useRef(false);
+  // Timestamp of touch start — used for velocity-based snap decisions.
+  const touchStartTimeRef = useRef<number | null>(null);
 
   const selectedPoi = selectedPoiId
     ? amenityPois.find((p) => p.id === selectedPoiId) ?? null
@@ -519,48 +521,90 @@ export default function BottomDrawer({
     return () => el.removeEventListener("touchmove", onNativeTouchMove);
   }, []);
 
+  // Returns the translateY offset in px for a given snap state.
+  // Client-only — reads window.innerHeight.
+  function offsetForState(state: DrawerState): number {
+    const vh = window.innerHeight;
+    if (state === "full") return 0;
+    if (state === "half") return Math.round(vh * (1 - HALF_VH));
+    return vh - PEEK_HEIGHT_PX;
+  }
+
   // Drag handlers — start/end via React synthetic events; move split:
   // native listener (above) calls preventDefault() to suppress passive-listener warnings,
-  // React onTouchMove updates isDragging / dragOffsetY visual state.
+  // React onTouchMove updates the drawer DOM directly (no setState = no re-renders per frame).
   function handleTouchStart(e: React.TouchEvent) {
     // Reset here (not in onClick) so a drag that never fires a click event
     // doesn't leave wasDragRef stuck at true and swallow the next real tap.
     wasDragRef.current = false;
     if (e.touches.length !== 1) return;
     touchStartY.current = e.touches[0].clientY;
-    setIsDragging(false);
-    setDragOffsetY(0);
+    touchStartTimeRef.current = Date.now();
+    // Kill the CSS transition for the duration of the drag so the drawer
+    // tracks the finger with zero latency.
+    if (drawerRef.current) drawerRef.current.style.transition = "none";
   }
 
   function handleTouchMove(e: React.TouchEvent) {
-    if (touchStartY.current === null) return;
+    if (touchStartY.current === null || !drawerRef.current) return;
     const dy = e.touches[0].clientY - touchStartY.current;
-    setIsDragging(true);
-    // Constrain: don't drag past drawer's natural height (upward only)
-    setDragOffsetY(Math.max(0, dy));
+    // Downward: full travel. Upward: 20 % resistance capped at 20 px so the
+    // drawer communicates it can expand without flying off-screen.
+    const delta = dy < 0 ? Math.max(-20, dy * 0.2) : dy;
+    const base = offsetForState(drawerState);
+    // Clamp so the drawer can't go above full (offset 0).
+    const offset = Math.max(0, base + delta);
+    drawerRef.current.style.transform = `translateY(${offset}px)`;
   }
 
   function handleTouchEnd(e: React.TouchEvent) {
-    if (touchStartY.current === null) return;
+    if (touchStartY.current === null || !drawerRef.current) return;
     const dy = e.changedTouches[0].clientY - touchStartY.current;
+    const dt = touchStartTimeRef.current !== null ? Date.now() - touchStartTimeRef.current : 999;
+    const velocity = dy / Math.max(dt, 1); // px/ms, positive = downward
     touchStartY.current = null;
-    const wasDrag = Math.abs(dy) > DRAG_THRESHOLD_PX;
-    wasDragRef.current = wasDrag;
-    setIsDragging(false);
-    setDragOffsetY(0);
-    if (dy < -DRAG_THRESHOLD_PX) {
+    touchStartTimeRef.current = null;
+    wasDragRef.current = Math.abs(dy) > 8;
+
+    // Re-enable the CSS transition so the snap animation plays from the
+    // exact visual position the user released — no snap-back to the old state.
+    drawerRef.current.style.transition = "";
+
+    const VELOCITY_THRESHOLD = 0.4; // px/ms
+    const allStates: DrawerState[] = ["peek", "half", "full"];
+
+    if (velocity < -VELOCITY_THRESHOLD) {
+      // Fast flick upward — advance one step.
       onDrawerStateChange(cycleUp(drawerState));
-    } else if (dy > DRAG_THRESHOLD_PX) {
+    } else if (velocity > VELOCITY_THRESHOLD) {
+      // Fast flick downward — retreat one step.
       onDrawerStateChange(cycleDown(drawerState));
+    } else {
+      // Slow drag — snap to whichever position is closest to where the
+      // user released. This lets a single drag go from full → peek without
+      // stepping through half.
+      const base = offsetForState(drawerState);
+      const delta = dy < 0 ? Math.max(-20, dy * 0.2) : dy;
+      const releaseOffset = Math.max(0, base + delta);
+      const target = allStates.reduce((nearest, s) =>
+        Math.abs(offsetForState(s) - releaseOffset) <
+        Math.abs(offsetForState(nearest) - releaseOffset)
+          ? s
+          : nearest
+      );
+      onDrawerStateChange(target);
     }
   }
 
   const isFull = drawerState === "full";
-  const drawerHeightStyle = isFull
-    ? "100dvh"
+  // The drawer is always position:fixed, top:0, height:100dvh.
+  // Only transform:translateY changes — it's compositor-only so there is
+  // no layout reflow on any animation frame.
+  const translateOffset = isFull
+    ? "0px"
     : drawerState === "half"
-    ? `${HALF_VH * 100}vh`
-    : `${PEEK_HEIGHT_PX}px`;
+    ? `${Math.round((1 - HALF_VH) * 100)}dvh`
+    : `calc(100dvh - ${PEEK_HEIGHT_PX}px)`;
 
   // Peek state: show selected card (or first card) without scrolling
   const peekIdx = selectedIdx ?? 0;
@@ -571,24 +615,37 @@ export default function BottomDrawer({
 
   return (
     <div
+      ref={drawerRef}
       className="flex flex-col shadow-2xl z-50"
       style={{
-        position: isFull ? "fixed" : "absolute",
-        top: isFull ? 0 : "auto",
-        bottom: 0,
+        // Always fixed + full-height. Only transform:translateY moves the drawer —
+        // it runs on the compositor so there is zero layout reflow during animation
+        // or drag. The transform is also overridden directly via drawerRef during
+        // touch drag (no React renders per frame).
+        position: "fixed",
+        top: 0,
         left: 0,
         right: 0,
-        height: drawerHeightStyle,
+        height: "100dvh",
         borderRadius: isFull ? 0 : "1rem 1rem 0 0",
         borderTop: isFull ? "none" : "1.5px solid #e0dbd0",
-        transform: isDragging ? `translateY(${dragOffsetY}px)` : "translateY(0)",
-        transition: isDragging ? "none" : `height ${DRAWER_TRANSITION_MS}ms ease-in-out, border-radius ${DRAWER_TRANSITION_MS}ms ease-in-out`,
+        transform: `translateY(${translateOffset})`,
+        transition: `transform ${DRAWER_TRANSITION_MS}ms cubic-bezier(0.32, 0.72, 0, 1), border-radius ${DRAWER_TRANSITION_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`,
         background: SURFACE,
+        overflow: "hidden",
       }}
     >
-      {/* Spacer in full state — pushes content below the floating search bar + chips (z-[60]).
-          Intentionally opaque (inherits SURFACE background) to occlude map tiles beneath it. */}
-      {isFull && <div style={{ height: FULL_STATE_SPACER_PX, flexShrink: 0 }} />}
+      {/* Spacer — pushes content below the floating search bar + chips (z-[60]) in full
+          state. Height is animated alongside the transform so the handle doesn't jump
+          when entering or leaving full state. */}
+      <div
+        style={{
+          height: isFull ? FULL_STATE_SPACER_PX : 0,
+          flexShrink: 0,
+          overflow: "hidden",
+          transition: `height ${DRAWER_TRANSITION_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`,
+        }}
+      />
 
       {/* Peek strip — drag handle + summary row.
           Touch handlers live here so only dragging the handle strip moves the drawer;
@@ -600,7 +657,8 @@ export default function BottomDrawer({
         onClick={() => {
           // Suppress click when the touch gesture was a drag (not a tap)
           if (wasDragRef.current) { wasDragRef.current = false; return; }
-          onDrawerStateChange(drawerState === "peek" ? "half" : cycleDown(drawerState));
+          // Tap cycles upward: peek → half → full → peek (AllTrails pattern)
+          onDrawerStateChange(drawerState === "full" ? "peek" : cycleUp(drawerState));
         }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
