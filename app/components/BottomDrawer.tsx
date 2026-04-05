@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Drawer } from "vaul";
+import "vaul/style.css";
 import { CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
 import { wmoCodeToEmoji, condColorForCode } from "@/lib/weatherScore";
 import type { AmenityPOI, Campsite, POIMeta, WeatherDay } from "@/types/map";
@@ -530,13 +531,13 @@ export default function BottomDrawer({
     >
       <Drawer.Portal>
         <Drawer.Content
-          className="flex flex-col z-50 outline-none"
+          className="fixed bottom-0 left-0 right-0 flex flex-col z-50 outline-none"
           style={{
+            height: "100dvh",
             background: SURFACE,
             borderRadius: isFull ? 0 : "1rem 1rem 0 0",
             borderTop: isFull ? "none" : "1.5px solid #e0dbd0",
             boxShadow: "0 -4px 32px rgba(0,0,0,0.12)",
-            // overflow:hidden clips card content to the visible snap-point area.
             overflow: "hidden",
           }}
         >
