@@ -566,9 +566,16 @@ export default function BottomDrawer({
     touchStartTimeRef.current = null;
     wasDragRef.current = Math.abs(dy) > 8;
 
-    // Re-enable the CSS transition so the snap animation plays from the
-    // exact visual position the user released — no snap-back to the old state.
-    drawerRef.current.style.transition = "";
+    // Re-enable the CSS transition BEFORE calling setState, then force a
+    // reflow so the browser commits it as "active". When React subsequently
+    // changes only `transform` (transition is already the same value so React
+    // won't touch it), the browser fires the animation from the drag-release
+    // position → snap target, with no snap-back artefact.
+    // Clearing to "" would cause React to set both transition + transform in
+    // the same render; the browser skips the animation when both change at once.
+    drawerRef.current.style.transition = `transform ${DRAWER_TRANSITION_MS}ms cubic-bezier(0.32, 0.72, 0, 1), border-radius ${DRAWER_TRANSITION_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`;
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    drawerRef.current.getBoundingClientRect(); // force reflow — commits the transition
 
     const VELOCITY_THRESHOLD = 0.4; // px/ms
     const allStates: DrawerState[] = ["peek", "half", "full"];
