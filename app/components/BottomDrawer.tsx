@@ -522,6 +522,11 @@ export default function BottomDrawer({
       modal={false}
       // dismissible=false: peek is the minimum — the drawer never disappears.
       dismissible={false}
+      // fadeFromIndex=0 prevents Vaul's overlay-snap-point logic from treating
+      // the half snap point (index 1) as fadeFromIndex-1, which would cause
+      // getPercentageDragged to return 1 immediately when dragging down from
+      // half — triggering the dismissible=false drag block before any movement.
+      fadeFromIndex={0}
       // Always open; onOpenChange is a no-op since we control state via drawerState.
       open
       onOpenChange={() => {}}
