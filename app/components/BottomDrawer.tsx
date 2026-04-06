@@ -34,10 +34,11 @@ const FULL_STATE_SPACER_PX = 120;
  * Client-only — reads window.innerHeight. Do not call during SSR or in render.
  */
 export function getDrawerHeightPx(state: DrawerState): number {
+  // Drawer max height is 100dvh minus the top offset that keeps it below the search bar.
+  const maxH = window.innerHeight - FULL_STATE_SPACER_PX;
   if (state === "peek") return PEEK_HEIGHT_PX;
-  if (state === "half") return Math.round(window.innerHeight * HALF_VH);
-  // Full state covers 100dvh — use full viewport height for Mapbox padding calculation
-  return window.innerHeight;
+  if (state === "half") return Math.round(maxH * HALF_VH);
+  return maxH;
 }
 
 // ── Drive time estimate ────────────────────────────────────────────────────────
@@ -537,35 +538,23 @@ export default function BottomDrawer({
         <Drawer.Content
           className="fixed bottom-0 left-0 right-0 flex flex-col z-50 outline-none"
           style={{
-            height: "100dvh",
+            // Cap at 100dvh minus the search-bar+chips height so the drawer can
+            // never slide up behind them. No spacer div needed — it's structural.
+            height: `calc(100dvh - ${FULL_STATE_SPACER_PX}px)`,
             background: SURFACE,
-            borderRadius: isFull ? 0 : "1rem 1rem 0 0",
-            borderTop: isFull ? "none" : "1.5px solid #e0dbd0",
+            borderRadius: "1rem 1rem 0 0",
+            borderTop: "1.5px solid #e0dbd0",
             boxShadow: "0 -4px 32px rgba(0,0,0,0.12)",
             overflow: "hidden",
           }}
         >
-          {/* Spacer — pushes content below the floating search bar + chips (z-[60])
-              in full state. Animating the height (rather than mount/unmount) prevents
-              the handle from jumping when entering or leaving full state. */}
-          <div
-            style={{
-              height: isFull ? FULL_STATE_SPACER_PX : 0,
-              flexShrink: 0,
-              overflow: "hidden",
-              transition: `height ${DRAWER_TRANSITION_MS}ms cubic-bezier(0.32,0.72,0,1)`,
-            }}
-          />
 
           {/* Handle strip — drag pill + summary row + More/Less button.
               Vaul attaches its own pointer-event listeners to Drawer.Content so
               dragging anywhere on the strip (or the card list) moves the drawer.
               Vaul's internal scroll detection prevents card-list scrolling from
               accidentally triggering a drawer drag. */}
-          <div
-            className="flex-shrink-0 select-none"
-            style={{ borderTop: isFull ? "1.5px solid #e0dbd0" : "none" }}
-          >
+          <div className="flex-shrink-0 select-none">
             {/* Drag pill */}
             <div className="flex justify-center pt-3 pb-2">
               <div className="w-10 h-1 rounded-full bg-[#e0dbd0]" />
