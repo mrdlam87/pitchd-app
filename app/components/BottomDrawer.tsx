@@ -497,10 +497,11 @@ export default function BottomDrawer({
   // will overwrite the imperative value.
   const spacerRef = useRef<HTMLDivElement>(null);
 
-  // rAF loop: reads the drawer's live translateY via getComputedStyle (resolves
-  // CSS custom properties that Vaul uses in data-vaul-delayed-snap-points mode),
-  // then sets the spacer height = max(0, FULL_STATE_SPACER_PX - translateY).
-  // This gives the AllTrails-style proportional growth as the drawer slides up.
+  // rAF loop: reads the drawer's live top position via getBoundingClientRect()
+  // (always reflects the actual rendered position including CSS transforms),
+  // then sets the spacer height = max(0, FULL_STATE_SPACER_PX - top).
+  // This gives the AllTrails-style proportional growth as the drawer slides up:
+  // top ≈ 0 at full (spacer = 120px), top ≈ innerHeight-64 at peek (spacer = 0).
   useEffect(() => {
     const spacer = spacerRef.current;
     if (!spacer) return;
@@ -513,21 +514,10 @@ export default function BottomDrawer({
         drawerEl = document.querySelector<HTMLElement>("[data-vaul-drawer]");
       }
       if (drawerEl) {
-        const t = window.getComputedStyle(drawerEl).transform;
-        let y = Infinity;
-        if (t && t !== "none") {
-          const m = t.match(/matrix(?:3d)?\(([^)]+)\)/);
-          if (m) {
-            const vals = m[1].split(",").map(parseFloat);
-            // matrix(a,b,c,d,tx,ty) → index 5; matrix3d(...) → index 13
-            y = vals.length === 6 ? vals[5] : vals[13];
-          }
-        }
-        const h = isFinite(y) ? Math.max(0, FULL_STATE_SPACER_PX - y) : 0;
+        const top = drawerEl.getBoundingClientRect().top;
+        const h = Math.max(0, Math.round(FULL_STATE_SPACER_PX - top));
         if (h !== prevH) {
           prevH = h;
-          // spacer is guaranteed non-null: we checked at the top of useEffect
-          // and the effect cleanup cancels the rAF before unmount.
           (spacer as HTMLDivElement).style.height = `${h}px`;
         }
       }
