@@ -502,24 +502,26 @@ export default function BottomDrawer({
   // then sets the spacer height = max(0, FULL_STATE_SPACER_PX - top).
   // This gives the AllTrails-style proportional growth as the drawer slides up:
   // top ≈ 0 at full (spacer = 120px), top ≈ innerHeight-64 at peek (spacer = 0).
+  // rAF loop: reads the drawer's live top position via getBoundingClientRect()
+  // on the spacer's parentElement (= Drawer.Content DOM node — guaranteed since
+  // the spacer is the first child of Drawer.Content, no DOM query needed).
+  // Spacer height = max(0, FULL_STATE_SPACER_PX - top): 0 at peek/half,
+  // 120px at full — covers the map behind the search bar proportionally.
   useEffect(() => {
     const spacer = spacerRef.current;
     if (!spacer) return;
-    let drawerEl: HTMLElement | null = null;
+    // parentElement is Drawer.Content — the element Vaul translates.
+    const drawerEl = spacer.parentElement;
+    if (!drawerEl) return;
     let prevH = -1;
     let rafId: number;
 
     function tick() {
-      if (!drawerEl) {
-        drawerEl = document.querySelector<HTMLElement>("[data-vaul-drawer]");
-      }
-      if (drawerEl) {
-        const top = drawerEl.getBoundingClientRect().top;
-        const h = Math.max(0, Math.round(FULL_STATE_SPACER_PX - top));
-        if (h !== prevH) {
-          prevH = h;
-          (spacer as HTMLDivElement).style.height = `${h}px`;
-        }
+      const top = drawerEl!.getBoundingClientRect().top;
+      const h = Math.max(0, Math.round(FULL_STATE_SPACER_PX - top));
+      if (h !== prevH) {
+        prevH = h;
+        spacer.style.height = `${h}px`;
       }
       rafId = requestAnimationFrame(tick);
     }
