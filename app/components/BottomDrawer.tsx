@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { Drawer } from "vaul";
 import { CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
 import { wmoCodeToEmoji, condColorForCode } from "@/lib/weatherScore";
@@ -13,9 +12,10 @@ export type DrawerState = "peek" | "half" | "full";
 
 export const PEEK_HEIGHT_PX = 64;
 
-// Duration of the CSS height transition on the drawer div — exported so Map.tsx
-// can use it to delay scrollIntoView until the animation has settled.
-export const DRAWER_TRANSITION_MS = 300;
+// Duration of Vaul's snap animation — exported so Map.tsx can delay
+// scrollIntoView until the drawer has settled. Must match Vaul's internal
+// CSS transition: `transform 0.5s cubic-bezier(0.32,0.72,0,1)` (500ms).
+export const DRAWER_TRANSITION_MS = 500;
 
 // Viewport-height fraction for half state
 const HALF_VH = 0.52;
@@ -445,18 +445,19 @@ function DrawerContentList({
 // ── BottomDrawer ───────────────────────────────────────────────────────────────
 
 // Vaul snap points: least → most visible.
-// "64px" = peek strip, 0.52 = half viewport, 1 = full viewport.
-const SNAP_POINTS: (number | string)[] = ["64px", 0.52, 1];
+// "64px" = peek strip, HALF_VH = half viewport, 1 = full viewport.
+const SNAP_POINTS: (number | string)[] = ["64px", HALF_VH, 1];
 
 function snapForState(s: DrawerState): number | string {
   if (s === "full") return 1;
-  if (s === "half") return 0.52;
+  if (s === "half") return HALF_VH;
   return "64px";
 }
 
 function stateForSnap(snap: number | string | null): DrawerState {
   if (snap === 1) return "full";
-  if (snap === 0.52) return "half";
+  // Vaul returns the exact value passed in SNAP_POINTS, so === is safe here.
+  if (snap === HALF_VH) return "half";
   return "peek";
 }
 
@@ -545,6 +546,10 @@ export default function BottomDrawer({
             overflow: "hidden",
           }}
         >
+          {/* Visually-hidden title for screen readers — Vaul extends Radix Dialog
+              which requires either aria-label or a Drawer.Title to be present. */}
+          <Drawer.Title className="sr-only">Search results</Drawer.Title>
+
           {/* Spacer — pushes content below the floating search bar + chips (z-[60])
               in full state. Animating the height (rather than mount/unmount) prevents
               the handle from jumping when entering or leaving full state. */}
@@ -563,7 +568,7 @@ export default function BottomDrawer({
               Vaul's internal scroll detection prevents card-list scrolling from
               accidentally triggering a drawer drag. */}
           <div
-            className="flex-shrink-0 select-none"
+            className="flex-shrink-0 select-none cursor-pointer"
             style={{ borderTop: isFull ? "1.5px solid #e0dbd0" : "none" }}
           >
             {/* Drag pill */}
