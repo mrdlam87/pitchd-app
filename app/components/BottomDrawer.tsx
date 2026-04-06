@@ -519,7 +519,25 @@ export default function BottomDrawer({
     : null;
 
   return (
-    <Drawer.Root
+    <>
+      {/* Map cover — fills the 0–FULL_STATE_SPACER_PX gap above the drawer in full
+          state, preventing the map from showing through behind the search bar and
+          chips. Sits below the search bar (z-[60]) and above the map. */}
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: FULL_STATE_SPACER_PX,
+          background: SURFACE,
+          zIndex: 49,
+          opacity: isFull ? 1 : 0,
+          transition: "opacity 500ms cubic-bezier(0.32,0.72,0,1)",
+          pointerEvents: "none",
+        }}
+      />
+      <Drawer.Root
       snapPoints={SNAP_POINTS}
       activeSnapPoint={snapForState(drawerState)}
       setActiveSnapPoint={(snap) => onDrawerStateChange(stateForSnap(snap))}
@@ -629,5 +647,6 @@ export default function BottomDrawer({
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>
+    </>
   );
 }
