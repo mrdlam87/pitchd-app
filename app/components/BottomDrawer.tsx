@@ -526,7 +526,9 @@ export default function BottomDrawer({
         const h = isFinite(y) ? Math.max(0, FULL_STATE_SPACER_PX - y) : 0;
         if (h !== prevH) {
           prevH = h;
-          spacer.style.height = `${h}px`;
+          // spacer is guaranteed non-null: we checked at the top of useEffect
+          // and the effect cleanup cancels the rAF before unmount.
+          (spacer as HTMLDivElement).style.height = `${h}px`;
         }
       }
       rafId = requestAnimationFrame(tick);
