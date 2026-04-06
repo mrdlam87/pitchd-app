@@ -34,11 +34,10 @@ const FULL_STATE_SPACER_PX = 120;
  * Client-only — reads window.innerHeight. Do not call during SSR or in render.
  */
 export function getDrawerHeightPx(state: DrawerState): number {
-  // Drawer max height is 100dvh minus the top offset that keeps it below the search bar.
-  const maxH = window.innerHeight - FULL_STATE_SPACER_PX;
   if (state === "peek") return PEEK_HEIGHT_PX;
-  if (state === "half") return Math.round(maxH * HALF_VH);
-  return maxH;
+  if (state === "half") return Math.round(window.innerHeight * HALF_VH);
+  // Full state: drawer stops FULL_STATE_SPACER_PX below the viewport top.
+  return window.innerHeight - FULL_STATE_SPACER_PX;
 }
 
 // ── Drive time estimate ────────────────────────────────────────────────────────
@@ -445,22 +444,6 @@ function DrawerContentList({
 
 // ── BottomDrawer ───────────────────────────────────────────────────────────────
 
-// Vaul snap points: least → most visible.
-// "64px" = peek strip, 0.52 = half viewport, 1 = full viewport.
-const SNAP_POINTS: (number | string)[] = ["64px", 0.52, 1];
-
-function snapForState(s: DrawerState): number | string {
-  if (s === "full") return 1;
-  if (s === "half") return 0.52;
-  return "64px";
-}
-
-function stateForSnap(snap: number | string | null): DrawerState {
-  if (snap === 1) return "full";
-  if (snap === 0.52) return "half";
-  return "peek";
-}
-
 function cycleUp(s: DrawerState): DrawerState {
   return s === "peek" ? "half" : "full";
 }
@@ -492,6 +475,27 @@ export default function BottomDrawer({
   onDrawerStateChange,
   onSelectPin,
 }: Props) {
+  // Vaul uses window.innerHeight (not the element height) for snap point offsets.
+  // To stop the drawer FULL_STATE_SPACER_PX below the viewport top in full state,
+  // we pass a fraction < 1. At runtime: offset = innerHeight × (1 − fullFrac) = FULL_STATE_SPACER_PX.
+  const fullFrac = typeof window !== "undefined"
+    ? (window.innerHeight - FULL_STATE_SPACER_PX) / window.innerHeight
+    : 1 - FULL_STATE_SPACER_PX / 844; // SSR fallback
+
+  const SNAP_POINTS: (number | string)[] = ["64px", HALF_VH, fullFrac];
+
+  const snapForState = (s: DrawerState): number | string => {
+    if (s === "full") return fullFrac;
+    if (s === "half") return HALF_VH;
+    return "64px";
+  };
+
+  const stateForSnap = (snap: number | string | null): DrawerState => {
+    if (snap === fullFrac) return "full";
+    if (snap === HALF_VH) return "half";
+    return "peek";
+  };
+
   const isFull = drawerState === "full";
 
   const selectedPoi = selectedPoiId
@@ -538,12 +542,13 @@ export default function BottomDrawer({
         <Drawer.Content
           className="fixed bottom-0 left-0 right-0 flex flex-col z-50 outline-none"
           style={{
-            // Cap at 100dvh minus the search-bar+chips height so the drawer can
-            // never slide up behind them. No spacer div needed — it's structural.
-            height: `calc(100dvh - ${FULL_STATE_SPACER_PX}px)`,
+            // Full-height drawer; the full snap point fraction ensures the top
+            // edge stops FULL_STATE_SPACER_PX below the viewport top, clearing
+            // the floating search bar and chips. No spacer div needed.
+            height: "100dvh",
             background: SURFACE,
-            borderRadius: "1rem 1rem 0 0",
-            borderTop: "1.5px solid #e0dbd0",
+            borderRadius: isFull ? 0 : "1rem 1rem 0 0",
+            borderTop: isFull ? "none" : "1.5px solid #e0dbd0",
             boxShadow: "0 -4px 32px rgba(0,0,0,0.12)",
             overflow: "hidden",
           }}
@@ -554,7 +559,10 @@ export default function BottomDrawer({
               dragging anywhere on the strip (or the card list) moves the drawer.
               Vaul's internal scroll detection prevents card-list scrolling from
               accidentally triggering a drawer drag. */}
-          <div className="flex-shrink-0 select-none">
+          <div
+            className="flex-shrink-0 select-none"
+            style={{ borderTop: isFull ? "1.5px solid #e0dbd0" : "none" }}
+          >
             {/* Drag pill */}
             <div className="flex justify-center pt-3 pb-2">
               <div className="w-10 h-1 rounded-full bg-[#e0dbd0]" />
