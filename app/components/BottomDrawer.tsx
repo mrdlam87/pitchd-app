@@ -458,9 +458,12 @@ function stateForSnap(snap: number | string | null): DrawerState {
   if (snap === 1) return "full";
   // Vaul returns the exact value passed in SNAP_POINTS, so === is safe here.
   if (snap === HALF_VH) return "half";
+  // null only occurs when dismissible=true closes the drawer — never fires here.
   return "peek";
 }
 
+// More button cycles up: peek→half→full. Collapse goes full→peek directly
+// (skipping half) — drag is the natural way to land on half from full.
 function cycleUp(s: DrawerState): DrawerState {
   return s === "peek" ? "half" : "full";
 }
@@ -544,6 +547,9 @@ export default function BottomDrawer({
             borderTop: isFull ? "none" : "1.5px solid #e0dbd0",
             boxShadow: "0 -4px 32px rgba(0,0,0,0.12)",
             overflow: "hidden",
+            // Transition border-radius so it animates alongside Vaul's snap
+            // rather than snapping instantly when drawerState commits.
+            transition: `border-radius ${DRAWER_TRANSITION_MS}ms cubic-bezier(0.32,0.72,0,1)`,
           }}
         >
           {/* Visually-hidden title for screen readers — Vaul extends Radix Dialog
@@ -568,7 +574,7 @@ export default function BottomDrawer({
               Vaul's internal scroll detection prevents card-list scrolling from
               accidentally triggering a drawer drag. */}
           <div
-            className="flex-shrink-0 select-none cursor-pointer"
+            className="flex-shrink-0 select-none cursor-grab"
             style={{ borderTop: isFull ? "1.5px solid #e0dbd0" : "none" }}
           >
             {/* Drag pill */}
