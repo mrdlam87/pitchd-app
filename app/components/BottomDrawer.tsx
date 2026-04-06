@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Drawer } from "vaul";
 import { CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
 import { wmoCodeToEmoji, condColorForCode } from "@/lib/weatherScore";
@@ -448,6 +448,23 @@ function cycleUp(s: DrawerState): DrawerState {
   return s === "peek" ? "half" : "full";
 }
 
+// Snap points — full=1 means the drawer's top edge reaches translateY=0,
+// so the internal spacer formula max(0, FULL_STATE_SPACER_PX - translateY)
+// reaches exactly FULL_STATE_SPACER_PX when fully expanded.
+const SNAP_POINTS: (number | string)[] = ["64px", HALF_VH, 1];
+
+function snapForState(s: DrawerState): number | string {
+  if (s === "full") return 1;
+  if (s === "half") return HALF_VH;
+  return "64px";
+}
+
+function stateForSnap(snap: number | string | null): DrawerState {
+  if (snap === 1) return "full";
+  if (snap === HALF_VH) return "half";
+  return "peek";
+}
+
 type Props = {
   campsites: Campsite[];
   hasMore: boolean;
@@ -475,26 +492,49 @@ export default function BottomDrawer({
   onDrawerStateChange,
   onSelectPin,
 }: Props) {
-  // Vaul uses window.innerHeight (not the element height) for snap point offsets.
-  // To stop the drawer FULL_STATE_SPACER_PX below the viewport top in full state,
-  // we pass a fraction < 1. At runtime: offset = innerHeight × (1 − fullFrac) = FULL_STATE_SPACER_PX.
-  const fullFrac = typeof window !== "undefined"
-    ? (window.innerHeight - FULL_STATE_SPACER_PX) / window.innerHeight
-    : 1 - FULL_STATE_SPACER_PX / 844; // SSR fallback
+  // Spacer ref — height driven imperatively by the rAF loop below.
+  // Must NOT have a `height` in its React style prop or React re-renders
+  // will overwrite the imperative value.
+  const spacerRef = useRef<HTMLDivElement>(null);
 
-  const SNAP_POINTS: (number | string)[] = ["64px", HALF_VH, fullFrac];
+  // rAF loop: reads the drawer's live translateY via getComputedStyle (resolves
+  // CSS custom properties that Vaul uses in data-vaul-delayed-snap-points mode),
+  // then sets the spacer height = max(0, FULL_STATE_SPACER_PX - translateY).
+  // This gives the AllTrails-style proportional growth as the drawer slides up.
+  useEffect(() => {
+    const spacer = spacerRef.current;
+    if (!spacer) return;
+    let drawerEl: HTMLElement | null = null;
+    let prevH = -1;
+    let rafId: number;
 
-  const snapForState = (s: DrawerState): number | string => {
-    if (s === "full") return fullFrac;
-    if (s === "half") return HALF_VH;
-    return "64px";
-  };
+    function tick() {
+      if (!drawerEl) {
+        drawerEl = document.querySelector<HTMLElement>("[data-vaul-drawer]");
+      }
+      if (drawerEl) {
+        const t = window.getComputedStyle(drawerEl).transform;
+        let y = Infinity;
+        if (t && t !== "none") {
+          const m = t.match(/matrix(?:3d)?\(([^)]+)\)/);
+          if (m) {
+            const vals = m[1].split(",").map(parseFloat);
+            // matrix(a,b,c,d,tx,ty) → index 5; matrix3d(...) → index 13
+            y = vals.length === 6 ? vals[5] : vals[13];
+          }
+        }
+        const h = isFinite(y) ? Math.max(0, FULL_STATE_SPACER_PX - y) : 0;
+        if (h !== prevH) {
+          prevH = h;
+          spacer.style.height = `${h}px`;
+        }
+      }
+      rafId = requestAnimationFrame(tick);
+    }
 
-  const stateForSnap = (snap: number | string | null): DrawerState => {
-    if (snap === fullFrac) return "full";
-    if (snap === HALF_VH) return "half";
-    return "peek";
-  };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, []);
 
   const isFull = drawerState === "full";
 
@@ -519,25 +559,7 @@ export default function BottomDrawer({
     : null;
 
   return (
-    <>
-      {/* Map cover — fills the 0–FULL_STATE_SPACER_PX gap above the drawer in full
-          state, preventing the map from showing through behind the search bar and
-          chips. Sits below the search bar (z-[60]) and above the map. */}
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: FULL_STATE_SPACER_PX,
-          background: SURFACE,
-          zIndex: 49,
-          opacity: isFull ? 1 : 0,
-          transition: "opacity 500ms cubic-bezier(0.32,0.72,0,1)",
-          pointerEvents: "none",
-        }}
-      />
-      <Drawer.Root
+    <Drawer.Root
       snapPoints={SNAP_POINTS}
       activeSnapPoint={snapForState(drawerState)}
       setActiveSnapPoint={(snap) => onDrawerStateChange(stateForSnap(snap))}
@@ -560,9 +582,6 @@ export default function BottomDrawer({
         <Drawer.Content
           className="fixed bottom-0 left-0 right-0 flex flex-col z-50 outline-none"
           style={{
-            // Full-height drawer; the full snap point fraction ensures the top
-            // edge stops FULL_STATE_SPACER_PX below the viewport top, clearing
-            // the floating search bar and chips. No spacer div needed.
             height: "100dvh",
             background: SURFACE,
             borderRadius: isFull ? 0 : "1rem 1rem 0 0",
@@ -571,6 +590,12 @@ export default function BottomDrawer({
             overflow: "hidden",
           }}
         >
+          {/* Growing spacer — height is driven by the rAF loop above.
+              Grows from 0→FULL_STATE_SPACER_PX as the drawer slides up toward
+              the viewport top, covering the map behind the search bar and chips
+              proportionally (AllTrails-style). NO height in React style prop —
+              React must not overwrite the imperative updates. */}
+          <div ref={spacerRef} style={{ flexShrink: 0, overflow: "hidden" }} />
 
           {/* Handle strip — drag pill + summary row + More/Less button.
               Vaul attaches its own pointer-event listeners to Drawer.Content so
@@ -647,6 +672,5 @@ export default function BottomDrawer({
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>
-    </>
   );
 }
