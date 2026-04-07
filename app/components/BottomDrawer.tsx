@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Drawer } from "vaul";
 import { CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
 import { wmoCodeToEmoji, condColorForCode } from "@/lib/weatherScore";
 import type { AmenityPOI, Campsite, POIMeta, WeatherDay } from "@/types/map";
@@ -12,9 +12,10 @@ export type DrawerState = "peek" | "half" | "full";
 
 export const PEEK_HEIGHT_PX = 64;
 
-// Duration of the CSS height transition on the drawer div — exported so Map.tsx
-// can use it to delay scrollIntoView until the animation has settled.
-export const DRAWER_TRANSITION_MS = 300;
+// Duration of Vaul's snap animation — exported so Map.tsx can delay
+// scrollIntoView until the drawer has settled. Must match Vaul's internal
+// CSS transition: `transform 0.5s cubic-bezier(0.32,0.72,0,1)` (500ms).
+export const DRAWER_TRANSITION_MS = 500;
 
 // Viewport-height fraction for half state
 const HALF_VH = 0.52;
@@ -443,13 +444,28 @@ function DrawerContentList({
 
 // ── BottomDrawer ───────────────────────────────────────────────────────────────
 
-const DRAG_THRESHOLD_PX = 40;
+// Vaul snap points: least → most visible.
+// "64px" = peek strip, HALF_VH = half viewport, 1 = full viewport.
+const SNAP_POINTS: (number | string)[] = ["64px", HALF_VH, 1];
 
+function snapForState(s: DrawerState): number | string {
+  if (s === "full") return 1;
+  if (s === "half") return HALF_VH;
+  return "64px";
+}
+
+function stateForSnap(snap: number | string | null): DrawerState {
+  if (snap === 1) return "full";
+  // Vaul returns the exact value passed in SNAP_POINTS, so === is safe here.
+  if (snap === HALF_VH) return "half";
+  // null only occurs when dismissible=true closes the drawer — never fires here.
+  return "peek";
+}
+
+// More button cycles up: peek→half→full. Collapse goes full→peek directly
+// (skipping half) — drag is the natural way to land on half from full.
 function cycleUp(s: DrawerState): DrawerState {
   return s === "peek" ? "half" : "full";
-}
-function cycleDown(s: DrawerState): DrawerState {
-  return s === "full" ? "half" : s === "half" ? "peek" : "peek";
 }
 
 type Props = {
@@ -479,18 +495,7 @@ export default function BottomDrawer({
   onDrawerStateChange,
   onSelectPin,
 }: Props) {
-  // Touch drag tracking
-  const touchStartY = useRef<number | null>(null);
-  // Whether we are currently mid-drag (suppresses CSS transition during drag)
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragOffsetY, setDragOffsetY] = useState(0);
-  // Ref to the handle strip so we can attach a non-passive native touchmove
-  // listener (React registers touch handlers as passive by default, which
-  // silently ignores e.preventDefault() and spams console warnings).
-  const handleStripRef = useRef<HTMLDivElement | null>(null);
-  // Track whether the last touch was a drag (vs a tap) so we can suppress the
-  // onClick that fires after touchEnd when the gesture was a drag, not a tap.
-  const wasDragRef = useRef(false);
+  const isFull = drawerState === "full";
 
   const selectedPoi = selectedPoiId
     ? amenityPois.find((p) => p.id === selectedPoiId) ?? null
@@ -505,63 +510,6 @@ export default function BottomDrawer({
       ? (poiMeta[selectedPoi.amenityType.key] ?? { label: "POI" }).label
       : "";
 
-  // Attach a non-passive native touchmove to the handle strip so we can call
-  // preventDefault() without browser console warnings.
-  useEffect(() => {
-    const el = handleStripRef.current;
-    if (!el) return;
-    function onNativeTouchMove(e: TouchEvent) {
-      if (touchStartY.current === null) return;
-      // Only prevent default (scroll lock) when dragging the handle
-      e.preventDefault();
-    }
-    el.addEventListener("touchmove", onNativeTouchMove, { passive: false });
-    return () => el.removeEventListener("touchmove", onNativeTouchMove);
-  }, []);
-
-  // Drag handlers — start/end via React synthetic events; move split:
-  // native listener (above) calls preventDefault() to suppress passive-listener warnings,
-  // React onTouchMove updates isDragging / dragOffsetY visual state.
-  function handleTouchStart(e: React.TouchEvent) {
-    // Reset here (not in onClick) so a drag that never fires a click event
-    // doesn't leave wasDragRef stuck at true and swallow the next real tap.
-    wasDragRef.current = false;
-    if (e.touches.length !== 1) return;
-    touchStartY.current = e.touches[0].clientY;
-    setIsDragging(false);
-    setDragOffsetY(0);
-  }
-
-  function handleTouchMove(e: React.TouchEvent) {
-    if (touchStartY.current === null) return;
-    const dy = e.touches[0].clientY - touchStartY.current;
-    setIsDragging(true);
-    // Constrain: don't drag past drawer's natural height (upward only)
-    setDragOffsetY(Math.max(0, dy));
-  }
-
-  function handleTouchEnd(e: React.TouchEvent) {
-    if (touchStartY.current === null) return;
-    const dy = e.changedTouches[0].clientY - touchStartY.current;
-    touchStartY.current = null;
-    const wasDrag = Math.abs(dy) > DRAG_THRESHOLD_PX;
-    wasDragRef.current = wasDrag;
-    setIsDragging(false);
-    setDragOffsetY(0);
-    if (dy < -DRAG_THRESHOLD_PX) {
-      onDrawerStateChange(cycleUp(drawerState));
-    } else if (dy > DRAG_THRESHOLD_PX) {
-      onDrawerStateChange(cycleDown(drawerState));
-    }
-  }
-
-  const isFull = drawerState === "full";
-  const drawerHeightStyle = isFull
-    ? "100dvh"
-    : drawerState === "half"
-    ? `${HALF_VH * 100}vh`
-    : `${PEEK_HEIGHT_PX}px`;
-
   // Peek state: show selected card (or first card) without scrolling
   const peekIdx = selectedIdx ?? 0;
   const peekCampsite = campsites[peekIdx];
@@ -570,106 +518,130 @@ export default function BottomDrawer({
     : null;
 
   return (
-    <div
-      className="flex flex-col shadow-2xl z-50"
-      style={{
-        position: isFull ? "fixed" : "absolute",
-        top: isFull ? 0 : "auto",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: drawerHeightStyle,
-        borderRadius: isFull ? 0 : "1rem 1rem 0 0",
-        borderTop: isFull ? "none" : "1.5px solid #e0dbd0",
-        transform: isDragging ? `translateY(${dragOffsetY}px)` : "translateY(0)",
-        transition: isDragging ? "none" : `height ${DRAWER_TRANSITION_MS}ms ease-in-out, border-radius ${DRAWER_TRANSITION_MS}ms ease-in-out`,
-        background: SURFACE,
-      }}
+    <Drawer.Root
+      snapPoints={SNAP_POINTS}
+      activeSnapPoint={snapForState(drawerState)}
+      setActiveSnapPoint={(snap) => onDrawerStateChange(stateForSnap(snap))}
+      // modal=false: the map and UI above the drawer stay fully interactive.
+      modal={false}
+      // dismissible=false: peek is the minimum — the drawer never disappears.
+      dismissible={false}
+      // fadeFromIndex=0 prevents Vaul's overlay-snap-point logic from treating
+      // the half snap point (index 1) as fadeFromIndex-1, which would cause
+      // getPercentageDragged to return 1 immediately when dragging down from
+      // half — triggering the dismissible=false drag block before any movement.
+      fadeFromIndex={0}
+      // Always open; onOpenChange is a no-op since we control state via drawerState.
+      open
+      onOpenChange={() => {}}
+      // Prevent Vaul from adding overflow:hidden or background-color to <body>.
+      noBodyStyles
     >
-      {/* Spacer in full state — pushes content below the floating search bar + chips (z-[60]).
-          Intentionally opaque (inherits SURFACE background) to occlude map tiles beneath it. */}
-      {isFull && <div style={{ height: FULL_STATE_SPACER_PX, flexShrink: 0 }} />}
+      <Drawer.Portal>
+        <Drawer.Content
+          className="fixed bottom-0 left-0 right-0 flex flex-col z-50 outline-none"
+          style={{
+            height: "100dvh",
+            background: SURFACE,
+            borderRadius: isFull ? 0 : "1rem 1rem 0 0",
+            borderTop: isFull ? "none" : "1.5px solid #e0dbd0",
+            boxShadow: "0 -4px 32px rgba(0,0,0,0.12)",
+            overflow: "hidden",
+            // Transition border-radius so it animates alongside Vaul's snap
+            // rather than snapping instantly when drawerState commits.
+            transition: `border-radius ${DRAWER_TRANSITION_MS}ms cubic-bezier(0.32,0.72,0,1)`,
+          }}
+        >
+          {/* Visually-hidden title for screen readers — Vaul extends Radix Dialog
+              which requires either aria-label or a Drawer.Title to be present. */}
+          <Drawer.Title className="sr-only">Search results</Drawer.Title>
 
-      {/* Peek strip — drag handle + summary row.
-          Touch handlers live here so only dragging the handle strip moves the drawer;
-          the card list scrolls independently without triggering drag. */}
-      <div
-        ref={handleStripRef}
-        className="flex-shrink-0 cursor-pointer select-none"
-        style={{ borderTop: isFull ? "1.5px solid #e0dbd0" : "none" }}
-        onClick={() => {
-          // Suppress click when the touch gesture was a drag (not a tap)
-          if (wasDragRef.current) { wasDragRef.current = false; return; }
-          onDrawerStateChange(drawerState === "peek" ? "half" : cycleDown(drawerState));
-        }}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
-        {/* Drag handle */}
-        <div className="flex justify-center pt-3 pb-2">
-          <div className="w-10 h-1 rounded-full bg-[#e0dbd0]" />
-        </div>
-
-        {/* Summary row */}
-        <div className="px-4 pb-2 flex items-center justify-between">
-          <div className="text-sm font-semibold" style={{ color: FOREST_GREEN }}>
-            {resultLabel}
-            {campsites.length > 0 && (
-              <span className="ml-1.5 font-normal text-xs" style={{ color: SAGE }}>
-                · nearby
-              </span>
-            )}
-          </div>
-          {/* More / Less toggle — cycles peek→half→full→peek */}
-          <button
-            type="button"
-            className="text-[11px] font-bold flex-shrink-0 ml-2"
-            style={{ color: CORAL }}
-            onClick={(e) => {
-              e.stopPropagation();
-              onDrawerStateChange(drawerState === "full" ? "peek" : cycleUp(drawerState));
+          {/* Spacer — pushes content below the floating search bar + chips (z-[60])
+              in full state. Animating the height (rather than mount/unmount) prevents
+              the handle from jumping when entering or leaving full state. */}
+          <div
+            style={{
+              height: isFull ? FULL_STATE_SPACER_PX : 0,
+              flexShrink: 0,
+              overflow: "hidden",
+              transition: `height ${DRAWER_TRANSITION_MS}ms cubic-bezier(0.32,0.72,0,1)`,
             }}
-            aria-label={drawerState === "full" ? "Collapse drawer" : "Expand drawer"}
+          />
+
+          {/* Handle strip — drag pill + summary row + More/Less button.
+              Vaul attaches its own pointer-event listeners to Drawer.Content so
+              dragging anywhere on the strip (or the card list) moves the drawer.
+              Vaul's internal scroll detection prevents card-list scrolling from
+              accidentally triggering a drawer drag. */}
+          <div
+            className="flex-shrink-0 select-none cursor-grab"
+            style={{ borderTop: isFull ? "1.5px solid #e0dbd0" : "none" }}
           >
-            {drawerState === "full" ? "▼ Less" : "▲ More"}
-          </button>
-        </div>
-      </div>
+            {/* Drag pill */}
+            <div className="flex justify-center pt-3 pb-2">
+              <div className="w-10 h-1 rounded-full bg-[#e0dbd0]" />
+            </div>
 
-      {/* Scrollable card list — visible in half and full states */}
-      {drawerState !== "peek" && (
-        <DrawerContentList
-          campsites={campsites}
-          selectedPoi={selectedPoi}
-          poiMeta={poiMeta}
-          selectedIdx={selectedIdx}
-          userLocation={userLocation}
-          cardRefs={cardRefs}
-          compact={drawerState !== "full"}
-          onSelectPin={onSelectPin}
-        />
-      )}
+            {/* Summary row */}
+            <div className="px-4 pb-2 flex items-center justify-between">
+              <div className="text-sm font-semibold" style={{ color: FOREST_GREEN }}>
+                {resultLabel}
+                {campsites.length > 0 && (
+                  <span className="ml-1.5 font-normal text-xs" style={{ color: SAGE }}>
+                    · nearby
+                  </span>
+                )}
+              </div>
+              {/* More / Less button — tap to cycle up, or collapse from full */}
+              <button
+                type="button"
+                className="text-[11px] font-bold flex-shrink-0 ml-2"
+                style={{ color: CORAL }}
+                onClick={() =>
+                  onDrawerStateChange(drawerState === "full" ? "peek" : cycleUp(drawerState))
+                }
+                aria-label={drawerState === "full" ? "Collapse drawer" : "Expand drawer"}
+              >
+                {drawerState === "full" ? "▼ Less" : "▲ More"}
+              </button>
+            </div>
+          </div>
 
-      {/* Peek state — show selected card (or first card) without scrolling */}
-      {drawerState === "peek" && (
-        <div className="px-4 pt-2 pb-4 overflow-hidden">
-          {selectedPoi && peekPoiMeta
-            ? <POICard poi={selectedPoi} meta={peekPoiMeta} />
-            : peekCampsite && (
-                <CampsiteCard
-                  campsite={peekCampsite}
-                  index={peekIdx}
-                  isSelected={selectedIdx === peekIdx}
-                  compact={true}
-                  userLocation={userLocation}
-                  cardRef={() => { /* peek card — ref not used for scrollIntoView */ }}
-                  onSelect={() => onSelectPin(peekIdx)}
-                />
-              )
-          }
-        </div>
-      )}
-    </div>
+          {/* Scrollable card list — visible in half and full states */}
+          {drawerState !== "peek" && (
+            <DrawerContentList
+              campsites={campsites}
+              selectedPoi={selectedPoi}
+              poiMeta={poiMeta}
+              selectedIdx={selectedIdx}
+              userLocation={userLocation}
+              cardRefs={cardRefs}
+              compact={drawerState !== "full"}
+              onSelectPin={onSelectPin}
+            />
+          )}
+
+          {/* Peek state — show selected card (or first card) without scrolling */}
+          {drawerState === "peek" && (
+            <div className="px-4 pt-2 pb-4 overflow-hidden">
+              {selectedPoi && peekPoiMeta
+                ? <POICard poi={selectedPoi} meta={peekPoiMeta} />
+                : peekCampsite && (
+                    <CampsiteCard
+                      campsite={peekCampsite}
+                      index={peekIdx}
+                      isSelected={selectedIdx === peekIdx}
+                      compact={true}
+                      userLocation={userLocation}
+                      cardRef={() => { /* peek card — ref not used for scrollIntoView */ }}
+                      onSelect={() => onSelectPin(peekIdx)}
+                    />
+                  )
+              }
+            </div>
+          )}
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
   );
 }
