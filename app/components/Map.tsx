@@ -269,7 +269,7 @@ function consumeSearchResults(): SearchResultsPayload | null {
 // radius is in screen pixels (zoom-adaptive). Pin body is 26px wide, so
 // two pins overlap when centers are <26px apart. 40px adds a tap-target
 // buffer — tighten toward 28 for stricter overlap-only clustering.
-const CLUSTER_OPTIONS = { radius: 40, maxZoom: 14 } as const;
+const CLUSTER_OPTIONS = { radius: 45, maxZoom: 14 } as const;
 
 type ClusterBubbleProps = { count: number; color: string; ariaLabel: string; onExpand: () => void };
 function ClusterBubble({ count, color, ariaLabel, onExpand }: ClusterBubbleProps) {
