@@ -3,7 +3,8 @@
 import mapboxgl from "mapbox-gl";
 import MapGL, { Marker, type MapRef } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { useCallback, useEffect, useRef, useState } from "react";
+import Supercluster from "supercluster";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import FilterPanel, { type FilterState } from "./FilterPanel";
 import BottomDrawer, {
   type DrawerState,
@@ -362,6 +363,49 @@ export default function MapView() {
   // Mirrors campsites state for stable callbacks (handleMoveEnd AI pan path).
   const campsitesRef = useRef<Campsite[]>([]);
 
+  // Tracks current map viewport for cluster computation.
+  // Updated on every onMoveEnd and on initial onLoad.
+  const [currentZoom, setCurrentZoom] = useState<number>(DEFAULT_VIEWPORT.zoom);
+  const [currentBounds, setCurrentBounds] = useState<[number, number, number, number] | null>(null);
+
+  // Campsite cluster index — rebuilt only when the campsite list changes.
+  const campsiteClusterInstance = useMemo(() => {
+    const sc = new Supercluster<{ id: string; idx: number }>({ radius: 60, maxZoom: 14 });
+    sc.load(
+      campsites.map((c, i) => ({
+        type: "Feature" as const,
+        geometry: { type: "Point" as const, coordinates: [c.lng, c.lat] },
+        properties: { id: c.id, idx: i },
+      }))
+    );
+    return sc;
+  }, [campsites]);
+
+  // Amenity POI cluster index — rebuilt only when the amenity list changes.
+  const amenityClusterInstance = useMemo(() => {
+    const sc = new Supercluster<{ id: string; poiType: string }>({ radius: 60, maxZoom: 14 });
+    sc.load(
+      amenityPois.map((p) => ({
+        type: "Feature" as const,
+        geometry: { type: "Point" as const, coordinates: [p.lng, p.lat] },
+        properties: { id: p.id, poiType: p.amenityType.key },
+      }))
+    );
+    return sc;
+  }, [amenityPois]);
+
+  // Visible campsite clusters — recomputed on zoom, pan, or data change.
+  const campsiteClusters = useMemo(() => {
+    if (!currentBounds) return [];
+    return campsiteClusterInstance.getClusters(currentBounds, Math.floor(currentZoom));
+  }, [campsiteClusterInstance, currentZoom, currentBounds]);
+
+  // Visible amenity POI clusters.
+  const amenityClusters = useMemo(() => {
+    if (!currentBounds) return [];
+    return amenityClusterInstance.getClusters(currentBounds, Math.floor(currentZoom));
+  }, [amenityClusterInstance, currentZoom, currentBounds]);
+
   // Request user geolocation on mount
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -548,6 +592,9 @@ export default function MapView() {
   const handleLoad = useCallback(
     (_e: { target: mapboxgl.Map }) => {
       mapLoadedRef.current = true;
+      const lb = _e.target.getBounds();
+      setCurrentZoom(_e.target.getZoom());
+      if (lb) setCurrentBounds([lb.getWest(), lb.getSouth(), lb.getEast(), lb.getNorth()]);
 
       // If we arrived from an AI NL search, display those results immediately and
       // fit the map to show all pins. Skip the browse API fetch.
@@ -603,6 +650,12 @@ export default function MapView() {
 
   const handleMoveEnd = useCallback(
     (e: { target: mapboxgl.Map }) => {
+      // Always update zoom + bounds so cluster computation stays current,
+      // even when the fetch is skipped (e.g. after programmatic setPadding).
+      const mb = e.target.getBounds();
+      setCurrentZoom(e.target.getZoom());
+      if (mb) setCurrentBounds([mb.getWest(), mb.getSouth(), mb.getEast(), mb.getNorth()]);
+
       if (skipNextFetch.current) {
         skipNextFetch.current = false;
         return;
@@ -1009,9 +1062,55 @@ export default function MapView() {
           </Marker>
         )}
 
-        {/* Campsite pins */}
-        {campsites.map((campsite, i) => {
-          const isSel = selectedIdx === i;
+        {/* Campsite pins / clusters */}
+        {campsiteClusters.map((feature) => {
+          const [fLng, fLat] = feature.geometry.coordinates;
+
+          if ("cluster" in feature.properties && feature.properties.cluster) {
+            // Cluster bubble
+            const count = (feature.properties as { point_count: number }).point_count;
+            const clusterId = feature.id as number;
+            const size = count >= 50 ? 48 : count >= 10 ? 40 : 32;
+            const handleExpand = () => {
+              const zoom = campsiteClusterInstance.getClusterExpansionZoom(clusterId);
+              mapRef.current?.easeTo({ center: [fLng, fLat], zoom: zoom + 0.5, duration: 400 });
+            };
+            return (
+              <Marker key={`cs-cluster-${clusterId}`} longitude={fLng} latitude={fLat} anchor="center" style={{ zIndex: 2 }}>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${count} campsites — tap to expand`}
+                  onClick={handleExpand}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleExpand(); } }}
+                  style={{
+                    width: size,
+                    height: size,
+                    borderRadius: "50%",
+                    background: FOREST_GREEN,
+                    color: "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 800,
+                    fontSize: size >= 48 ? 14 : 12,
+                    fontFamily: "var(--font-dm-sans), sans-serif",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.28)",
+                    cursor: "pointer",
+                    border: "2.5px solid #fff",
+                  }}
+                >
+                  {count}
+                </div>
+              </Marker>
+            );
+          }
+
+          // Individual campsite pin
+          const { idx } = feature.properties as { id: string; idx: number };
+          const campsite = campsites[idx];
+          if (!campsite) return null;
+          const isSel = selectedIdx === idx;
           const shortName = campsite.name
             .replace(" National Park", " NP")
             .replace(" Conservation Park", " CP")
@@ -1030,11 +1129,11 @@ export default function MapView() {
                 role="button"
                 tabIndex={0}
                 className="relative flex flex-col items-center cursor-pointer select-none"
-                onClick={(e) => { e.stopPropagation(); selectPin(i, false); }}
+                onClick={(e) => { e.stopPropagation(); selectPin(idx, false); }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectPin(i, false); }
+                  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectPin(idx, false); }
                 }}
-                aria-label={`Select campsite ${i + 1}: ${campsite.name}`}
+                aria-label={`Select campsite ${idx + 1}: ${campsite.name}`}
               >
                 <svg
                   style={{
@@ -1061,7 +1160,7 @@ export default function MapView() {
                     fontWeight="800"
                     fontFamily="DM Sans, sans-serif"
                   >
-                    {i + 1}
+                    {idx + 1}
                   </text>
                 </svg>
                 <div
@@ -1080,8 +1179,57 @@ export default function MapView() {
           );
         })}
 
-        {/* AmenityPOI pins */}
-        {amenityPois.map((poi) => {
+        {/* AmenityPOI pins / clusters */}
+        {amenityClusters.map((feature) => {
+          const [fLng, fLat] = feature.geometry.coordinates;
+
+          if ("cluster" in feature.properties && feature.properties.cluster) {
+            // Cluster bubble — derive color from one of the underlying POI leaves
+            const count = (feature.properties as { point_count: number }).point_count;
+            const clusterId = feature.id as number;
+            const leaves = amenityClusterInstance.getLeaves(clusterId, 1);
+            const leafPoiType = (leaves[0]?.properties as { poiType?: string } | undefined)?.poiType;
+            const clusterColor = leafPoiType ? (POI_META[leafPoiType]?.color ?? FOREST_GREEN) : FOREST_GREEN;
+            const size = count >= 50 ? 48 : count >= 10 ? 40 : 32;
+            const handleExpand = () => {
+              const zoom = amenityClusterInstance.getClusterExpansionZoom(clusterId);
+              mapRef.current?.easeTo({ center: [fLng, fLat], zoom: zoom + 0.5, duration: 400 });
+            };
+            return (
+              <Marker key={`poi-cluster-${clusterId}`} longitude={fLng} latitude={fLat} anchor="center" style={{ zIndex: 2 }}>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${count} nearby — tap to expand`}
+                  onClick={handleExpand}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleExpand(); } }}
+                  style={{
+                    width: size,
+                    height: size,
+                    borderRadius: "50%",
+                    background: clusterColor,
+                    color: "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 800,
+                    fontSize: size >= 48 ? 14 : 12,
+                    fontFamily: "var(--font-dm-sans), sans-serif",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.28)",
+                    cursor: "pointer",
+                    border: "2.5px solid #fff",
+                  }}
+                >
+                  {count}
+                </div>
+              </Marker>
+            );
+          }
+
+          // Individual amenity POI pin
+          const { id: poiId } = feature.properties as { id: string; poiType: string };
+          const poi = amenityPois.find((p) => p.id === poiId);
+          if (!poi) return null;
           const isSel = selectedPoiId === poi.id;
           const meta = POI_META[poi.amenityType.key] ?? { emoji: "📍", label: poi.amenityType.key, color: FOREST_GREEN };
           const pinW = isSel ? 34 : 26;
