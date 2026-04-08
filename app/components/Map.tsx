@@ -227,6 +227,11 @@ function computeVisibleBounds(map: mapboxgl.Map, drawerHeightPx: number): Bounds
 
 const EMPTY_FILTERS: FilterState = { activities: [], pois: [], startDate: null, endDate: null };
 
+// Full-world bbox passed to getClusters so all loaded points are always considered.
+// The API already scopes fetched data to the viewport, so filtering again here is
+// redundant and causes a flash-of-empty race when bounds update before the fetch resolves.
+const WORLD_BBOX: [number, number, number, number] = [-180, -90, 180, 90];
+
 
 // Fit the map to the bounding box of a set of campsites.
 // Uses reduce instead of spread to avoid V8 stack overflow on large arrays.
@@ -460,10 +465,9 @@ export default function MapView() {
   // Mirrors campsites state for stable callbacks (handleMoveEnd AI pan path).
   const campsitesRef = useRef<Campsite[]>([]);
 
-  // Tracks current map viewport for cluster computation.
+  // Tracks current zoom level for cluster computation.
   // Updated on every onMoveEnd and on initial onLoad.
   const [currentZoom, setCurrentZoom] = useState<number>(DEFAULT_VIEWPORT.zoom);
-  const [currentBounds, setCurrentBounds] = useState<[number, number, number, number] | null>(null);
 
   // Campsite cluster index — rebuilt only when the campsite list changes.
   const campsiteClusterInstance = useMemo(() => {
@@ -491,17 +495,17 @@ export default function MapView() {
     return sc;
   }, [amenityPois]);
 
-  // Visible campsite clusters — recomputed on zoom, pan, or data change.
-  const campsiteClusters = useMemo(() => {
-    if (!currentBounds) return [];
-    return campsiteClusterInstance.getClusters(currentBounds, Math.floor(currentZoom));
-  }, [campsiteClusterInstance, currentZoom, currentBounds]);
+  // Visible campsite clusters — recomputed when zoom or data changes.
+  const campsiteClusters = useMemo(
+    () => campsiteClusterInstance.getClusters(WORLD_BBOX, Math.floor(currentZoom)),
+    [campsiteClusterInstance, currentZoom]
+  );
 
   // Visible amenity POI clusters.
-  const amenityClusters = useMemo(() => {
-    if (!currentBounds) return [];
-    return amenityClusterInstance.getClusters(currentBounds, Math.floor(currentZoom));
-  }, [amenityClusterInstance, currentZoom, currentBounds]);
+  const amenityClusters = useMemo(
+    () => amenityClusterInstance.getClusters(WORLD_BBOX, Math.floor(currentZoom)),
+    [amenityClusterInstance, currentZoom]
+  );
 
   // O(1) lookup for individual amenity POI features in the render loop.
   const amenityPoiById = useMemo(
@@ -695,9 +699,7 @@ export default function MapView() {
   const handleLoad = useCallback(
     (_e: { target: mapboxgl.Map }) => {
       mapLoadedRef.current = true;
-      const lb = _e.target.getBounds();
       setCurrentZoom(_e.target.getZoom());
-      if (lb) setCurrentBounds([lb.getWest(), lb.getSouth(), lb.getEast(), lb.getNorth()]);
 
       // If we arrived from an AI NL search, display those results immediately and
       // fit the map to show all pins. Skip the browse API fetch.
@@ -753,11 +755,9 @@ export default function MapView() {
 
   const handleMoveEnd = useCallback(
     (e: { target: mapboxgl.Map }) => {
-      // Always update zoom + bounds so cluster computation stays current,
+      // Always update zoom so cluster computation stays current,
       // even when the fetch is skipped (e.g. after programmatic setPadding).
-      const mb = e.target.getBounds();
       setCurrentZoom(e.target.getZoom());
-      if (mb) setCurrentBounds([mb.getWest(), mb.getSouth(), mb.getEast(), mb.getNorth()]);
 
       if (skipNextFetch.current) {
         skipNextFetch.current = false;
