@@ -261,6 +261,103 @@ function consumeSearchResults(): SearchResultsPayload | null {
   }
 }
 
+const CLUSTER_OPTIONS = { radius: 60, maxZoom: 14 } as const;
+
+type ClusterBubbleProps = { count: number; color: string; ariaLabel: string; onExpand: () => void };
+function ClusterBubble({ count, color, ariaLabel, onExpand }: ClusterBubbleProps) {
+  const size = count >= 50 ? 48 : count >= 10 ? 40 : 32;
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={ariaLabel}
+      onClick={onExpand}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onExpand(); } }}
+      style={{
+        width: size, height: size, borderRadius: "50%",
+        background: color, color: "#fff",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontWeight: 800, fontSize: size >= 48 ? 14 : 12,
+        fontFamily: "var(--font-dm-sans), sans-serif",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.28)", cursor: "pointer", border: "2.5px solid #fff",
+      }}
+    >
+      {count}
+    </div>
+  );
+}
+
+type CampsitePinProps = { campsite: Campsite; idx: number; isSelected: boolean; onSelect: () => void };
+function CampsitePin({ campsite, idx, isSelected, onSelect }: CampsitePinProps) {
+  const shortName = campsite.name
+    .replace(" National Park", " NP")
+    .replace(" Conservation Park", " CP")
+    .split(" – ")[0];
+  const pinW = isSelected ? 34 : 26;
+  const pinH = isSelected ? 37 : 28;
+  return (
+    <div
+      role="button" tabIndex={0}
+      className="relative flex flex-col items-center cursor-pointer select-none"
+      onClick={(e) => { e.stopPropagation(); onSelect(); }}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(); } }}
+      aria-label={`Select campsite ${idx + 1}: ${campsite.name}`}
+    >
+      <svg
+        style={{ width: pinW, height: pinH, filter: `drop-shadow(0 2px 6px rgba(0,0,0,${isSelected ? 0.45 : 0.28}))`, transition: "width 150ms, height 150ms" }}
+        viewBox="0 0 26 28" fill="none"
+      >
+        <path d="M13 1.5C7.2 1.5 2.5 6.2 2.5 12C2.5 18.5 9 24 13 26C17 24 23.5 18.5 23.5 12C23.5 6.2 18.8 1.5 13 1.5Z"
+          fill={isSelected ? FOREST_GREEN : "#fff"} stroke={FOREST_GREEN} strokeWidth="1.5" />
+        <text x="13" y="12.5" textAnchor="middle" dominantBaseline="central"
+          fill={isSelected ? "#fff" : FOREST_GREEN} fontSize={isSelected ? 11 : 9} fontWeight="800" fontFamily="DM Sans, sans-serif">
+          {idx + 1}
+        </text>
+      </svg>
+      <div
+        className={`absolute left-full top-1/2 -translate-y-1/2 ml-1 w-max max-w-[140px] leading-tight ${isSelected ? "font-bold" : "font-semibold"}`}
+        style={{ color: FOREST_GREEN, fontFamily: "var(--font-dm-sans), sans-serif", fontSize: isSelected ? 11 : 10, textShadow: "0 0 3px rgba(255,255,255,0.95), 0 0 6px rgba(255,255,255,0.8), 0 1px 2px rgba(0,0,0,0.12)" }}
+      >
+        {shortName}
+      </div>
+    </div>
+  );
+}
+
+type AmenityPinProps = { poi: AmenityPOI; meta: { emoji: string; label: string; color: string }; isSelected: boolean; onSelect: () => void };
+function AmenityPin({ poi, meta, isSelected, onSelect }: AmenityPinProps) {
+  const pinW = isSelected ? 34 : 26;
+  const pinH = isSelected ? 37 : 28;
+  return (
+    <div
+      role="button" tabIndex={0}
+      className="relative flex flex-col items-center cursor-pointer select-none"
+      onClick={(e) => { e.stopPropagation(); onSelect(); }}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(); } }}
+      aria-label={`Select ${meta.label}${poi.name ? `: ${poi.name}` : ""}`}
+    >
+      <svg
+        style={{ width: pinW, height: pinH, filter: `drop-shadow(0 2px 6px rgba(0,0,0,${isSelected ? 0.45 : 0.28}))`, transition: "width 150ms, height 150ms" }}
+        viewBox="0 0 26 28" fill="none"
+      >
+        <path d="M13 1.5C7.2 1.5 2.5 6.2 2.5 12C2.5 18.5 9 24 13 26C17 24 23.5 18.5 23.5 12C23.5 6.2 18.8 1.5 13 1.5Z"
+          fill="#fff" stroke={meta.color} strokeWidth={isSelected ? "2.5" : "1.5"} />
+      </svg>
+      <div className="absolute pointer-events-none"
+        style={{ fontSize: isSelected ? 12 : 10, lineHeight: 1, top: 0, width: pinW, height: Math.round(pinH * 0.72), display: "flex", alignItems: "center", justifyContent: "center" }}
+      >
+        {meta.emoji}
+      </div>
+      <div
+        className={`absolute left-full top-1/2 -translate-y-1/2 ml-1 w-max max-w-[140px] leading-tight ${isSelected ? "font-bold" : "font-semibold"}`}
+        style={{ color: FOREST_GREEN, fontFamily: "var(--font-dm-sans), sans-serif", fontSize: isSelected ? 11 : 10, textShadow: "0 0 3px rgba(255,255,255,0.95), 0 0 6px rgba(255,255,255,0.8), 0 1px 2px rgba(0,0,0,0.12)" }}
+      >
+        {poi.name ?? meta.label}
+      </div>
+    </div>
+  );
+}
+
 export default function MapView() {
   const [campsites, setCampsites] = useState<Campsite[]>([]);
   // useState lazy initialiser runs synchronously on the first render — before any effects
@@ -370,7 +467,7 @@ export default function MapView() {
 
   // Campsite cluster index — rebuilt only when the campsite list changes.
   const campsiteClusterInstance = useMemo(() => {
-    const sc = new Supercluster<{ id: string; idx: number }>({ radius: 60, maxZoom: 14 });
+    const sc = new Supercluster<{ id: string; idx: number }>(CLUSTER_OPTIONS);
     sc.load(
       campsites.map((c, i) => ({
         type: "Feature" as const,
@@ -383,7 +480,7 @@ export default function MapView() {
 
   // Amenity POI cluster index — rebuilt only when the amenity list changes.
   const amenityClusterInstance = useMemo(() => {
-    const sc = new Supercluster<{ id: string; poiType: string }>({ radius: 60, maxZoom: 14 });
+    const sc = new Supercluster<{ id: string; poiType: string }>(CLUSTER_OPTIONS);
     sc.load(
       amenityPois.map((p) => ({
         type: "Feature" as const,
@@ -405,6 +502,12 @@ export default function MapView() {
     if (!currentBounds) return [];
     return amenityClusterInstance.getClusters(currentBounds, Math.floor(currentZoom));
   }, [amenityClusterInstance, currentZoom, currentBounds]);
+
+  // O(1) lookup for individual amenity POI features in the render loop.
+  const amenityPoiById = useMemo(
+    () => new Map(amenityPois.map((p) => [p.id, p])),
+    [amenityPois]
+  );
 
   // Request user geolocation on mount
   useEffect(() => {
@@ -1065,116 +1168,29 @@ export default function MapView() {
         {/* Campsite pins / clusters */}
         {campsiteClusters.map((feature) => {
           const [fLng, fLat] = feature.geometry.coordinates;
-
           if ("cluster" in feature.properties && feature.properties.cluster) {
-            // Cluster bubble
             const count = (feature.properties as { point_count: number }).point_count;
             const clusterId = feature.id as number;
-            const size = count >= 50 ? 48 : count >= 10 ? 40 : 32;
-            const handleExpand = () => {
-              const zoom = campsiteClusterInstance.getClusterExpansionZoom(clusterId);
-              mapRef.current?.easeTo({ center: [fLng, fLat], zoom: zoom + 0.5, duration: 400 });
-            };
             return (
               <Marker key={`cs-cluster-${clusterId}`} longitude={fLng} latitude={fLat} anchor="center" style={{ zIndex: 2 }}>
-                <div
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`${count} campsites — tap to expand`}
-                  onClick={handleExpand}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleExpand(); } }}
-                  style={{
-                    width: size,
-                    height: size,
-                    borderRadius: "50%",
-                    background: FOREST_GREEN,
-                    color: "#fff",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: 800,
-                    fontSize: size >= 48 ? 14 : 12,
-                    fontFamily: "var(--font-dm-sans), sans-serif",
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.28)",
-                    cursor: "pointer",
-                    border: "2.5px solid #fff",
+                <ClusterBubble
+                  count={count}
+                  color={FOREST_GREEN}
+                  ariaLabel={`${count} campsites — tap to expand`}
+                  onExpand={() => {
+                    const zoom = campsiteClusterInstance.getClusterExpansionZoom(clusterId);
+                    mapRef.current?.easeTo({ center: [fLng, fLat], zoom: zoom + 0.5, duration: 400 });
                   }}
-                >
-                  {count}
-                </div>
+                />
               </Marker>
             );
           }
-
-          // Individual campsite pin
           const { idx } = feature.properties as { id: string; idx: number };
           const campsite = campsites[idx];
           if (!campsite) return null;
-          const isSel = selectedIdx === idx;
-          const shortName = campsite.name
-            .replace(" National Park", " NP")
-            .replace(" Conservation Park", " CP")
-            .split(" – ")[0];
-          const pinW = isSel ? 34 : 26;
-          const pinH = isSel ? 37 : 28;
           return (
-            <Marker
-              key={campsite.id}
-              longitude={campsite.lng}
-              latitude={campsite.lat}
-              anchor="bottom"
-              style={{ zIndex: isSel ? 10 : 1 }}
-            >
-              <div
-                role="button"
-                tabIndex={0}
-                className="relative flex flex-col items-center cursor-pointer select-none"
-                onClick={(e) => { e.stopPropagation(); selectPin(idx, false); }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectPin(idx, false); }
-                }}
-                aria-label={`Select campsite ${idx + 1}: ${campsite.name}`}
-              >
-                <svg
-                  style={{
-                    width: pinW,
-                    height: pinH,
-                    filter: `drop-shadow(0 2px 6px rgba(0,0,0,${isSel ? 0.45 : 0.28}))`,
-                    transition: "width 150ms, height 150ms",
-                  }}
-                  viewBox="0 0 26 28"
-                  fill="none"
-                >
-                  <path
-                    d="M13 1.5C7.2 1.5 2.5 6.2 2.5 12C2.5 18.5 9 24 13 26C17 24 23.5 18.5 23.5 12C23.5 6.2 18.8 1.5 13 1.5Z"
-                    fill={isSel ? FOREST_GREEN : "#fff"}
-                    stroke={FOREST_GREEN}
-                    strokeWidth="1.5"
-                  />
-                  <text
-                    x="13" y="12.5"
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fill={isSel ? "#fff" : FOREST_GREEN}
-                    fontSize={isSel ? 11 : 9}
-                    fontWeight="800"
-                    fontFamily="DM Sans, sans-serif"
-                  >
-                    {idx + 1}
-                  </text>
-                </svg>
-                <div
-                  className={`absolute left-full top-1/2 -translate-y-1/2 ml-1 w-max max-w-[140px] leading-tight ${isSel ? "font-bold" : "font-semibold"}`}
-                  style={{
-                    color: FOREST_GREEN,
-                    fontFamily: "var(--font-dm-sans), sans-serif",
-                    fontSize: isSel ? 11 : 10,
-                    textShadow: "0 0 3px rgba(255,255,255,0.95), 0 0 6px rgba(255,255,255,0.8), 0 1px 2px rgba(0,0,0,0.12)",
-                  }}
-                >
-                  {shortName}
-                </div>
-              </div>
+            <Marker key={campsite.id} longitude={campsite.lng} latitude={campsite.lat} anchor="bottom" style={{ zIndex: selectedIdx === idx ? 10 : 1 }}>
+              <CampsitePin campsite={campsite} idx={idx} isSelected={selectedIdx === idx} onSelect={() => selectPin(idx, false)} />
             </Marker>
           );
         })}
@@ -1182,120 +1198,33 @@ export default function MapView() {
         {/* AmenityPOI pins / clusters */}
         {amenityClusters.map((feature) => {
           const [fLng, fLat] = feature.geometry.coordinates;
-
           if ("cluster" in feature.properties && feature.properties.cluster) {
-            // Cluster bubble — derive color from one of the underlying POI leaves
             const count = (feature.properties as { point_count: number }).point_count;
             const clusterId = feature.id as number;
             const leaves = amenityClusterInstance.getLeaves(clusterId, 1);
             const leafPoiType = (leaves[0]?.properties as { poiType?: string } | undefined)?.poiType;
             const clusterColor = leafPoiType ? (POI_META[leafPoiType]?.color ?? FOREST_GREEN) : FOREST_GREEN;
-            const size = count >= 50 ? 48 : count >= 10 ? 40 : 32;
-            const handleExpand = () => {
-              const zoom = amenityClusterInstance.getClusterExpansionZoom(clusterId);
-              mapRef.current?.easeTo({ center: [fLng, fLat], zoom: zoom + 0.5, duration: 400 });
-            };
             return (
               <Marker key={`poi-cluster-${clusterId}`} longitude={fLng} latitude={fLat} anchor="center" style={{ zIndex: 2 }}>
-                <div
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`${count} nearby — tap to expand`}
-                  onClick={handleExpand}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleExpand(); } }}
-                  style={{
-                    width: size,
-                    height: size,
-                    borderRadius: "50%",
-                    background: clusterColor,
-                    color: "#fff",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: 800,
-                    fontSize: size >= 48 ? 14 : 12,
-                    fontFamily: "var(--font-dm-sans), sans-serif",
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.28)",
-                    cursor: "pointer",
-                    border: "2.5px solid #fff",
+                <ClusterBubble
+                  count={count}
+                  color={clusterColor}
+                  ariaLabel={`${count} nearby — tap to expand`}
+                  onExpand={() => {
+                    const zoom = amenityClusterInstance.getClusterExpansionZoom(clusterId);
+                    mapRef.current?.easeTo({ center: [fLng, fLat], zoom: zoom + 0.5, duration: 400 });
                   }}
-                >
-                  {count}
-                </div>
+                />
               </Marker>
             );
           }
-
-          // Individual amenity POI pin
           const { id: poiId } = feature.properties as { id: string; poiType: string };
-          const poi = amenityPois.find((p) => p.id === poiId);
+          const poi = amenityPoiById.get(poiId);
           if (!poi) return null;
-          const isSel = selectedPoiId === poi.id;
           const meta = POI_META[poi.amenityType.key] ?? { emoji: "📍", label: poi.amenityType.key, color: FOREST_GREEN };
-          const pinW = isSel ? 34 : 26;
-          const pinH = isSel ? 37 : 28;
           return (
-            <Marker
-              key={poi.id}
-              longitude={poi.lng}
-              latitude={poi.lat}
-              anchor="bottom"
-              style={{ zIndex: isSel ? 10 : 1 }}
-            >
-              <div
-                role="button"
-                tabIndex={0}
-                className="relative flex flex-col items-center cursor-pointer select-none"
-                onClick={(e) => { e.stopPropagation(); selectPoi(poi); }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectPoi(poi); }
-                }}
-                aria-label={`Select ${meta.label}${poi.name ? `: ${poi.name}` : ""}`}
-              >
-                <svg
-                  style={{
-                    width: pinW,
-                    height: pinH,
-                    filter: `drop-shadow(0 2px 6px rgba(0,0,0,${isSel ? 0.45 : 0.28}))`,
-                    transition: "width 150ms, height 150ms",
-                  }}
-                  viewBox="0 0 26 28"
-                  fill="none"
-                >
-                  <path
-                    d="M13 1.5C7.2 1.5 2.5 6.2 2.5 12C2.5 18.5 9 24 13 26C17 24 23.5 18.5 23.5 12C23.5 6.2 18.8 1.5 13 1.5Z"
-                    fill="#fff"
-                    stroke={meta.color}
-                    strokeWidth={isSel ? "2.5" : "1.5"}
-                  />
-                </svg>
-                <div
-                  className="absolute pointer-events-none"
-                  style={{
-                    fontSize: isSel ? 12 : 10,
-                    lineHeight: 1,
-                    top: 0,
-                    width: pinW,
-                    height: Math.round(pinH * 0.72),
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  {meta.emoji}
-                </div>
-                <div
-                  className={`absolute left-full top-1/2 -translate-y-1/2 ml-1 w-max max-w-[140px] leading-tight ${isSel ? "font-bold" : "font-semibold"}`}
-                  style={{
-                    color: FOREST_GREEN,
-                    fontFamily: "var(--font-dm-sans), sans-serif",
-                    fontSize: isSel ? 11 : 10,
-                    textShadow: "0 0 3px rgba(255,255,255,0.95), 0 0 6px rgba(255,255,255,0.8), 0 1px 2px rgba(0,0,0,0.12)",
-                  }}
-                >
-                  {poi.name ?? meta.label}
-                </div>
-              </div>
+            <Marker key={poi.id} longitude={poi.lng} latitude={poi.lat} anchor="bottom" style={{ zIndex: selectedPoiId === poi.id ? 10 : 1 }}>
+              <AmenityPin poi={poi} meta={meta} isSelected={selectedPoiId === poi.id} onSelect={() => selectPoi(poi)} />
             </Marker>
           );
         })}
