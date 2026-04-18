@@ -466,6 +466,11 @@ export default function MapView() {
   const weatherCacheRef = useRef<Map<string, WeatherDay[] | null>>(new Map());
   // Mirrors campsites state for stable callbacks (handleMoveEnd AI pan path).
   const campsitesRef = useRef<Campsite[]>([]);
+  // Tracks whether the currently selected campsite was last seen as an individual
+  // (unclustered) pin. Used to detect zoom-out transitions that absorb the pin into
+  // a cluster and should trigger deselection, while ignoring fresh selections of
+  // campsites that are already clustered (where selectPin zooms in to uncluster).
+  const selectedPinWasVisibleRef = useRef(false);
 
   // Tracks current zoom level for cluster computation.
   // Updated on every onMoveEnd and on initial onLoad.
@@ -515,15 +520,27 @@ export default function MapView() {
     [amenityPois]
   );
 
-  // Clear selection when the selected campsite gets absorbed into a cluster on zoom-out.
-  // Without this the drawer would show a campsite that has no visible pin on the map.
+  // Deselect when the selected campsite transitions from a visible individual pin into
+  // a cluster (i.e. the user zoomed out). Only triggers on that visible→clustered
+  // transition — fresh selections of already-clustered campsites are not deselected
+  // because selectPin zooms in to uncluster them first.
   useEffect(() => {
-    if (selectedIdx === null) return;
+    if (selectedIdx === null) {
+      selectedPinWasVisibleRef.current = false;
+      return;
+    }
     const isIndividualPin = campsiteClusters.some(
       (f) => !("cluster" in f.properties && f.properties.cluster) &&
              (f.properties as { idx: number }).idx === selectedIdx
     );
-    if (!isIndividualPin) {
+    if (isIndividualPin) {
+      selectedPinWasVisibleRef.current = true;
+      return;
+    }
+    // Pin is clustered. Only deselect if it was previously visible — that means the
+    // user zoomed out and absorbed it. If it was never visible, selectPin is mid-zoom.
+    if (selectedPinWasVisibleRef.current) {
+      selectedPinWasVisibleRef.current = false;
       setSelectedIdx(null);
       selectedIdRef.current = null;
       setDrawerState("peek");
@@ -819,9 +836,16 @@ export default function MapView() {
       selectedIdRef.current = campsite?.id ?? null;
       if (animate && campsite && mapRef.current) {
         skipNextFetch.current = true;
+        const isIndividualPin = campsiteClusters.some(
+          (f) => !("cluster" in f.properties && f.properties.cluster) &&
+                 (f.properties as { idx: number }).idx === i
+        );
         mapRef.current.easeTo({
           center: [campsite.lng, campsite.lat],
-          duration: 300,
+          // Zoom past maxZoom so supercluster renders it as an individual pin.
+          // CLUSTER_OPTIONS.maxZoom is 14; at 15 every point is unclustered.
+          ...(isIndividualPin ? {} : { zoom: CLUSTER_OPTIONS.maxZoom + 1 }),
+          duration: isIndividualPin ? 300 : 500,
           padding: { top: 0, right: 0, bottom: getDrawerHeightPx("half"), left: 0 },
         });
       }
@@ -837,7 +861,7 @@ export default function MapView() {
         }, DRAWER_TRANSITION_MS);
       }
     },
-    [campsites]
+    [campsites, campsiteClusters]
   );
 
   const handleApplyFilters = useCallback(
