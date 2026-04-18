@@ -281,13 +281,12 @@ function ClusterBubble({ count, color, ariaLabel, onExpand }: ClusterBubbleProps
       aria-label={ariaLabel}
       onClick={onExpand}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onExpand(); } }}
+      className="flex items-center justify-center rounded-full cursor-pointer font-black border-[2.5px] border-white shadow-[0_2px_8px_rgba(0,0,0,0.28)] text-white font-[family-name:var(--font-dm-sans)]"
       style={{
-        width: size, height: size, borderRadius: "50%",
-        background: color, color: "#fff",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontWeight: 800, fontSize: size >= 48 ? 14 : 12,
-        fontFamily: "var(--font-dm-sans), sans-serif",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.28)", cursor: "pointer", border: "2.5px solid #fff",
+        width: size,
+        height: size,
+        background: color,
+        fontSize: size >= 48 ? 14 : 12,
       }}
     >
       {count}
@@ -515,6 +514,21 @@ export default function MapView() {
     () => new Map(amenityPois.map((p) => [p.id, p])),
     [amenityPois]
   );
+
+  // Clear selection when the selected campsite gets absorbed into a cluster on zoom-out.
+  // Without this the drawer would show a campsite that has no visible pin on the map.
+  useEffect(() => {
+    if (selectedIdx === null) return;
+    const isIndividualPin = campsiteClusters.some(
+      (f) => !("cluster" in f.properties && f.properties.cluster) &&
+             (f.properties as { idx: number }).idx === selectedIdx
+    );
+    if (!isIndividualPin) {
+      setSelectedIdx(null);
+      selectedIdRef.current = null;
+      setDrawerState("peek");
+    }
+  }, [campsiteClusters, selectedIdx]);
 
   // Request user geolocation on mount
   useEffect(() => {
@@ -1181,8 +1195,12 @@ export default function MapView() {
                   color={FOREST_GREEN}
                   ariaLabel={`${count} campsites — tap to expand`}
                   onExpand={() => {
-                    const zoom = campsiteClusterInstance.getClusterExpansionZoom(clusterId);
-                    mapRef.current?.easeTo({ center: [fLng, fLat], zoom: zoom + 0.5, duration: 400 });
+                    try {
+                      const zoom = campsiteClusterInstance.getClusterExpansionZoom(clusterId);
+                      // +1 (integer) guarantees the cluster splits — +0.5 is floored to the same
+                      // integer by getClusters and leaves the cluster unchanged at maxZoom.
+                      mapRef.current?.easeTo({ center: [fLng, fLat], zoom: zoom + 1, duration: 400 });
+                    } catch {}
                   }}
                 />
               </Marker>
@@ -1204,6 +1222,9 @@ export default function MapView() {
           if ("cluster" in feature.properties && feature.properties.cluster) {
             const count = (feature.properties as { point_count: number }).point_count;
             const clusterId = feature.id as number;
+            // Color is sampled from the first leaf only — mixed-type clusters (e.g. toilets +
+            // dump points) will show a single arbitrary color. Intentional simplification;
+            // the "N nearby" label already avoids implying a single type.
             const leaves = amenityClusterInstance.getLeaves(clusterId, 1);
             const leafPoiType = (leaves[0]?.properties as { poiType?: string } | undefined)?.poiType;
             const clusterColor = leafPoiType ? (POI_META[leafPoiType]?.color ?? FOREST_GREEN) : FOREST_GREEN;
@@ -1214,8 +1235,10 @@ export default function MapView() {
                   color={clusterColor}
                   ariaLabel={`${count} nearby — tap to expand`}
                   onExpand={() => {
-                    const zoom = amenityClusterInstance.getClusterExpansionZoom(clusterId);
-                    mapRef.current?.easeTo({ center: [fLng, fLat], zoom: zoom + 0.5, duration: 400 });
+                    try {
+                      const zoom = amenityClusterInstance.getClusterExpansionZoom(clusterId);
+                      mapRef.current?.easeTo({ center: [fLng, fLat], zoom: zoom + 1, duration: 400 });
+                    } catch {}
                   }}
                 />
               </Marker>
