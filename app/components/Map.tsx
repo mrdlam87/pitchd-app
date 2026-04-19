@@ -522,6 +522,12 @@ export default function MapView() {
     [amenityClusterInstance, currentZoom]
   );
 
+  // Mirrors campsiteClusters / amenityClusters so selectPin / selectPoi can read
+  // the latest cluster state without taking them as dependencies (which would cause
+  // the callbacks to be recreated on every zoom level change).
+  const campsiteClustersRef = useRef([] as typeof campsiteClusters);
+  const amenityClustersRef = useRef([] as typeof amenityClusters);
+
   // Pre-compute cluster bubble colors keyed by cluster ID so the render loop does
   // not call getLeaves on every render. Color is sampled from the first leaf only —
   // mixed-type clusters (e.g. toilets + dump points) show a single arbitrary color.
@@ -777,6 +783,14 @@ export default function MapView() {
     campsitesRef.current = campsites;
   }, [campsites]);
 
+  useEffect(() => {
+    campsiteClustersRef.current = campsiteClusters;
+  }, [campsiteClusters]);
+
+  useEffect(() => {
+    amenityClustersRef.current = amenityClusters;
+  }, [amenityClusters]);
+
   const handleLoad = useCallback(
     (e: { target: mapboxgl.Map }) => {
       mapLoadedRef.current = true;
@@ -840,10 +854,12 @@ export default function MapView() {
       // even when the fetch is skipped (e.g. after programmatic setPadding).
       setCurrentZoom(e.target.getZoom());
 
-      if (isUnclusteringRef.current) {
-        isUnclusteringRef.current = false;
-        setHideMarkers(false);
-      }
+      // Always clear unclustering state unconditionally — a fast drag can fire moveend
+      // before isUnclusteringRef is set, leaving a second moveend with the ref already
+      // reset and hideMarkers stuck true. Clearing here regardless is safe: a no-op
+      // when we weren't unclustering, and always correct when we were.
+      isUnclusteringRef.current = false;
+      setHideMarkers(false);
 
       if (skipNextFetch.current) {
         skipNextFetch.current = false;
@@ -869,9 +885,18 @@ export default function MapView() {
       selectedIdRef.current = null;
       if (animate && mapRef.current) {
         skipNextFetch.current = true;
+        const isIndividualPin = amenityClustersRef.current.some(
+          (f) => !("cluster" in f.properties && f.properties.cluster) &&
+                 (f.properties as { id: string }).id === poi.id
+        );
+        if (!isIndividualPin) {
+          isUnclusteringRef.current = true;
+          setHideMarkers(true);
+        }
         mapRef.current.easeTo({
           center: [poi.lng, poi.lat],
-          duration: 300,
+          ...(isIndividualPin ? {} : { zoom: CLUSTER_OPTIONS.maxZoom + 1 }),
+          duration: isIndividualPin ? 300 : 450,
           padding: { top: 0, right: 0, bottom: getDrawerHeightPx("half"), left: 0 },
         });
       }
@@ -888,7 +913,7 @@ export default function MapView() {
       selectedIdRef.current = campsite?.id ?? null;
       if (animate && campsite && mapRef.current) {
         skipNextFetch.current = true;
-        const isIndividualPin = campsiteClusters.some(
+        const isIndividualPin = campsiteClustersRef.current.some(
           (f) => !("cluster" in f.properties && f.properties.cluster) &&
                  (f.properties as { idx: number }).idx === i
         );
@@ -920,7 +945,7 @@ export default function MapView() {
         }, DRAWER_TRANSITION_MS);
       }
     },
-    [campsites, campsiteClusters]
+    [campsites]
   );
 
   const handleApplyFilters = useCallback(
