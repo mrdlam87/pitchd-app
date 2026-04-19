@@ -471,6 +471,11 @@ export default function MapView() {
   // a cluster and should trigger deselection, while ignoring fresh selections of
   // campsites that are already clustered (where selectPin zooms in to uncluster).
   const selectedPinWasVisibleRef = useRef(false);
+  // Set to true while the zoom-to-uncluster animation is in flight.
+  // Hides all markers during the animation so the many simultaneous CSS transform
+  // updates don't drop frames; markers snap back in when moveend fires.
+  const isUnclusteringRef = useRef(false);
+  const [hideMarkers, setHideMarkers] = useState(false);
 
   // Tracks current zoom level for cluster computation.
   // Updated on every onMoveEnd and on initial onLoad.
@@ -793,6 +798,11 @@ export default function MapView() {
       // even when the fetch is skipped (e.g. after programmatic setPadding).
       setCurrentZoom(e.target.getZoom());
 
+      if (isUnclusteringRef.current) {
+        isUnclusteringRef.current = false;
+        setHideMarkers(false);
+      }
+
       if (skipNextFetch.current) {
         skipNextFetch.current = false;
         return;
@@ -840,12 +850,19 @@ export default function MapView() {
           (f) => !("cluster" in f.properties && f.properties.cluster) &&
                  (f.properties as { idx: number }).idx === i
         );
+        if (!isIndividualPin) {
+          // Hide markers for the duration of the zoom animation — with many clusters
+          // in view, simultaneous CSS transform updates on each frame cause jank.
+          // Markers snap back in cleanly once moveend fires at the new zoom level.
+          isUnclusteringRef.current = true;
+          setHideMarkers(true);
+        }
         mapRef.current.easeTo({
           center: [campsite.lng, campsite.lat],
           // Zoom past maxZoom so supercluster renders it as an individual pin.
           // CLUSTER_OPTIONS.maxZoom is 14; at 15 every point is unclustered.
           ...(isIndividualPin ? {} : { zoom: CLUSTER_OPTIONS.maxZoom + 1 }),
-          duration: isIndividualPin ? 300 : 500,
+          duration: isIndividualPin ? 300 : 450,
           padding: { top: 0, right: 0, bottom: getDrawerHeightPx("half"), left: 0 },
         });
       }
@@ -1206,8 +1223,8 @@ export default function MapView() {
           </Marker>
         )}
 
-        {/* Campsite pins / clusters */}
-        {campsiteClusters.map((feature) => {
+        {/* Campsite pins / clusters — hidden while zoom-to-uncluster animation plays */}
+        {!hideMarkers && campsiteClusters.map((feature) => {
           const [fLng, fLat] = feature.geometry.coordinates;
           if ("cluster" in feature.properties && feature.properties.cluster) {
             const count = (feature.properties as { point_count: number }).point_count;
@@ -1240,8 +1257,8 @@ export default function MapView() {
           );
         })}
 
-        {/* AmenityPOI pins / clusters */}
-        {amenityClusters.map((feature) => {
+        {/* AmenityPOI pins / clusters — hidden while zoom-to-uncluster animation plays */}
+        {!hideMarkers && amenityClusters.map((feature) => {
           const [fLng, fLat] = feature.geometry.coordinates;
           if ("cluster" in feature.properties && feature.properties.cluster) {
             const count = (feature.properties as { point_count: number }).point_count;
