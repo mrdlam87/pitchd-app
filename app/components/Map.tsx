@@ -3,7 +3,8 @@
 import mapboxgl from "mapbox-gl";
 import MapGL, { Marker, type MapRef } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { useCallback, useEffect, useRef, useState } from "react";
+import Supercluster from "supercluster";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import FilterPanel, { type FilterState } from "./FilterPanel";
 import BottomDrawer, {
   type DrawerState,
@@ -226,6 +227,11 @@ function computeVisibleBounds(map: mapboxgl.Map, drawerHeightPx: number): Bounds
 
 const EMPTY_FILTERS: FilterState = { activities: [], pois: [], startDate: null, endDate: null };
 
+// Full-world bbox passed to getClusters so all loaded points are always considered.
+// The API already scopes fetched data to the viewport, so filtering again here is
+// redundant and causes a flash-of-empty race when bounds update before the fetch resolves.
+const WORLD_BBOX: [number, number, number, number] = [-180, -90, 180, 90];
+
 
 // Fit the map to the bounding box of a set of campsites.
 // Uses reduce instead of spread to avoid V8 stack overflow on large arrays.
@@ -258,6 +264,105 @@ function consumeSearchResults(): SearchResultsPayload | null {
   } catch {
     return null;
   }
+}
+
+// radius is in screen pixels (zoom-adaptive). Pin body is 26px wide, so
+// two pins overlap when centers are <26px apart. 40px adds a tap-target
+// buffer — tighten toward 28 for stricter overlap-only clustering.
+const CLUSTER_OPTIONS = { radius: 45, maxZoom: 14 } as const;
+
+type ClusterBubbleProps = { count: number; color: string; ariaLabel: string; onExpand: () => void };
+function ClusterBubble({ count, color, ariaLabel, onExpand }: ClusterBubbleProps) {
+  const size = count >= 50 ? 48 : count >= 10 ? 40 : 32;
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={ariaLabel}
+      onClick={onExpand}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onExpand(); } }}
+      className="flex items-center justify-center rounded-full cursor-pointer font-black border-[2.5px] border-white shadow-[0_2px_8px_rgba(0,0,0,0.28)] text-white font-[family-name:var(--font-dm-sans)]"
+      style={{
+        width: size,
+        height: size,
+        background: color,
+        fontSize: size >= 48 ? 14 : 12,
+      }}
+    >
+      {count}
+    </div>
+  );
+}
+
+type CampsitePinProps = { campsite: Campsite; idx: number; isSelected: boolean; onSelect: () => void };
+function CampsitePin({ campsite, idx, isSelected, onSelect }: CampsitePinProps) {
+  const shortName = campsite.name
+    .replace(" National Park", " NP")
+    .replace(" Conservation Park", " CP")
+    .split(" – ")[0];
+  const pinW = isSelected ? 34 : 26;
+  const pinH = isSelected ? 37 : 28;
+  return (
+    <div
+      role="button" tabIndex={0}
+      className="relative flex flex-col items-center cursor-pointer select-none"
+      onClick={(e) => { e.stopPropagation(); onSelect(); }}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(); } }}
+      aria-label={`Select campsite ${idx + 1}: ${campsite.name}`}
+    >
+      <svg
+        style={{ width: pinW, height: pinH, filter: `drop-shadow(0 2px 6px rgba(0,0,0,${isSelected ? 0.45 : 0.28}))`, transition: "width 150ms, height 150ms" }}
+        viewBox="0 0 26 28" fill="none"
+      >
+        <path d="M13 1.5C7.2 1.5 2.5 6.2 2.5 12C2.5 18.5 9 24 13 26C17 24 23.5 18.5 23.5 12C23.5 6.2 18.8 1.5 13 1.5Z"
+          fill={isSelected ? FOREST_GREEN : "#fff"} stroke={FOREST_GREEN} strokeWidth="1.5" />
+        <text x="13" y="12.5" textAnchor="middle" dominantBaseline="central"
+          fill={isSelected ? "#fff" : FOREST_GREEN} fontSize={isSelected ? 11 : 9} fontWeight="800" fontFamily="DM Sans, sans-serif">
+          {idx + 1}
+        </text>
+      </svg>
+      <div
+        className={`absolute left-full top-1/2 -translate-y-1/2 ml-1 w-max max-w-[140px] leading-tight ${isSelected ? "font-bold" : "font-semibold"}`}
+        style={{ color: FOREST_GREEN, fontFamily: "var(--font-dm-sans), sans-serif", fontSize: isSelected ? 11 : 10, textShadow: "0 0 3px rgba(255,255,255,0.95), 0 0 6px rgba(255,255,255,0.8), 0 1px 2px rgba(0,0,0,0.12)" }}
+      >
+        {shortName}
+      </div>
+    </div>
+  );
+}
+
+type AmenityPinProps = { poi: AmenityPOI; meta: { emoji: string; label: string; color: string }; isSelected: boolean; onSelect: () => void };
+function AmenityPin({ poi, meta, isSelected, onSelect }: AmenityPinProps) {
+  const pinW = isSelected ? 34 : 26;
+  const pinH = isSelected ? 37 : 28;
+  return (
+    <div
+      role="button" tabIndex={0}
+      className="relative flex flex-col items-center cursor-pointer select-none"
+      onClick={(e) => { e.stopPropagation(); onSelect(); }}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(); } }}
+      aria-label={`Select ${meta.label}${poi.name ? `: ${poi.name}` : ""}`}
+    >
+      <svg
+        style={{ width: pinW, height: pinH, filter: `drop-shadow(0 2px 6px rgba(0,0,0,${isSelected ? 0.45 : 0.28}))`, transition: "width 150ms, height 150ms" }}
+        viewBox="0 0 26 28" fill="none"
+      >
+        <path d="M13 1.5C7.2 1.5 2.5 6.2 2.5 12C2.5 18.5 9 24 13 26C17 24 23.5 18.5 23.5 12C23.5 6.2 18.8 1.5 13 1.5Z"
+          fill="#fff" stroke={meta.color} strokeWidth={isSelected ? "2.5" : "1.5"} />
+      </svg>
+      <div className="absolute pointer-events-none"
+        style={{ fontSize: isSelected ? 12 : 10, lineHeight: 1, top: 0, width: pinW, height: Math.round(pinH * 0.72), display: "flex", alignItems: "center", justifyContent: "center" }}
+      >
+        {meta.emoji}
+      </div>
+      <div
+        className={`absolute left-full top-1/2 -translate-y-1/2 ml-1 w-max max-w-[140px] leading-tight ${isSelected ? "font-bold" : "font-semibold"}`}
+        style={{ color: FOREST_GREEN, fontFamily: "var(--font-dm-sans), sans-serif", fontSize: isSelected ? 11 : 10, textShadow: "0 0 3px rgba(255,255,255,0.95), 0 0 6px rgba(255,255,255,0.8), 0 1px 2px rgba(0,0,0,0.12)" }}
+      >
+        {poi.name ?? meta.label}
+      </div>
+    </div>
+  );
 }
 
 export default function MapView() {
@@ -361,6 +466,139 @@ export default function MapView() {
   const weatherCacheRef = useRef<Map<string, WeatherDay[] | null>>(new Map());
   // Mirrors campsites state for stable callbacks (handleMoveEnd AI pan path).
   const campsitesRef = useRef<Campsite[]>([]);
+  // Tracks whether the currently selected campsite was last seen as an individual
+  // (unclustered) pin. Used to detect zoom-out transitions that absorb the pin into
+  // a cluster and should trigger deselection, while ignoring fresh selections of
+  // campsites that are already clustered (where selectPin zooms in to uncluster).
+  const selectedPinWasVisibleRef = useRef(false);
+  // Mirrors selectedPinWasVisibleRef but for amenity POI selection — tracks the
+  // visible→clustered transition that should trigger POI deselection.
+  const selectedPoiWasVisibleRef = useRef(false);
+  // Set to true while the zoom-to-uncluster animation is in flight.
+  // Hides all markers during the animation so the many simultaneous CSS transform
+  // updates don't drop frames; markers snap back in when moveend fires.
+  const isUnclusteringRef = useRef(false);
+  const [hideMarkers, setHideMarkers] = useState(false);
+
+  // Tracks current zoom level for cluster computation.
+  // Updated on every onMoveEnd and on initial onLoad.
+  const [currentZoom, setCurrentZoom] = useState<number>(DEFAULT_VIEWPORT.zoom);
+
+  // Campsite cluster index — rebuilt only when the campsite list changes.
+  const campsiteClusterInstance = useMemo(() => {
+    const sc = new Supercluster<{ id: string; idx: number }>(CLUSTER_OPTIONS);
+    sc.load(
+      campsites.map((c, i) => ({
+        type: "Feature" as const,
+        geometry: { type: "Point" as const, coordinates: [c.lng, c.lat] },
+        properties: { id: c.id, idx: i },
+      }))
+    );
+    return sc;
+  }, [campsites]);
+
+  // Amenity POI cluster index — rebuilt only when the amenity list changes.
+  const amenityClusterInstance = useMemo(() => {
+    const sc = new Supercluster<{ id: string; poiType: string }>(CLUSTER_OPTIONS);
+    sc.load(
+      amenityPois.map((p) => ({
+        type: "Feature" as const,
+        geometry: { type: "Point" as const, coordinates: [p.lng, p.lat] },
+        properties: { id: p.id, poiType: p.amenityType.key },
+      }))
+    );
+    return sc;
+  }, [amenityPois]);
+
+  // Visible campsite clusters — recomputed when zoom or data changes.
+  const campsiteClusters = useMemo(
+    () => campsiteClusterInstance.getClusters(WORLD_BBOX, Math.floor(currentZoom)),
+    [campsiteClusterInstance, currentZoom]
+  );
+
+  // Visible amenity POI clusters.
+  const amenityClusters = useMemo(
+    () => amenityClusterInstance.getClusters(WORLD_BBOX, Math.floor(currentZoom)),
+    [amenityClusterInstance, currentZoom]
+  );
+
+  // Mirrors campsiteClusters / amenityClusters so selectPin / selectPoi can read
+  // the latest cluster state without taking them as dependencies (which would cause
+  // the callbacks to be recreated on every zoom level change).
+  const campsiteClustersRef = useRef([] as typeof campsiteClusters);
+  const amenityClustersRef = useRef([] as typeof amenityClusters);
+
+  // Pre-compute cluster bubble colors keyed by cluster ID so the render loop does
+  // not call getLeaves on every render. Color is sampled from the first leaf only —
+  // mixed-type clusters (e.g. toilets + dump points) show a single arbitrary color.
+  // Intentional simplification; the "N amenities nearby" label avoids implying a single type.
+  const amenityClusterColorMap = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const f of amenityClusters) {
+      if ("cluster" in f.properties && f.properties.cluster) {
+        const clusterId = f.id as number;
+        const leaves = amenityClusterInstance.getLeaves(clusterId, 1);
+        const leafPoiType = (leaves[0]?.properties as { poiType?: string } | undefined)?.poiType;
+        map.set(clusterId, leafPoiType ? (POI_META[leafPoiType]?.color ?? FOREST_GREEN) : FOREST_GREEN);
+      }
+    }
+    return map;
+  }, [amenityClusters, amenityClusterInstance]);
+
+  // O(1) lookup for individual amenity POI features in the render loop.
+  const amenityPoiById = useMemo(
+    () => new Map(amenityPois.map((p) => [p.id, p])),
+    [amenityPois]
+  );
+
+  // Deselect when the selected campsite transitions from a visible individual pin into
+  // a cluster (i.e. the user zoomed out). Only triggers on that visible→clustered
+  // transition — fresh selections of already-clustered campsites are not deselected
+  // because selectPin zooms in to uncluster them first.
+  useEffect(() => {
+    if (selectedIdx === null) {
+      selectedPinWasVisibleRef.current = false;
+      return;
+    }
+    const isIndividualPin = campsiteClusters.some(
+      (f) => !("cluster" in f.properties && f.properties.cluster) &&
+             (f.properties as { idx: number }).idx === selectedIdx
+    );
+    if (isIndividualPin) {
+      selectedPinWasVisibleRef.current = true;
+      return;
+    }
+    // Pin is clustered. Only deselect if it was previously visible — that means the
+    // user zoomed out and absorbed it. If it was never visible, selectPin is mid-zoom.
+    if (selectedPinWasVisibleRef.current) {
+      selectedPinWasVisibleRef.current = false;
+      setSelectedIdx(null);
+      selectedIdRef.current = null;
+      setDrawerState("peek");
+    }
+  }, [campsiteClusters, selectedIdx]);
+
+  // Deselect when the selected amenity POI transitions from a visible individual pin
+  // into a cluster (i.e. the user zoomed out). Mirrors the campsite deselection effect.
+  useEffect(() => {
+    if (selectedPoiId === null) {
+      selectedPoiWasVisibleRef.current = false;
+      return;
+    }
+    const isIndividualPin = amenityClusters.some(
+      (f) => !("cluster" in f.properties && f.properties.cluster) &&
+             (f.properties as { id: string }).id === selectedPoiId
+    );
+    if (isIndividualPin) {
+      selectedPoiWasVisibleRef.current = true;
+      return;
+    }
+    if (selectedPoiWasVisibleRef.current) {
+      selectedPoiWasVisibleRef.current = false;
+      setSelectedPoiId(null);
+      setDrawerState("peek");
+    }
+  }, [amenityClusters, selectedPoiId]);
 
   // Request user geolocation on mount
   useEffect(() => {
@@ -545,9 +783,18 @@ export default function MapView() {
     campsitesRef.current = campsites;
   }, [campsites]);
 
+  useEffect(() => {
+    campsiteClustersRef.current = campsiteClusters;
+  }, [campsiteClusters]);
+
+  useEffect(() => {
+    amenityClustersRef.current = amenityClusters;
+  }, [amenityClusters]);
+
   const handleLoad = useCallback(
-    (_e: { target: mapboxgl.Map }) => {
+    (e: { target: mapboxgl.Map }) => {
       mapLoadedRef.current = true;
+      setCurrentZoom(e.target.getZoom());
 
       // If we arrived from an AI NL search, display those results immediately and
       // fit the map to show all pins. Skip the browse API fetch.
@@ -564,13 +811,13 @@ export default function MapView() {
         // prevent the geolocation callback from flying away from the results.
         skipNextFetch.current = true;
         suppressGeoFlyRef.current = true;
-        fitToCampsites(_e.target, searchPayload.campsites, getDrawerHeightPx("half"));
+        fitToCampsites(e.target, searchPayload.campsites, getDrawerHeightPx("half"));
 
         // Fetch weather only for pins visible in the initial viewport.
         // loadWeatherForViewport increments weatherFetchCounterRef, so a subsequent
         // pan invalidates this fetch and loadWeatherForViewport runs again for the
         // new visible set.
-        loadWeatherForViewport(_e.target, searchPayload.campsites);
+        loadWeatherForViewport(e.target, searchPayload.campsites);
         return;
       }
 
@@ -593,9 +840,9 @@ export default function MapView() {
         // setPadding fires moveend internally (easeTo duration:0) — skipNextFetch
         // suppresses that so loadCampsites below isn't called a second time.
         skipNextFetch.current = true;
-        _e.target.setPadding({ top: 0, right: 0, bottom: PEEK_HEIGHT_PX, left: 0 });
-        loadCampsites(_e.target);
-        loadAmenities(_e.target);
+        e.target.setPadding({ top: 0, right: 0, bottom: PEEK_HEIGHT_PX, left: 0 });
+        loadCampsites(e.target);
+        loadAmenities(e.target);
       }
     },
     [loadCampsites, loadAmenities, loadWeatherForViewport]
@@ -603,6 +850,17 @@ export default function MapView() {
 
   const handleMoveEnd = useCallback(
     (e: { target: mapboxgl.Map }) => {
+      // Always update zoom so cluster computation stays current,
+      // even when the fetch is skipped (e.g. after programmatic setPadding).
+      setCurrentZoom(e.target.getZoom());
+
+      // Always clear unclustering state unconditionally — a fast drag can fire moveend
+      // before isUnclusteringRef is set, leaving a second moveend with the ref already
+      // reset and hideMarkers stuck true. Clearing here regardless is safe: a no-op
+      // when we weren't unclustering, and always correct when we were.
+      isUnclusteringRef.current = false;
+      setHideMarkers(false);
+
       if (skipNextFetch.current) {
         skipNextFetch.current = false;
         return;
@@ -627,9 +885,18 @@ export default function MapView() {
       selectedIdRef.current = null;
       if (animate && mapRef.current) {
         skipNextFetch.current = true;
+        const isIndividualPin = amenityClustersRef.current.some(
+          (f) => !("cluster" in f.properties && f.properties.cluster) &&
+                 (f.properties as { id: string }).id === poi.id
+        );
+        if (!isIndividualPin) {
+          isUnclusteringRef.current = true;
+          setHideMarkers(true);
+        }
         mapRef.current.easeTo({
           center: [poi.lng, poi.lat],
-          duration: 300,
+          ...(isIndividualPin ? {} : { zoom: CLUSTER_OPTIONS.maxZoom + 1 }),
+          duration: isIndividualPin ? 300 : 450,
           padding: { top: 0, right: 0, bottom: getDrawerHeightPx("half"), left: 0 },
         });
       }
@@ -646,9 +913,23 @@ export default function MapView() {
       selectedIdRef.current = campsite?.id ?? null;
       if (animate && campsite && mapRef.current) {
         skipNextFetch.current = true;
+        const isIndividualPin = campsiteClustersRef.current.some(
+          (f) => !("cluster" in f.properties && f.properties.cluster) &&
+                 (f.properties as { idx: number }).idx === i
+        );
+        if (!isIndividualPin) {
+          // Hide markers for the duration of the zoom animation — with many clusters
+          // in view, simultaneous CSS transform updates on each frame cause jank.
+          // Markers snap back in cleanly once moveend fires at the new zoom level.
+          isUnclusteringRef.current = true;
+          setHideMarkers(true);
+        }
         mapRef.current.easeTo({
           center: [campsite.lng, campsite.lat],
-          duration: 300,
+          // Zoom past maxZoom so supercluster renders it as an individual pin.
+          // CLUSTER_OPTIONS.maxZoom is 14; at 15 every point is unclustered.
+          ...(isIndividualPin ? {} : { zoom: CLUSTER_OPTIONS.maxZoom + 1 }),
+          duration: isIndividualPin ? 300 : 450,
           padding: { top: 0, right: 0, bottom: getDrawerHeightPx("half"), left: 0 },
         });
       }
@@ -1009,145 +1290,76 @@ export default function MapView() {
           </Marker>
         )}
 
-        {/* Campsite pins */}
-        {campsites.map((campsite, i) => {
-          const isSel = selectedIdx === i;
-          const shortName = campsite.name
-            .replace(" National Park", " NP")
-            .replace(" Conservation Park", " CP")
-            .split(" – ")[0];
-          const pinW = isSel ? 34 : 26;
-          const pinH = isSel ? 37 : 28;
+        {/* Campsite pins / clusters — hidden while zoom-to-uncluster animation plays */}
+        {!hideMarkers && campsiteClusters.map((feature) => {
+          const [fLng, fLat] = feature.geometry.coordinates;
+          if ("cluster" in feature.properties && feature.properties.cluster) {
+            const count = (feature.properties as { point_count: number }).point_count;
+            const clusterId = feature.id as number;
+            return (
+              <Marker key={`cs-cluster-${clusterId}`} longitude={fLng} latitude={fLat} anchor="center" style={{ zIndex: 2 }}>
+                <ClusterBubble
+                  count={count}
+                  color={FOREST_GREEN}
+                  ariaLabel={`${count} campsites — tap to expand`}
+                  onExpand={() => {
+                    try {
+                      const zoom = campsiteClusterInstance.getClusterExpansionZoom(clusterId);
+                      // +1 (integer) guarantees the cluster splits — +0.5 is floored to the same
+                      // integer by getClusters and leaves the cluster unchanged at maxZoom.
+                      mapRef.current?.easeTo({ center: [fLng, fLat], zoom: zoom + 1, duration: 400 });
+                    } catch (err) {
+                      /* stale cluster ID — safe to ignore */
+                      if (process.env.NODE_ENV !== "production") console.warn("[cluster] getClusterExpansionZoom failed", err);
+                    }
+                  }}
+                />
+              </Marker>
+            );
+          }
+          const { idx } = feature.properties as { id: string; idx: number };
+          const campsite = campsites[idx];
+          if (!campsite) return null;
           return (
-            <Marker
-              key={campsite.id}
-              longitude={campsite.lng}
-              latitude={campsite.lat}
-              anchor="bottom"
-              style={{ zIndex: isSel ? 10 : 1 }}
-            >
-              <div
-                role="button"
-                tabIndex={0}
-                className="relative flex flex-col items-center cursor-pointer select-none"
-                onClick={(e) => { e.stopPropagation(); selectPin(i, false); }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectPin(i, false); }
-                }}
-                aria-label={`Select campsite ${i + 1}: ${campsite.name}`}
-              >
-                <svg
-                  style={{
-                    width: pinW,
-                    height: pinH,
-                    filter: `drop-shadow(0 2px 6px rgba(0,0,0,${isSel ? 0.45 : 0.28}))`,
-                    transition: "width 150ms, height 150ms",
-                  }}
-                  viewBox="0 0 26 28"
-                  fill="none"
-                >
-                  <path
-                    d="M13 1.5C7.2 1.5 2.5 6.2 2.5 12C2.5 18.5 9 24 13 26C17 24 23.5 18.5 23.5 12C23.5 6.2 18.8 1.5 13 1.5Z"
-                    fill={isSel ? FOREST_GREEN : "#fff"}
-                    stroke={FOREST_GREEN}
-                    strokeWidth="1.5"
-                  />
-                  <text
-                    x="13" y="12.5"
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fill={isSel ? "#fff" : FOREST_GREEN}
-                    fontSize={isSel ? 11 : 9}
-                    fontWeight="800"
-                    fontFamily="DM Sans, sans-serif"
-                  >
-                    {i + 1}
-                  </text>
-                </svg>
-                <div
-                  className={`absolute left-full top-1/2 -translate-y-1/2 ml-1 w-max max-w-[140px] leading-tight ${isSel ? "font-bold" : "font-semibold"}`}
-                  style={{
-                    color: FOREST_GREEN,
-                    fontFamily: "var(--font-dm-sans), sans-serif",
-                    fontSize: isSel ? 11 : 10,
-                    textShadow: "0 0 3px rgba(255,255,255,0.95), 0 0 6px rgba(255,255,255,0.8), 0 1px 2px rgba(0,0,0,0.12)",
-                  }}
-                >
-                  {shortName}
-                </div>
-              </div>
+            <Marker key={campsite.id} longitude={campsite.lng} latitude={campsite.lat} anchor="bottom" style={{ zIndex: selectedIdx === idx ? 10 : 1 }}>
+              <CampsitePin campsite={campsite} idx={idx} isSelected={selectedIdx === idx} onSelect={() => selectPin(idx, false)} />
             </Marker>
           );
         })}
 
-        {/* AmenityPOI pins */}
-        {amenityPois.map((poi) => {
-          const isSel = selectedPoiId === poi.id;
+        {/* AmenityPOI pins / clusters — hidden while zoom-to-uncluster animation plays */}
+        {!hideMarkers && amenityClusters.map((feature) => {
+          const [fLng, fLat] = feature.geometry.coordinates;
+          if ("cluster" in feature.properties && feature.properties.cluster) {
+            const count = (feature.properties as { point_count: number }).point_count;
+            const clusterId = feature.id as number;
+            const clusterColor = amenityClusterColorMap.get(clusterId) ?? FOREST_GREEN;
+            return (
+              <Marker key={`poi-cluster-${clusterId}`} longitude={fLng} latitude={fLat} anchor="center" style={{ zIndex: 2 }}>
+                <ClusterBubble
+                  count={count}
+                  color={clusterColor}
+                  ariaLabel={`${count} amenities nearby — tap to expand`}
+                  onExpand={() => {
+                    try {
+                      const zoom = amenityClusterInstance.getClusterExpansionZoom(clusterId);
+                      mapRef.current?.easeTo({ center: [fLng, fLat], zoom: zoom + 1, duration: 400 });
+                    } catch (err) {
+                      /* stale cluster ID — safe to ignore */
+                      if (process.env.NODE_ENV !== "production") console.warn("[cluster] getClusterExpansionZoom failed", err);
+                    }
+                  }}
+                />
+              </Marker>
+            );
+          }
+          const { id: poiId } = feature.properties as { id: string; poiType: string };
+          const poi = amenityPoiById.get(poiId);
+          if (!poi) return null;
           const meta = POI_META[poi.amenityType.key] ?? { emoji: "📍", label: poi.amenityType.key, color: FOREST_GREEN };
-          const pinW = isSel ? 34 : 26;
-          const pinH = isSel ? 37 : 28;
           return (
-            <Marker
-              key={poi.id}
-              longitude={poi.lng}
-              latitude={poi.lat}
-              anchor="bottom"
-              style={{ zIndex: isSel ? 10 : 1 }}
-            >
-              <div
-                role="button"
-                tabIndex={0}
-                className="relative flex flex-col items-center cursor-pointer select-none"
-                onClick={(e) => { e.stopPropagation(); selectPoi(poi); }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectPoi(poi); }
-                }}
-                aria-label={`Select ${meta.label}${poi.name ? `: ${poi.name}` : ""}`}
-              >
-                <svg
-                  style={{
-                    width: pinW,
-                    height: pinH,
-                    filter: `drop-shadow(0 2px 6px rgba(0,0,0,${isSel ? 0.45 : 0.28}))`,
-                    transition: "width 150ms, height 150ms",
-                  }}
-                  viewBox="0 0 26 28"
-                  fill="none"
-                >
-                  <path
-                    d="M13 1.5C7.2 1.5 2.5 6.2 2.5 12C2.5 18.5 9 24 13 26C17 24 23.5 18.5 23.5 12C23.5 6.2 18.8 1.5 13 1.5Z"
-                    fill="#fff"
-                    stroke={meta.color}
-                    strokeWidth={isSel ? "2.5" : "1.5"}
-                  />
-                </svg>
-                <div
-                  className="absolute pointer-events-none"
-                  style={{
-                    fontSize: isSel ? 12 : 10,
-                    lineHeight: 1,
-                    top: 0,
-                    width: pinW,
-                    height: Math.round(pinH * 0.72),
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  {meta.emoji}
-                </div>
-                <div
-                  className={`absolute left-full top-1/2 -translate-y-1/2 ml-1 w-max max-w-[140px] leading-tight ${isSel ? "font-bold" : "font-semibold"}`}
-                  style={{
-                    color: FOREST_GREEN,
-                    fontFamily: "var(--font-dm-sans), sans-serif",
-                    fontSize: isSel ? 11 : 10,
-                    textShadow: "0 0 3px rgba(255,255,255,0.95), 0 0 6px rgba(255,255,255,0.8), 0 1px 2px rgba(0,0,0,0.12)",
-                  }}
-                >
-                  {poi.name ?? meta.label}
-                </div>
-              </div>
+            <Marker key={poi.id} longitude={poi.lng} latitude={poi.lat} anchor="bottom" style={{ zIndex: selectedPoiId === poi.id ? 10 : 1 }}>
+              <AmenityPin poi={poi} meta={meta} isSelected={selectedPoiId === poi.id} onSelect={() => selectPoi(poi)} />
             </Marker>
           );
         })}
