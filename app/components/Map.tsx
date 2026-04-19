@@ -471,6 +471,9 @@ export default function MapView() {
   // a cluster and should trigger deselection, while ignoring fresh selections of
   // campsites that are already clustered (where selectPin zooms in to uncluster).
   const selectedPinWasVisibleRef = useRef(false);
+  // Mirrors selectedPinWasVisibleRef but for amenity POI selection — tracks the
+  // visible→clustered transition that should trigger POI deselection.
+  const selectedPoiWasVisibleRef = useRef(false);
   // Set to true while the zoom-to-uncluster animation is in flight.
   // Hides all markers during the animation so the many simultaneous CSS transform
   // updates don't drop frames; markers snap back in when moveend fires.
@@ -519,6 +522,23 @@ export default function MapView() {
     [amenityClusterInstance, currentZoom]
   );
 
+  // Pre-compute cluster bubble colors keyed by cluster ID so the render loop does
+  // not call getLeaves on every render. Color is sampled from the first leaf only —
+  // mixed-type clusters (e.g. toilets + dump points) show a single arbitrary color.
+  // Intentional simplification; the "N amenities nearby" label avoids implying a single type.
+  const amenityClusterColorMap = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const f of amenityClusters) {
+      if ("cluster" in f.properties && f.properties.cluster) {
+        const clusterId = f.id as number;
+        const leaves = amenityClusterInstance.getLeaves(clusterId, 1);
+        const leafPoiType = (leaves[0]?.properties as { poiType?: string } | undefined)?.poiType;
+        map.set(clusterId, leafPoiType ? (POI_META[leafPoiType]?.color ?? FOREST_GREEN) : FOREST_GREEN);
+      }
+    }
+    return map;
+  }, [amenityClusters, amenityClusterInstance]);
+
   // O(1) lookup for individual amenity POI features in the render loop.
   const amenityPoiById = useMemo(
     () => new Map(amenityPois.map((p) => [p.id, p])),
@@ -551,6 +571,28 @@ export default function MapView() {
       setDrawerState("peek");
     }
   }, [campsiteClusters, selectedIdx]);
+
+  // Deselect when the selected amenity POI transitions from a visible individual pin
+  // into a cluster (i.e. the user zoomed out). Mirrors the campsite deselection effect.
+  useEffect(() => {
+    if (selectedPoiId === null) {
+      selectedPoiWasVisibleRef.current = false;
+      return;
+    }
+    const isIndividualPin = amenityClusters.some(
+      (f) => !("cluster" in f.properties && f.properties.cluster) &&
+             (f.properties as { id: string }).id === selectedPoiId
+    );
+    if (isIndividualPin) {
+      selectedPoiWasVisibleRef.current = true;
+      return;
+    }
+    if (selectedPoiWasVisibleRef.current) {
+      selectedPoiWasVisibleRef.current = false;
+      setSelectedPoiId(null);
+      setDrawerState("peek");
+    }
+  }, [amenityClusters, selectedPoiId]);
 
   // Request user geolocation on mount
   useEffect(() => {
@@ -736,9 +778,9 @@ export default function MapView() {
   }, [campsites]);
 
   const handleLoad = useCallback(
-    (_e: { target: mapboxgl.Map }) => {
+    (e: { target: mapboxgl.Map }) => {
       mapLoadedRef.current = true;
-      setCurrentZoom(_e.target.getZoom());
+      setCurrentZoom(e.target.getZoom());
 
       // If we arrived from an AI NL search, display those results immediately and
       // fit the map to show all pins. Skip the browse API fetch.
@@ -755,13 +797,13 @@ export default function MapView() {
         // prevent the geolocation callback from flying away from the results.
         skipNextFetch.current = true;
         suppressGeoFlyRef.current = true;
-        fitToCampsites(_e.target, searchPayload.campsites, getDrawerHeightPx("half"));
+        fitToCampsites(e.target, searchPayload.campsites, getDrawerHeightPx("half"));
 
         // Fetch weather only for pins visible in the initial viewport.
         // loadWeatherForViewport increments weatherFetchCounterRef, so a subsequent
         // pan invalidates this fetch and loadWeatherForViewport runs again for the
         // new visible set.
-        loadWeatherForViewport(_e.target, searchPayload.campsites);
+        loadWeatherForViewport(e.target, searchPayload.campsites);
         return;
       }
 
@@ -784,9 +826,9 @@ export default function MapView() {
         // setPadding fires moveend internally (easeTo duration:0) — skipNextFetch
         // suppresses that so loadCampsites below isn't called a second time.
         skipNextFetch.current = true;
-        _e.target.setPadding({ top: 0, right: 0, bottom: PEEK_HEIGHT_PX, left: 0 });
-        loadCampsites(_e.target);
-        loadAmenities(_e.target);
+        e.target.setPadding({ top: 0, right: 0, bottom: PEEK_HEIGHT_PX, left: 0 });
+        loadCampsites(e.target);
+        loadAmenities(e.target);
       }
     },
     [loadCampsites, loadAmenities, loadWeatherForViewport]
@@ -1241,7 +1283,10 @@ export default function MapView() {
                       // +1 (integer) guarantees the cluster splits — +0.5 is floored to the same
                       // integer by getClusters and leaves the cluster unchanged at maxZoom.
                       mapRef.current?.easeTo({ center: [fLng, fLat], zoom: zoom + 1, duration: 400 });
-                    } catch {}
+                    } catch (err) {
+                      /* stale cluster ID — safe to ignore */
+                      if (process.env.NODE_ENV !== "production") console.warn("[cluster] getClusterExpansionZoom failed", err);
+                    }
                   }}
                 />
               </Marker>
@@ -1263,23 +1308,21 @@ export default function MapView() {
           if ("cluster" in feature.properties && feature.properties.cluster) {
             const count = (feature.properties as { point_count: number }).point_count;
             const clusterId = feature.id as number;
-            // Color is sampled from the first leaf only — mixed-type clusters (e.g. toilets +
-            // dump points) will show a single arbitrary color. Intentional simplification;
-            // the "N nearby" label already avoids implying a single type.
-            const leaves = amenityClusterInstance.getLeaves(clusterId, 1);
-            const leafPoiType = (leaves[0]?.properties as { poiType?: string } | undefined)?.poiType;
-            const clusterColor = leafPoiType ? (POI_META[leafPoiType]?.color ?? FOREST_GREEN) : FOREST_GREEN;
+            const clusterColor = amenityClusterColorMap.get(clusterId) ?? FOREST_GREEN;
             return (
               <Marker key={`poi-cluster-${clusterId}`} longitude={fLng} latitude={fLat} anchor="center" style={{ zIndex: 2 }}>
                 <ClusterBubble
                   count={count}
                   color={clusterColor}
-                  ariaLabel={`${count} nearby — tap to expand`}
+                  ariaLabel={`${count} amenities nearby — tap to expand`}
                   onExpand={() => {
                     try {
                       const zoom = amenityClusterInstance.getClusterExpansionZoom(clusterId);
                       mapRef.current?.easeTo({ center: [fLng, fLat], zoom: zoom + 1, duration: 400 });
-                    } catch {}
+                    } catch (err) {
+                      /* stale cluster ID — safe to ignore */
+                      if (process.env.NODE_ENV !== "production") console.warn("[cluster] getClusterExpansionZoom failed", err);
+                    }
                   }}
                 />
               </Marker>
