@@ -1,6 +1,6 @@
 ---
 description: Implement a GitHub issue by number. Creates a branch, implements the work, verifies acceptance criteria, and opens a PR.
-allowed-tools: Bash(git:*), Bash(gh:*), Read, Edit, Write, Grep, Glob, Agent, TodoWrite
+allowed-tools: Bash(git:*), Bash(gh:*), Read, Edit, Write, Grep, Glob, Agent, TodoWrite, EnterPlanMode, ExitPlanMode
 argument-hint: <issue-number>
 ---
 
@@ -31,8 +31,11 @@ State the tier and what it means for this task. Complex issues get extra adversa
 
 **Checkpoint:** State the tier and a one-line reason before proceeding.
 
-## Step 4 — Explore & plan
-Before writing a single line, use Grep and Glob to find every file relevant to the issue — existing routes, models, components, scripts, migrations, or utilities that the implementation will touch or depend on.
+## Step 4 — Enter plan mode and explore
+
+**Enter plan mode now** using the `EnterPlanMode` tool. Remain in plan mode until the plan is confirmed.
+
+Use Grep and Glob to find every file relevant to the issue — existing routes, models, components, scripts, migrations, or utilities that the implementation will touch or depend on.
 
 **Rule: never assume code exists.** Grep to confirm every function, method, field, model, or constant you plan to reference actually exists before using it. Hallucinated references are a top source of bugs.
 
@@ -56,13 +59,49 @@ Wait for confirmation before proceeding.
 
 **Checkpoint:** Plan table presented and confirmed by the user.
 
-## Step 5 — Create a branch
+## Step 5 — Write context file and exit plan mode
+
+After the user confirms the plan, write a context file at `.claude/context/issue-$ARGUMENTS.md`:
+
+```markdown
+# Issue #<number> — <title>
+
+## Summary
+<one paragraph describing what the issue is asking for>
+
+## Complexity
+<Simple / Medium / Complex> — <one-line reason>
+
+## Acceptance criteria
+<copy acceptance criteria from the issue body>
+
+## Plan
+| # | Action | File | Notes |
+|---|---|---|---|
+...
+
+## Risks / unknowns
+<any flagged risks from planning>
+
+## Status
+- [ ] Branch created
+- [ ] Implementation complete
+- [ ] Acceptance criteria verified
+- [ ] Build & lint passing
+- [ ] PR raised
+```
+
+Then **exit plan mode** using the `ExitPlanMode` tool before touching any code.
+
+## Step 6 — Create a branch
 Branch naming: `feature/`, `fix/`, or `chore/` prefix based on issue type, followed by issue number and a short slug.
 Example: `feature/13-scaffold-nextjs-app`
 
 Run: `!git checkout -b <branch-name>`
 
-## Step 6 — Implement
+Update the context file: tick `- [x] Branch created`.
+
+## Step 7 — Implement
 For Medium or Complex issues, use `TodoWrite` to track progress — one task per file or logical unit of work. Mark each done as you go.
 
 Implement the issue following all conventions in CLAUDE.md:
@@ -80,7 +119,9 @@ Keep the implementation focused on exactly what the issue describes. Do not add 
 
 **Checkpoint:** All planned files created or modified. TodoWrite tasks marked done.
 
-## Step 7 — Verify acceptance criteria
+Update the context file: tick `- [x] Implementation complete`.
+
+## Step 8 — Verify acceptance criteria
 Go through each acceptance criteria item from the issue body one by one. For each item:
 1. Verify it is met by reading the relevant code, running a check, or confirming the behaviour
 2. If an item is not met, fix it before proceeding
@@ -93,7 +134,9 @@ gh issue edit $ARGUMENTS --repo mrdlam87/pitchd-app --body "<full updated body w
 
 Do not raise the PR until all acceptance criteria are ticked.
 
-## Step 8 — Build & smoke test
+Update the context file: tick `- [x] Acceptance criteria verified`.
+
+## Step 9 — Build & smoke test
 Run these checks before opening the PR. Fix any errors before proceeding.
 
 **Always run:**
@@ -111,7 +154,7 @@ cd app && npx prisma migrate status
 
 **If the issue adds or modifies an API route:**
 - Write or update tests in `tests/api/<route>.test.ts` covering the new/changed behaviour before opening the PR
-- Use the API route checklist from Step 9 to drive test cases — every validation rule should have a corresponding test
+- Use the API route checklist from Step 10 to drive test cases — every validation rule should have a corresponding test
 ```bash
 cd app && npm test
 ```
@@ -129,7 +172,9 @@ All tests must pass before opening the PR.
 
 Report the results of each check. If a check fails, fix it before proceeding.
 
-## Step 9 — Pre-PR self-review
+Update the context file: tick `- [x] Build & lint passing`.
+
+## Step 10 — Pre-PR self-review
 Re-read every file you changed. Answer each question below out loud before marking it done. Fix anything you find.
 
 **Adversarial questions:**
@@ -163,7 +208,7 @@ For **Complex** issues, spend extra time on the adversarial questions and TOCTOU
 
 Do not open the PR until all items are addressed.
 
-## Step 10 — Open a PR
+## Step 11 — Open a PR
 Commit using conventional commit format:
 ```
 git commit -m "type(scope): short description"
@@ -194,5 +239,7 @@ Closes #<issue-number>
 EOF
 )"
 ```
+
+Update the context file: tick `- [x] PR raised` and add the PR URL at the bottom.
 
 Return the PR URL.
