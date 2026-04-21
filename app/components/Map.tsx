@@ -221,6 +221,7 @@ export default function MapView() {
     loadCampsites,
     loadAmenities,
     loadWeatherForViewport,
+    syncCampsiteCount,
   } = useMapData({
     drawerStateRef,
     activeFiltersRef,
@@ -424,6 +425,7 @@ export default function MapView() {
       if (searchPayload?.kind === "ai" && searchPayload.campsites.length > 0) {
         initialSearchRef.current = null;
         setCampsites(searchPayload.campsites);
+        syncCampsiteCount(searchPayload.campsites.length);
         setDrawerState("half");
         drawerStateRef.current = "half";
 
@@ -465,7 +467,7 @@ export default function MapView() {
         loadAmenities(e.target);
       }
     },
-    [loadCampsites, loadAmenities, loadWeatherForViewport, setCampsites]
+    [loadCampsites, loadAmenities, loadWeatherForViewport, setCampsites, syncCampsiteCount]
   );
 
   const handleMoveEnd = useCallback(
@@ -637,6 +639,7 @@ export default function MapView() {
         }
       }
       setCampsites(data.campsites);
+      syncCampsiteCount(data.campsites.length);
       setMapQuery("");
       if (data.campsites.length > 0 && mapRef.current) {
         // Results — enter search mode and fit the map to the pins

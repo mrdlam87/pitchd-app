@@ -1,11 +1,11 @@
 import { useCallback, useRef, useState } from "react";
+import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { DrawerState } from "@/components/BottomDrawer";
 import { getDrawerHeightPx } from "@/components/BottomDrawer";
 import type { FilterState } from "@/components/FilterPanel";
 import { DAY_NAMES } from "@/types/map";
 import type { AmenityPOI, Campsite, WeatherDay } from "@/types/map";
 import mapboxgl from "mapbox-gl";
-import React from "react";
 
 export type Bounds = { north: number; south: number; east: number; west: number };
 
@@ -192,29 +192,28 @@ export function computeVisibleBounds(map: mapboxgl.Map, drawerHeightPx: number):
 }
 
 export type UseMapDataOptions = {
-  drawerStateRef: React.MutableRefObject<DrawerState>;
-  activeFiltersRef: React.MutableRefObject<FilterState>;
-  activeChipRef: React.MutableRefObject<string | null>;
-  selectedIdRef: React.MutableRefObject<string | null>;
-  cardRefs: React.MutableRefObject<(HTMLDivElement | null)[]>;
-  skipNextFetch: React.MutableRefObject<boolean>;
+  drawerStateRef: MutableRefObject<DrawerState>;
+  activeFiltersRef: MutableRefObject<FilterState>;
+  activeChipRef: MutableRefObject<string | null>;
+  selectedIdRef: MutableRefObject<string | null>;
+  cardRefs: MutableRefObject<(HTMLDivElement | null)[]>;
+  skipNextFetch: MutableRefObject<boolean>;
   setDrawerState: (s: DrawerState) => void;
   setSelectedIdx: (i: number | null) => void;
-  setSelectedPoiId: React.Dispatch<React.SetStateAction<string | null>>;
+  setSelectedPoiId: Dispatch<SetStateAction<string | null>>;
 };
 
 export type UseMapDataReturn = {
   campsites: Campsite[];
-  setCampsites: React.Dispatch<React.SetStateAction<Campsite[]>>;
+  setCampsites: Dispatch<SetStateAction<Campsite[]>>;
   hasMore: boolean;
-  setHasMore: React.Dispatch<React.SetStateAction<boolean>>;
   amenityPois: AmenityPOI[];
-  setAmenityPois: React.Dispatch<React.SetStateAction<AmenityPOI[]>>;
-  campsitesRef: React.MutableRefObject<Campsite[]>;
-  weatherCacheRef: React.MutableRefObject<Map<string, WeatherDay[] | null>>;
+  campsitesRef: MutableRefObject<Campsite[]>;
+  weatherCacheRef: MutableRefObject<Map<string, WeatherDay[] | null>>;
   loadCampsites: (map: mapboxgl.Map) => void;
   loadAmenities: (map: mapboxgl.Map) => void;
   loadWeatherForViewport: (map: mapboxgl.Map, allCampsites: Campsite[]) => void;
+  syncCampsiteCount: (n: number) => void;
 };
 
 export function useMapData({
@@ -363,6 +362,10 @@ export function useMapData({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadWeatherForViewport, setDrawerState, setSelectedIdx]);
 
+  const syncCampsiteCount = useCallback((n: number) => {
+    prevCampsitesLengthRef.current = n;
+  }, []);
+
   const loadAmenities = useCallback((map: mapboxgl.Map) => {
     const poiTypes = activeFiltersRef.current.pois;
     if (poiTypes.length === 0) {
@@ -387,13 +390,12 @@ export function useMapData({
     campsites,
     setCampsites,
     hasMore,
-    setHasMore,
     amenityPois,
-    setAmenityPois,
     campsitesRef,
     weatherCacheRef,
     loadCampsites,
     loadAmenities,
     loadWeatherForViewport,
+    syncCampsiteCount,
   };
 }

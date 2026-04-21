@@ -1,5 +1,3 @@
-"use client";
-
 import { FOREST_GREEN } from "@/lib/tokens";
 import type { Campsite } from "@/types/map";
 
