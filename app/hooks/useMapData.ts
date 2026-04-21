@@ -175,7 +175,7 @@ async function fetchAmenities(bounds: Bounds, poiTypes: string[]): Promise<Ameni
 }
 
 // Returns the exact lat/lng bounding box of the visible area above the drawer.
-export function computeVisibleBounds(map: mapboxgl.Map, drawerHeightPx: number): Bounds {
+function computeVisibleBounds(map: mapboxgl.Map, drawerHeightPx: number): Bounds {
   const w = map.getCanvas().clientWidth;
   const h = map.getCanvas().clientHeight;
   const visH = Math.max(h - drawerHeightPx, 1);

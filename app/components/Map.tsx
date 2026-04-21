@@ -469,7 +469,9 @@ export default function MapView() {
         loadAmenities(e.target);
       }
     },
-    [loadCampsites, loadAmenities, loadWeatherForViewport, setCampsites, syncCampsiteCount]
+    // setCampsites is a stable useState setter — intentionally excluded from dep array.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [loadCampsites, loadAmenities, loadWeatherForViewport, syncCampsiteCount]
   );
 
   const handleMoveEnd = useCallback(
