@@ -64,27 +64,41 @@ Wait for confirmation before proceeding.
 After the user confirms the plan:
 
 1. **Exit plan mode** using the `ExitPlanMode` tool.
-2. Write a context file at `.claude/context/issue-$ARGUMENTS.md` (create the directory if it doesn't exist):
+2. Write a context file at `.claude/context/issue-$ARGUMENTS.md` (create the directory if it doesn't exist).
+
+The context file must be a rich, specific document — not a template with placeholder text. Write it as if briefing a colleague who is picking up the work mid-session. Every section should contain real findings from your exploration, not generic descriptions.
 
 ```markdown
-# Issue #<number> — <title>
+# Plan: Issue #<number> — <title>
 
-## Summary
-<one paragraph describing what the issue is asking for>
+## Context
+<A narrative paragraph explaining the current state of the codebase relevant to this issue: what exists, what has grown or changed, why the work is needed, and any constraints or background the implementation must account for. Be specific — reference file names, line counts, function names, or prior milestones if relevant.>
 
 ## Complexity
 <Simple / Medium / Complex> — <one-line reason>
 
-## Acceptance criteria
-<copy acceptance criteria from the issue body>
+## What to build / change
 
-## Plan
+### 1. `<file path>`
+- <Specific detail: what functions/types/components move here, what line ranges they come from, what imports are needed, what the component/hook receives and returns>
+- <Continue with all specific detail discovered during exploration>
+
+### 2. `<file path>`
+- <Same level of specificity>
+
+<One section per file in the plan. For edits, describe exactly what is removed, added, or restructured.>
+
+## Files
 | # | Action | File | Notes |
 |---|---|---|---|
-...
+| 1 | Create / Edit / Delete | `path/to/file` | What and why |
 
 ## Risks / unknowns
-<any flagged risks from planning>
+- <Specific risk referencing actual code behaviour, edge cases, or invariants that must be preserved — not generic concerns>
+
+## Verification
+- <Exact commands to run (lint, build, test)>
+- <Manual steps: what to click, what to observe, what must not regress>
 
 ## Status
 - [ ] Branch created

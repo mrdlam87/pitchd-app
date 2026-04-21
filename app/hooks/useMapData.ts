@@ -5,7 +5,7 @@ import { getDrawerHeightPx } from "@/components/BottomDrawer";
 import type { FilterState } from "@/components/FilterPanel";
 import { DAY_NAMES } from "@/types/map";
 import type { AmenityPOI, Campsite, WeatherDay } from "@/types/map";
-import mapboxgl from "mapbox-gl";
+import type mapboxgl from "mapbox-gl";
 
 export type Bounds = { north: number; south: number; east: number; west: number };
 
@@ -209,6 +209,8 @@ export type UseMapDataReturn = {
   hasMore: boolean;
   amenityPois: AmenityPOI[];
   campsitesRef: MutableRefObject<Campsite[]>;
+  // Exposed so Map.tsx can pre-populate cache from AI search response weather,
+  // avoiding a redundant /api/weather/batch round-trip after results arrive.
   weatherCacheRef: MutableRefObject<Map<string, WeatherDay[] | null>>;
   loadCampsites: (map: mapboxgl.Map) => void;
   loadAmenities: (map: mapboxgl.Map) => void;

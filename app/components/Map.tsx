@@ -403,7 +403,9 @@ export default function MapView() {
 
   useEffect(() => {
     campsitesRef.current = campsites;
-  }, [campsites, campsitesRef]);
+  // campsitesRef is a stable MutableRefObject — intentionally excluded from dep array.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campsites]);
 
   useEffect(() => {
     campsiteClustersRef.current = campsiteClusters;
@@ -496,7 +498,9 @@ export default function MapView() {
       loadCampsites(e.target);
       loadAmenities(e.target);
     },
-    [loadCampsites, loadAmenities, loadWeatherForViewport, campsitesRef]
+    // campsitesRef is a stable MutableRefObject — intentionally excluded from dep array.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [loadCampsites, loadAmenities, loadWeatherForViewport]
   );
 
   const selectPoi = useCallback(
