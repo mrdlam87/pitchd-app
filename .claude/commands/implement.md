@@ -59,9 +59,12 @@ Wait for confirmation before proceeding.
 
 **Checkpoint:** Plan table presented and confirmed by the user.
 
-## Step 5 — Write context file and exit plan mode
+## Step 5 — Exit plan mode and write context file
 
-After the user confirms the plan, write a context file at `.claude/context/issue-$ARGUMENTS.md`:
+After the user confirms the plan:
+
+1. **Exit plan mode** using the `ExitPlanMode` tool.
+2. Write a context file at `.claude/context/issue-$ARGUMENTS.md` (create the directory if it doesn't exist):
 
 ```markdown
 # Issue #<number> — <title>
@@ -90,8 +93,6 @@ After the user confirms the plan, write a context file at `.claude/context/issue
 - [ ] Build & lint passing
 - [ ] PR raised
 ```
-
-Then **exit plan mode** using the `ExitPlanMode` tool before touching any code.
 
 ## Step 6 — Create a branch
 Branch naming: `feature/`, `fix/`, or `chore/` prefix based on issue type, followed by issue number and a short slug.
