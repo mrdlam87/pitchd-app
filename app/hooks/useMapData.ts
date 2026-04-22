@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { DrawerState } from "@/components/BottomDrawer";
 import { getDrawerHeightPx } from "@/components/BottomDrawer";
@@ -205,17 +205,18 @@ export type UseMapDataOptions = {
 
 export type UseMapDataReturn = {
   campsites: Campsite[];
-  setCampsites: Dispatch<SetStateAction<Campsite[]>>;
   hasMore: boolean;
   amenityPois: AmenityPOI[];
-  campsitesRef: MutableRefObject<Campsite[]>;
   // Exposed so Map.tsx can pre-populate cache from AI search response weather,
   // avoiding a redundant /api/weather/batch round-trip after results arrive.
   weatherCacheRef: MutableRefObject<Map<string, WeatherDay[] | null>>;
   loadCampsites: (map: mapboxgl.Map) => void;
   loadAmenities: (map: mapboxgl.Map) => void;
-  loadWeatherForViewport: (map: mapboxgl.Map, allCampsites: Campsite[]) => void;
-  syncCampsiteCount: (n: number) => void;
+  // allCampsites is optional — omit to use campsitesRef.current (AI pan path in handleMoveEnd).
+  loadWeatherForViewport: (map: mapboxgl.Map, allCampsites?: Campsite[]) => void;
+  // Atomically updates campsites state, campsitesRef, and prevCampsitesLengthRef.
+  // Use instead of setCampsites for AI-search result paths so all three stay in sync.
+  setSearchResults: (campsites: Campsite[]) => void;
 };
 
 export function useMapData({
@@ -249,13 +250,21 @@ export function useMapData({
   // Mirrors campsites state for stable callbacks (handleMoveEnd AI pan path).
   const campsitesRef = useRef<Campsite[]>([]);
 
+  // Keeps campsitesRef in sync with campsites state so stable callbacks
+  // (loadWeatherForViewport default path) always read the latest list.
+  useEffect(() => {
+    campsitesRef.current = campsites;
+  }, [campsites]);
+
   // Fetches weather only for campsite pins currently visible in the map viewport.
   // Applies the client-side cache immediately, then fetches uncached visible pins
   // from the server in the background.
-  // allCampsites: the full list to search — may be larger than the viewport (AI mode).
+  // allCampsites: explicit list (browse fetch, AI arrival). Omit to use campsitesRef.current
+  // (handleMoveEnd AI pan path, where the ref is already current).
   const loadWeatherForViewport = useCallback(
-    (map: mapboxgl.Map, allCampsites: Campsite[]) => {
-      if (allCampsites.length === 0) return;
+    (map: mapboxgl.Map, allCampsites?: Campsite[]) => {
+      const items = allCampsites ?? campsitesRef.current;
+      if (items.length === 0) return;
 
       const bounds = computeVisibleBounds(map, getDrawerHeightPx(drawerStateRef.current));
 
@@ -263,7 +272,7 @@ export function useMapData({
       // Longitude check assumes west < east (no antimeridian wrap). This is safe
       // for Australian coverage — the dateline (180°) sits east of NZ and is
       // never crossed by a normal AU map viewport.
-      const uncached = allCampsites.filter(
+      const uncached = items.filter(
         (c) =>
           !weatherCacheRef.current.has(c.id) &&
           c.lat <= bounds.north &&
@@ -273,12 +282,12 @@ export function useMapData({
       );
 
       // Always set campsites with any cached weather applied. On first load (empty
-      // cache) this is equivalent to setCampsites(allCampsites); on subsequent pans
+      // cache) this is equivalent to setCampsites(items); on subsequent pans
       // it surfaces cached badges immediately without waiting for the async fetch.
       // Skipping this call when nothing is cached would leave browse-mode pins
       // invisible until the async updater runs against a stale prev list.
       setCampsites(
-        allCampsites.map((c) =>
+        items.map((c) =>
           weatherCacheRef.current.has(c.id)
             ? { ...c, weather: weatherCacheRef.current.get(c.id) ?? null }
             : c
@@ -364,8 +373,10 @@ export function useMapData({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadWeatherForViewport, setDrawerState, setSelectedIdx]);
 
-  const syncCampsiteCount = useCallback((n: number) => {
-    prevCampsitesLengthRef.current = n;
+  const setSearchResults = useCallback((newCampsites: Campsite[]) => {
+    setCampsites(newCampsites);
+    campsitesRef.current = newCampsites;
+    prevCampsitesLengthRef.current = newCampsites.length;
   }, []);
 
   const loadAmenities = useCallback((map: mapboxgl.Map) => {
@@ -390,14 +401,12 @@ export function useMapData({
 
   return {
     campsites,
-    setCampsites,
     hasMore,
     amenityPois,
-    campsitesRef,
     weatherCacheRef,
     loadCampsites,
     loadAmenities,
     loadWeatherForViewport,
-    syncCampsiteCount,
+    setSearchResults,
   };
 }

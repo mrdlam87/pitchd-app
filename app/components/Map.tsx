@@ -17,7 +17,7 @@ import { CORAL, FOREST_GREEN } from "@/lib/tokens";
 import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayload, type AISearchPayload } from "@/lib/searchResults";
 import { QUICK_CHIPS, AMENITY_CHIPS } from "@/lib/chips";
 import { CampsitePin } from "./CampsitePin";
-import { AmenityPin } from "./AmenityPin";
+import { AmenityPin, type AmenityPinMeta } from "./AmenityPin";
 import { useMapData } from "@/hooks/useMapData";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -35,7 +35,7 @@ const DEFAULT_VIEWPORT = {
 
 // Local metadata for each POI type — matches FilterPanel POI_OPTIONS and AmenityType seed data.
 // Colors and icons must stay in sync with the AmenityType seed data in prisma/seed.ts.
-const POI_META: Record<string, { emoji: string; label: string; color: string }> = {
+const POI_META: Record<string, AmenityPinMeta> = {
   dump_point: { emoji: "🚐", label: "Dump point", color: "#c8870a" },
   water_fill: { emoji: "💧", label: "Water fill", color: "#2a8ab0" },
   laundromat: { emoji: "🧺", label: "Laundromat", color: "#7a6ab0" },
@@ -213,15 +213,13 @@ export default function MapView() {
 
   const {
     campsites,
-    setCampsites,
     hasMore,
     amenityPois,
-    campsitesRef,
     weatherCacheRef,
     loadCampsites,
     loadAmenities,
     loadWeatherForViewport,
-    syncCampsiteCount,
+    setSearchResults,
   } = useMapData({
     drawerStateRef,
     activeFiltersRef,
@@ -401,11 +399,6 @@ export default function MapView() {
     activeFiltersRef.current = activeFilters;
   }, [activeFilters]);
 
-  useEffect(() => {
-    campsitesRef.current = campsites;
-  // campsitesRef is a stable MutableRefObject — intentionally excluded from dep array.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campsites]);
 
   useEffect(() => {
     campsiteClustersRef.current = campsiteClusters;
@@ -426,8 +419,7 @@ export default function MapView() {
       const searchPayload = initialSearchRef.current;
       if (searchPayload?.kind === "ai" && searchPayload.campsites.length > 0) {
         initialSearchRef.current = null;
-        setCampsites(searchPayload.campsites);
-        syncCampsiteCount(searchPayload.campsites.length);
+        setSearchResults(searchPayload.campsites);
         setDrawerState("half");
         drawerStateRef.current = "half";
 
@@ -469,9 +461,7 @@ export default function MapView() {
         loadAmenities(e.target);
       }
     },
-    // setCampsites is a stable useState setter — intentionally excluded from dep array.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [loadCampsites, loadAmenities, loadWeatherForViewport, syncCampsiteCount]
+    [loadCampsites, loadAmenities, loadWeatherForViewport, setSearchResults]
   );
 
   const handleMoveEnd = useCallback(
@@ -494,14 +484,12 @@ export default function MapView() {
       // While NL search results are active, suppress browse fetches but still
       // fetch weather for any newly visible pins that haven't been cached yet.
       if (searchModeRef.current) {
-        loadWeatherForViewport(e.target, campsitesRef.current);
+        loadWeatherForViewport(e.target);
         return;
       }
       loadCampsites(e.target);
       loadAmenities(e.target);
     },
-    // campsitesRef is a stable MutableRefObject — intentionally excluded from dep array.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [loadCampsites, loadAmenities, loadWeatherForViewport]
   );
 
@@ -644,8 +632,7 @@ export default function MapView() {
           weatherCacheRef.current.set(c.id, c.weather);
         }
       }
-      setCampsites(data.campsites);
-      syncCampsiteCount(data.campsites.length);
+      setSearchResults(data.campsites);
       setMapQuery("");
       if (data.campsites.length > 0 && mapRef.current) {
         // Results — enter search mode and fit the map to the pins
