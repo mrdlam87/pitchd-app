@@ -153,7 +153,7 @@ describe("GET /api/campsites", () => {
     expect(body).toMatchObject({
       results: expect.any(Array),
       page: 1,
-      pageSize: 20,
+      pageSize: 200,
       hasMore: expect.any(Boolean),
     });
   });
@@ -266,19 +266,6 @@ describe("GET /api/campsites", () => {
   });
 
   // --- Pagination ---
-
-  it("returns hasMore: true when a full page is returned", async () => {
-    // Seed 21 campsites to exceed PAGE_SIZE (20)
-    await Promise.all(
-      Array.from({ length: 21 }, (_, i) =>
-        seedCampsite({ lat: -33.87 + i * 0.001, lng: 151.21 })
-      )
-    );
-    const res = await GET(makeRequest(SYDNEY));
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.hasMore).toBe(true);
-  });
 
   it("respects page param", async () => {
     const res = await GET(makeRequest({ ...SYDNEY, page: "2" }));

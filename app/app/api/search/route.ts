@@ -61,13 +61,13 @@ async function geocodeLocation(location: string): Promise<{ lat: number; lng: nu
 }
 
 // Number of campsites to return after final combined ranking
-const RESULT_LIMIT = 20;
+const RESULT_LIMIT = 100;
 // Max rows fetched from DB before Haversine sort — guards against large bounding boxes
 // pulling thousands of rows into memory. Well above RESULT_LIMIT to preserve ranking quality.
 const DB_FETCH_LIMIT = 200;
 // Number of proximity candidates passed to weather enrichment. Larger than RESULT_LIMIT
 // so weather can promote great-weather sites that would otherwise just miss the cut.
-const WEATHER_CANDIDATES = 50;
+const WEATHER_CANDIDATES = 100;
 // MAX_DRIVE_TIME_HRS and KM_PER_HOUR imported from @/lib/parseIntent
 // hashQuery, getCachedIntent, setCachedIntent imported from @/lib/searchCache
 
