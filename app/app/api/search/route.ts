@@ -67,7 +67,7 @@ const RESULT_LIMIT = 100;
 const DB_FETCH_LIMIT = 200;
 // Number of proximity candidates passed to weather enrichment. Larger than RESULT_LIMIT
 // so weather can promote great-weather sites that would otherwise just miss the cut.
-const WEATHER_CANDIDATES = 100;
+const WEATHER_CANDIDATES = 150;
 // MAX_DRIVE_TIME_HRS and KM_PER_HOUR imported from @/lib/parseIntent
 // hashQuery, getCachedIntent, setCachedIntent imported from @/lib/searchCache
 

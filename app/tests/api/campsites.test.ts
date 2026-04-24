@@ -154,6 +154,8 @@ describe("GET /api/campsites", () => {
       results: expect.any(Array),
       page: 1,
       pageSize: 200,
+      // TODO: add a hasMore: true assertion once seeding PAGE_SIZE + 1 records in a
+      // tight bbox is feasible (currently seeding 201 records is too slow for CI).
       hasMore: expect.any(Boolean),
     });
   });

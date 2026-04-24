@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/apiAuth";
 import { SyncStatus } from "@/lib/generated/prisma/enums";
 
+// Set high enough that a typical viewport never hits the limit — pagination exists
+// as a safety valve for extreme zoom-out, not as a normal user flow.
 const PAGE_SIZE = 200;
 
 // Guard against full-table scans from very large viewports.
