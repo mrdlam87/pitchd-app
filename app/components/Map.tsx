@@ -13,7 +13,7 @@ import BottomDrawer, {
   getDrawerHeightPx,
 } from "./BottomDrawer";
 import type { AmenityPOI, Campsite } from "@/types/map";
-import { BORDER, CORAL, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
+import { BORDER, CORAL, FOREST_GREEN, SAGE, SURFACE_OVERLAY } from "@/lib/tokens";
 import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayload, type AISearchPayload } from "@/lib/searchResults";
 import { QUICK_CHIPS, AMENITY_CHIPS } from "@/lib/chips";
 import { CampsitePin } from "./CampsitePin";
@@ -988,7 +988,7 @@ export default function MapView() {
       {isInitialLoading && (
         <div
           className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 backdrop-blur-sm"
-          style={{ background: `${SURFACE}d2` }}
+          style={{ background: SURFACE_OVERLAY }}
         >
           <div
             className="w-12 h-12 rounded-full animate-spin"

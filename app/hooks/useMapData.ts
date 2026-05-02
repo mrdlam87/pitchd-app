@@ -345,6 +345,7 @@ export function useMapData({
   );
 
   const markInitialLoaded = useCallback(() => {
+    if (hasInitiallyLoadedRef.current) return;
     hasInitiallyLoadedRef.current = true;
     setIsInitialLoading(false);
   }, []);
@@ -408,7 +409,7 @@ export function useMapData({
     setCampsites(newCampsites);
     campsitesRef.current = newCampsites;
     prevCampsitesLengthRef.current = newCampsites.length;
-  }, []);
+  }, [markInitialLoaded]);
 
   const loadAmenities = useCallback((map: mapboxgl.Map) => {
     const poiTypes = activeFiltersRef.current.pois;
