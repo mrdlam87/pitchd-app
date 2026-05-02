@@ -447,6 +447,7 @@ function DrawerContentList({
 // Vaul snap points: least → most visible.
 // "64px" = peek strip, HALF_VH = half viewport, 1 = full viewport.
 const SNAP_POINTS: (number | string)[] = ["64px", HALF_VH, 1];
+const PEEK_ONLY_SNAP_POINTS: (number | string)[] = [SNAP_POINTS[0]];
 
 function snapForState(s: DrawerState): number | string {
   if (s === "full") return 1;
@@ -523,7 +524,7 @@ export default function BottomDrawer({
 
   return (
     <Drawer.Root
-      snapPoints={hasContent ? SNAP_POINTS : [SNAP_POINTS[0]]}
+      snapPoints={hasContent ? SNAP_POINTS : PEEK_ONLY_SNAP_POINTS}
       activeSnapPoint={hasContent ? snapForState(drawerState) : SNAP_POINTS[0]}
       setActiveSnapPoint={(snap) => { if (hasContent) onDrawerStateChange(stateForSnap(snap)); }}
       // modal=false: the map and UI above the drawer stay fully interactive.
@@ -590,7 +591,7 @@ export default function BottomDrawer({
             <div className="px-4 pb-2 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span
-                  className={`text-sm font-semibold transition-opacity${isFetching ? " animate-pulse" : ""}`}
+                  className={`text-sm font-semibold${isFetching ? " animate-pulse" : ""}`}
                   style={{ color: FOREST_GREEN }}
                 >
                   {resultLabel}

@@ -13,7 +13,7 @@ import BottomDrawer, {
   getDrawerHeightPx,
 } from "./BottomDrawer";
 import type { AmenityPOI, Campsite } from "@/types/map";
-import { BORDER, CORAL, FOREST_GREEN, SAGE } from "@/lib/tokens";
+import { BORDER, CORAL, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
 import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayload, type AISearchPayload } from "@/lib/searchResults";
 import { QUICK_CHIPS, AMENITY_CHIPS } from "@/lib/chips";
 import { CampsitePin } from "./CampsitePin";
@@ -987,15 +987,15 @@ export default function MapView() {
           z-20 sits above map markers (max z-index 10) but below the drawer (z-50). */}
       {isInitialLoading && (
         <div
-          className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3"
-          style={{ background: "rgba(247,245,240,0.82)", backdropFilter: "blur(4px)" }}
+          className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 backdrop-blur-sm"
+          style={{ background: `${SURFACE}d2` }}
         >
           <div
             className="w-12 h-12 rounded-full animate-spin"
             style={{ border: `3px solid ${BORDER}`, borderTopColor: CORAL }}
           />
           <div className="text-center">
-            <p className="font-serif text-base font-bold mb-1" style={{ color: FOREST_GREEN }}>
+            <p className="font-[family-name:var(--font-lora)] text-base font-bold mb-1" style={{ color: FOREST_GREEN }}>
               Pitching the best spots…
             </p>
             <p className="text-xs" style={{ color: SAGE }}>

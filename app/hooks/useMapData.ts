@@ -392,6 +392,9 @@ export function useMapData({
           loadWeatherForViewport(map, results);
         }
       })
+      // fetchCampsites has an internal try/catch and always resolves — this .catch()
+      // is a defensive guard in case that invariant ever changes (e.g. a future refactor
+      // that lets network errors propagate).
       .catch(() => {
         if (id !== fetchCounterRef.current) return;
         setIsFetching(false);
@@ -405,6 +408,12 @@ export function useMapData({
   }, [loadWeatherForViewport, setDrawerState, setSelectedIdx]);
 
   const setSearchResults = useCallback((newCampsites: Campsite[]) => {
+    // Clear the initial overlay immediately so AI search arrivals and inline map
+    // searches don't flash the spinner — covers both handleLoad and handleMapSearch paths.
+    if (!hasInitiallyLoadedRef.current) {
+      hasInitiallyLoadedRef.current = true;
+      setIsInitialLoading(false);
+    }
     setCampsites(newCampsites);
     campsitesRef.current = newCampsites;
     prevCampsitesLengthRef.current = newCampsites.length;
