@@ -31,6 +31,7 @@ const MOCK_FORECAST = {
 // to avoid cache record collisions when test files run in parallel.
 const LOC_A = { id: "camp-a", lat: -37.8136, lng: 144.9631 }; // Melbourne
 const LOC_B = { id: "camp-b", lat: -27.4698, lng: 153.0251 }; // Brisbane
+const LOC_C = { id: "camp-c", lat: -34.9285, lng: 138.6007 }; // Adelaide
 
 function makeRequest(body: unknown) {
   return new Request("http://localhost/api/weather/batch", {
@@ -60,8 +61,9 @@ describe("POST /api/weather/batch", () => {
   });
 
   afterEach(async () => {
-    await cleanupCache(LOC_A, LOC_B);
+    await cleanupCache(LOC_A, LOC_B, LOC_C);
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
     vi.clearAllMocks();
   });
 
@@ -216,6 +218,13 @@ describe("POST /api/weather/batch", () => {
     const body = await res.json();
     expect(body.results[LOC_A.id]).toEqual(MOCK_FORECAST);
     expect(vi.mocked(fetch)).toHaveBeenCalledOnce();
+
+    // Verify the stale record was replaced — with deleteMany+createMany a bug in the
+    // delete clause could leave the old row untouched and the test wouldn't catch it.
+    const record = await prisma.weatherCache.findUnique({
+      where: { lat_lng: { lat: LOC_A.lat, lng: LOC_A.lng } },
+    });
+    expect(record?.forecastJson).toEqual(MOCK_FORECAST);
   });
 
   // --- Deduplication ---
@@ -246,5 +255,27 @@ describe("POST /api/weather/batch", () => {
     const body = await res.json();
     expect(body.results[LOC_A.id]).toBeNull();
     expect(body.results[LOC_B.id]).toEqual(MOCK_FORECAST);
+  });
+
+  // --- Batch cache writes ---
+
+  it("writes all cache misses in a single batch instead of individual upserts", async () => {
+    // N concurrent upserts exhaust the DB connection pool — the fix must not call upsert at all.
+    const upsertSpy = vi.spyOn(prisma.weatherCache, "upsert");
+
+    const res = await POST(makeRequest({ locations: [LOC_A, LOC_B, LOC_C] }));
+    expect(res.status).toBe(200);
+
+    expect(upsertSpy).not.toHaveBeenCalled();
+
+    // All three locations must still be persisted to the cache
+    const [recA, recB, recC] = await Promise.all([
+      prisma.weatherCache.findUnique({ where: { lat_lng: { lat: LOC_A.lat, lng: LOC_A.lng } } }),
+      prisma.weatherCache.findUnique({ where: { lat_lng: { lat: LOC_B.lat, lng: LOC_B.lng } } }),
+      prisma.weatherCache.findUnique({ where: { lat_lng: { lat: LOC_C.lat, lng: LOC_C.lng } } }),
+    ]);
+    expect(recA?.forecastJson).toEqual(MOCK_FORECAST);
+    expect(recB?.forecastJson).toEqual(MOCK_FORECAST);
+    expect(recC?.forecastJson).toEqual(MOCK_FORECAST);
   });
 });

@@ -40,7 +40,7 @@ const NEUTRAL_WEATHER_SCORE = 50;
  * 2-day window used for ranking when no trip dates are known. This intentionally
  * differs from the client-side extractWeatherForecast (Map.tsx) which defaults
  * to MAX_FORECAST_DAYS (4) for browse-mode card display.
- * See also: extractWeatherForecast in app/components/Map.tsx (client-side counterpart).
+ * See also: extractWeatherForecast in app/lib/fetchWeatherBatch.ts (client-side counterpart).
  * Returns an empty array if the shape is unexpected.
  */
 export function extractForecastDays(

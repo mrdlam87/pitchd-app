@@ -5,11 +5,12 @@
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/apiAuth";
 import { Prisma } from "@/lib/generated/prisma/client";
+import { WEATHER_MAX_LOCATIONS } from "@/lib/weatherConstants";
 
 const OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast";
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const FETCH_TIMEOUT_MS = 10_000; // 10 seconds per location
-const MAX_LOCATIONS = 100;
+const MAX_LOCATIONS = WEATHER_MAX_LOCATIONS;
 // Maximum concurrent Open-Meteo requests to avoid overwhelming the free tier
 const CONCURRENCY = 10;
 
@@ -164,27 +165,42 @@ export async function POST(req: Request): Promise<Response> {
         CONCURRENCY
       );
 
-      // Write successful fetches to cache and attach to results
-      const fetchedAt = new Date();
-      const expiresAt = new Date(fetchedAt.getTime() + CACHE_TTL_MS);
+      // Attach all results (null for failed fetches)
+      for (let i = 0; i < misses.length; i++) {
+        results[misses[i].id] = fetched[i];
+      }
 
-      await Promise.all(
-        misses.map(async (loc, i) => {
-          const forecastJson = fetched[i];
-          results[loc.id] = forecastJson;
-          if (forecastJson !== null) {
-            try {
-              await prisma.weatherCache.upsert({
-                where: { lat_lng: { lat: loc.lat, lng: loc.lng } },
-                update: { fetchedAt, expiresAt, forecastJson },
-                create: { lat: loc.lat, lng: loc.lng, fetchedAt, expiresAt, forecastJson },
-              });
-            } catch (cacheErr) {
-              console.error("[POST /api/weather/batch] Cache write failed", loc.lat, loc.lng, cacheErr);
-            }
-          }
-        })
-      );
+      // Batch all successful fetches into a single transaction — avoids N concurrent
+      // upserts that exhaust the DB connection pool under large miss counts.
+      const cacheWrites = misses
+        .map((loc, i) => ({ loc, forecastJson: fetched[i] }))
+        .filter((item): item is { loc: Location; forecastJson: Prisma.InputJsonValue } =>
+          item.forecastJson !== null
+        );
+
+      if (cacheWrites.length > 0) {
+        const fetchedAt = new Date();
+        const expiresAt = new Date(fetchedAt.getTime() + CACHE_TTL_MS);
+        try {
+          await prisma.$transaction([
+            prisma.weatherCache.deleteMany({
+              where: { OR: cacheWrites.map(({ loc }) => ({ lat: loc.lat, lng: loc.lng })) },
+            }),
+            prisma.weatherCache.createMany({
+              data: cacheWrites.map(({ loc, forecastJson }) => ({
+                lat: loc.lat,
+                lng: loc.lng,
+                fetchedAt,
+                expiresAt,
+                forecastJson,
+              })),
+              skipDuplicates: true,
+            }),
+          ]);
+        } catch (cacheErr) {
+          console.error("[POST /api/weather/batch] Cache write failed", cacheErr);
+        }
+      }
     }
 
     return Response.json({ results });
