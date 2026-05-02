@@ -1,7 +1,7 @@
 "use client";
 
 import { Drawer } from "vaul";
-import { CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
+import { BORDER, CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
 import { wmoCodeToEmoji, condColorForCode } from "@/lib/weatherScore";
 import type { AmenityPOI, Campsite, POIMeta, WeatherDay } from "@/types/map";
 import { haversineKm } from "@/lib/distance";
@@ -480,6 +480,7 @@ type Props = {
   drawerState: DrawerState;
   onDrawerStateChange: (state: DrawerState) => void;
   onSelectPin: (i: number) => void;
+  isFetching?: boolean;
 };
 
 export default function BottomDrawer({
@@ -494,6 +495,7 @@ export default function BottomDrawer({
   drawerState,
   onDrawerStateChange,
   onSelectPin,
+  isFetching = false,
 }: Props) {
   const isFull = drawerState === "full";
 
@@ -584,12 +586,23 @@ export default function BottomDrawer({
 
             {/* Summary row */}
             <div className="px-4 pb-2 flex items-center justify-between">
-              <div className="text-sm font-semibold" style={{ color: FOREST_GREEN }}>
-                {resultLabel}
-                {campsites.length > 0 && (
-                  <span className="ml-1.5 font-normal text-xs" style={{ color: SAGE }}>
-                    · nearby
-                  </span>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`text-sm font-semibold transition-opacity${isFetching ? " animate-pulse" : ""}`}
+                  style={{ color: FOREST_GREEN }}
+                >
+                  {resultLabel}
+                  {campsites.length > 0 && (
+                    <span className="ml-1.5 font-normal text-xs" style={{ color: SAGE }}>
+                      · nearby
+                    </span>
+                  )}
+                </span>
+                {isFetching && (
+                  <div
+                    className="w-4 h-4 rounded-full animate-spin flex-shrink-0"
+                    style={{ border: `2px solid ${BORDER}`, borderTopColor: CORAL }}
+                  />
                 )}
               </div>
               {/* More / Less button — tap to cycle up, or collapse from full */}

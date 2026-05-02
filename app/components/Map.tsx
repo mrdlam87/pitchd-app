@@ -216,6 +216,7 @@ export default function MapView() {
     hasMore,
     amenityPois,
     isInitialLoading,
+    isFetching,
     weatherCacheRef,
     loadCampsites,
     loadAmenities,
@@ -996,7 +997,7 @@ export default function MapView() {
           />
           <div className="text-center">
             <p className="font-serif text-base font-bold mb-1" style={{ color: FOREST_GREEN }}>
-              Finding the best spots…
+              Pitching the best spots…
             </p>
             <p className="text-xs" style={{ color: SAGE }}>
               Loading campsites nearby
@@ -1019,6 +1020,7 @@ export default function MapView() {
           drawerState={drawerState}
           onDrawerStateChange={handleDrawerStateChange}
           onSelectPin={selectPin}
+          isFetching={isFetching}
         />
       )}
     </div>

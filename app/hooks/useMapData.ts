@@ -210,6 +210,8 @@ export type UseMapDataReturn = {
   // True until the first loadCampsites fetch resolves (browse mode initial load).
   // Map.tsx uses this to show a centered spinner overlay.
   isInitialLoading: boolean;
+  // True while any loadCampsites fetch is in flight (pan/zoom refetches).
+  isFetching: boolean;
   // Exposed so Map.tsx can pre-populate cache from AI search response weather,
   // avoiding a redundant /api/weather/batch round-trip after results arrive.
   weatherCacheRef: MutableRefObject<Map<string, WeatherDay[] | null>>;
@@ -239,6 +241,7 @@ export function useMapData({
   const [hasMore, setHasMore] = useState(false);
   const [amenityPois, setAmenityPois] = useState<AmenityPOI[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
 
   // Monotonic counter — discard results from stale in-flight requests
   const fetchCounterRef = useRef(0);
@@ -348,11 +351,13 @@ export function useMapData({
 
   const loadCampsites = useCallback((map: mapboxgl.Map) => {
     const id = ++fetchCounterRef.current;
+    setIsFetching(true);
     const bounds = computeVisibleBounds(map, getDrawerHeightPx(drawerStateRef.current));
     const filters = activeFiltersRef.current;
     const amenities = [...filters.activities, ...filters.pois];
     fetchCampsites(bounds, amenities).then(({ results, hasMore: newHasMore }) => {
       if (id !== fetchCounterRef.current) return; // stale fetch — discard
+      setIsFetching(false);
       if (!hasInitiallyLoadedRef.current) {
         hasInitiallyLoadedRef.current = true;
         setIsInitialLoading(false);
@@ -421,6 +426,7 @@ export function useMapData({
     hasMore,
     amenityPois,
     isInitialLoading,
+    isFetching,
     weatherCacheRef,
     loadCampsites,
     loadAmenities,
