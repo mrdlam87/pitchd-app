@@ -359,10 +359,7 @@ export function useMapData({
       .then(({ results, hasMore: newHasMore }) => {
         if (id !== fetchCounterRef.current) return; // stale fetch — discard
         setIsFetching(false);
-        if (!hasInitiallyLoadedRef.current) {
-          hasInitiallyLoadedRef.current = true;
-          setIsInitialLoading(false);
-        }
+        markInitialLoaded();
         cardRefs.current = [];
         // Re-open to half only on 0 → results transition.
         // Also sync map padding so Mapbox knows the drawer now covers ~52vh —
@@ -398,22 +395,16 @@ export function useMapData({
       .catch(() => {
         if (id !== fetchCounterRef.current) return;
         setIsFetching(false);
-        if (!hasInitiallyLoadedRef.current) {
-          hasInitiallyLoadedRef.current = true;
-          setIsInitialLoading(false);
-        }
+        markInitialLoaded();
       });
   // drawerStateRef, activeFiltersRef, selectedIdRef, cardRefs, skipNextFetch are stable refs.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadWeatherForViewport, setDrawerState, setSelectedIdx]);
+  }, [loadWeatherForViewport, markInitialLoaded, setDrawerState, setSelectedIdx]);
 
   const setSearchResults = useCallback((newCampsites: Campsite[]) => {
     // Clear the initial overlay immediately so AI search arrivals and inline map
     // searches don't flash the spinner — covers both handleLoad and handleMapSearch paths.
-    if (!hasInitiallyLoadedRef.current) {
-      hasInitiallyLoadedRef.current = true;
-      setIsInitialLoading(false);
-    }
+    markInitialLoaded();
     setCampsites(newCampsites);
     campsitesRef.current = newCampsites;
     prevCampsitesLengthRef.current = newCampsites.length;
