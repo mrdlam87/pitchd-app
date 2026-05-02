@@ -519,11 +519,13 @@ export default function BottomDrawer({
     ? (poiMeta[selectedPoi.amenityType.key] ?? { emoji: "📍", label: selectedPoi.amenityType.key, color: FOREST_GREEN })
     : null;
 
+  const hasContent = campsites.length > 0 || selectedPoi !== null;
+
   return (
     <Drawer.Root
-      snapPoints={SNAP_POINTS}
-      activeSnapPoint={snapForState(drawerState)}
-      setActiveSnapPoint={(snap) => onDrawerStateChange(stateForSnap(snap))}
+      snapPoints={hasContent ? SNAP_POINTS : [SNAP_POINTS[0]]}
+      activeSnapPoint={hasContent ? snapForState(drawerState) : SNAP_POINTS[0]}
+      setActiveSnapPoint={(snap) => { if (hasContent) onDrawerStateChange(stateForSnap(snap)); }}
       // modal=false: the map and UI above the drawer stay fully interactive.
       modal={false}
       // dismissible=false: peek is the minimum — the drawer never disappears.
@@ -605,18 +607,20 @@ export default function BottomDrawer({
                   />
                 )}
               </div>
-              {/* More / Less button — tap to cycle up, or collapse from full */}
-              <button
-                type="button"
-                className="text-[11px] font-bold flex-shrink-0 ml-2"
-                style={{ color: CORAL }}
-                onClick={() =>
-                  onDrawerStateChange(drawerState === "full" ? "peek" : cycleUp(drawerState))
-                }
-                aria-label={drawerState === "full" ? "Collapse drawer" : "Expand drawer"}
-              >
-                {drawerState === "full" ? "▼ Less" : "▲ More"}
-              </button>
+              {/* More / Less button — hidden when there's no content to expand into */}
+              {hasContent && (
+                <button
+                  type="button"
+                  className="text-[11px] font-bold flex-shrink-0 ml-2"
+                  style={{ color: CORAL }}
+                  onClick={() =>
+                    onDrawerStateChange(drawerState === "full" ? "peek" : cycleUp(drawerState))
+                  }
+                  aria-label={drawerState === "full" ? "Collapse drawer" : "Expand drawer"}
+                >
+                  {drawerState === "full" ? "▼ Less" : "▲ More"}
+                </button>
+              )}
             </div>
           </div>
 
