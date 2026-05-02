@@ -3,8 +3,8 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { DrawerState } from "@/components/BottomDrawer";
 import { getDrawerHeightPx } from "@/components/BottomDrawer";
 import type { FilterState } from "@/components/FilterPanel";
-import { DAY_NAMES } from "@/types/map";
 import type { AmenityPOI, Campsite, WeatherDay } from "@/types/map";
+import { fetchWeatherBatch, extractWeatherForecast } from "@/lib/fetchWeatherBatch";
 import type mapboxgl from "mapbox-gl";
 
 export type Bounds = { north: number; south: number; east: number; west: number };
@@ -30,109 +30,6 @@ async function fetchCampsites(bounds: Bounds, amenities: string[] = []): Promise
   } catch (e) {
     console.warn("[fetchCampsites] fetch failed", e);
     return { results: [], hasMore: false };
-  }
-}
-
-// Extracts weather data from an Open-Meteo forecast response.
-// When startDate/endDate are provided, only days within that range are included
-// (matching the date window used for ranking). Without dates, falls back to the
-// first MAX_FORECAST_DAYS (4) days — intentionally wider than the server-side
-// extractForecastDays default (today+tomorrow) because browse-mode cards show
-// more days than the 2-day ranking window needs.
-// See also: extractForecastDays in app/lib/weatherRanking.ts (server-side counterpart).
-// Returns null if the response shape is unexpected; gracefully handles absent
-// precipitation_probability_max (old cache entries) by setting null.
-const MAX_FORECAST_DAYS = 4;
-function extractWeatherForecast(
-  forecast: unknown,
-  startDate?: string | null,
-  endDate?: string | null,
-): WeatherDay[] | null {
-  if (typeof forecast !== "object" || forecast === null) return null;
-  const f = forecast as Record<string, unknown>;
-  if (typeof f.daily !== "object" || f.daily === null) return null;
-  const d = f.daily as Record<string, unknown>;
-  if (!Array.isArray(d.temperature_2m_max) || !Array.isArray(d.temperature_2m_min)) return null;
-  if (!Array.isArray(d.precipitation_sum) || !Array.isArray(d.weathercode)) return null;
-  if (!Array.isArray(d.time)) return null;
-
-  const probArr = Array.isArray(d.precipitation_probability_max)
-    ? (d.precipitation_probability_max as unknown[])
-    : null;
-
-  const days: WeatherDay[] = [];
-  for (let i = 0; i < (d.time as unknown[]).length; i++) {
-    const dateStr = d.time[i];
-    if (typeof dateStr !== "string") continue;
-
-    // Date range filter:
-    // - Full range supplied: show only days within [startDate, endDate].
-    // - startDate only (partial range): show MAX_FORECAST_DAYS days from startDate.
-    // - No dates (browse mode): show first MAX_FORECAST_DAYS days of the forecast.
-    if (startDate && endDate) {
-      if (dateStr < startDate || dateStr > endDate) continue;
-    } else if (startDate) {
-      if (dateStr < startDate) continue;
-      if (days.length >= MAX_FORECAST_DAYS) break;
-    } else if (days.length >= MAX_FORECAST_DAYS) {
-      break;
-    }
-
-    const tempMax = d.temperature_2m_max[i];
-    const tempMin = d.temperature_2m_min[i];
-    const precipitationSum = d.precipitation_sum[i];
-    const weatherCode = d.weathercode[i];
-    // Skip malformed days rather than aborting the whole array. Day 0 is the
-    // most critical (shown in compact mode); if it is missing, the caller
-    // receives a shorter array and the WeatherStrip shows fewer segments.
-    if (typeof tempMax !== "number" || typeof tempMin !== "number") continue;
-    if (typeof precipitationSum !== "number" || typeof weatherCode !== "number") continue;
-    // T00:00:00 forces local-time midnight parsing — without it, `new Date("2024-03-23")`
-    // is parsed as UTC midnight and .getDay() returns the wrong day in UTC+ timezones.
-    const dow = new Date(dateStr + "T00:00:00").getDay();
-    const precipProbRaw = probArr?.[i];
-    days.push({
-      date: dateStr,
-      dayName: DAY_NAMES[dow],
-      tempMax,
-      tempMin,
-      precipitationSum,
-      precipProbability: typeof precipProbRaw === "number" ? precipProbRaw : null,
-      weatherCode,
-    });
-  }
-  return days.length > 0 ? days : null;
-}
-
-// Fetches weather for a batch of campsites from /api/weather/batch.
-// startDate/endDate filter the displayed days to the search date window (when supplied).
-// Returns the same array with weather attached — failures result in weather: null.
-// Never throws; errors are logged and each campsite gets weather: null.
-async function fetchWeatherBatch(
-  campsites: Campsite[],
-  startDate?: string | null,
-  endDate?: string | null,
-): Promise<Campsite[]> {
-  if (campsites.length === 0) return campsites;
-  const locations = campsites.map((c) => ({ id: c.id, lat: c.lat, lng: c.lng }));
-  try {
-    const res = await fetch("/api/weather/batch", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ locations }),
-    });
-    if (!res.ok) {
-      console.warn(`[fetchWeatherBatch] ${res.status} ${res.statusText}`);
-      return campsites.map((c) => ({ ...c, weather: null }));
-    }
-    const data = (await res.json()) as { results: Record<string, unknown> };
-    return campsites.map((c) => ({
-      ...c,
-      weather: extractWeatherForecast(data.results[c.id], startDate, endDate) ?? null,
-    }));
-  } catch (e) {
-    console.warn("[fetchWeatherBatch] fetch failed", e);
-    return campsites.map((c) => ({ ...c, weather: null }));
   }
 }
 
