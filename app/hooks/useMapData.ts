@@ -355,42 +355,51 @@ export function useMapData({
     const bounds = computeVisibleBounds(map, getDrawerHeightPx(drawerStateRef.current));
     const filters = activeFiltersRef.current;
     const amenities = [...filters.activities, ...filters.pois];
-    fetchCampsites(bounds, amenities).then(({ results, hasMore: newHasMore }) => {
-      if (id !== fetchCounterRef.current) return; // stale fetch — discard
-      setIsFetching(false);
-      if (!hasInitiallyLoadedRef.current) {
-        hasInitiallyLoadedRef.current = true;
-        setIsInitialLoading(false);
-      }
-      cardRefs.current = [];
-      // Re-open to half only on 0 → results transition.
-      // Also sync map padding so Mapbox knows the drawer now covers ~52vh —
-      // without this, pin centering and bounds computation stay at PEEK_HEIGHT_PX
-      // until the next user-triggered easeTo. skipNextFetch suppresses the
-      // moveend that setPadding's internal easeTo(duration:0) fires.
-      if (results.length > 0 && prevCampsitesLengthRef.current === 0) {
-        setDrawerState("half");
-        skipNextFetch.current = true;
-        map.setPadding({ top: 0, right: 0, bottom: getDrawerHeightPx("half"), left: 0 });
-      }
-      prevCampsitesLengthRef.current = results.length;
-      setHasMore(newHasMore);
-      const newIdx = selectedIdRef.current
-        ? results.findIndex((c) => c.id === selectedIdRef.current)
-        : -1;
-      setSelectedIdx(newIdx >= 0 ? newIdx : null);
-      if (newIdx < 0) selectedIdRef.current = null;
-      // loadWeatherForViewport sets campsites state (with cache applied) for non-empty
-      // results. For empty results it returns early, so clear the list explicitly.
-      if (results.length === 0) {
-        setCampsites([]);
-      } else {
-        // Fetch weather only for visible pins not already cached client-side.
-        // loadWeatherForViewport increments weatherFetchCounterRef internally, so
-        // any in-flight fetch from a previous loadCampsites call is invalidated.
-        loadWeatherForViewport(map, results);
-      }
-    });
+    fetchCampsites(bounds, amenities)
+      .then(({ results, hasMore: newHasMore }) => {
+        if (id !== fetchCounterRef.current) return; // stale fetch — discard
+        setIsFetching(false);
+        if (!hasInitiallyLoadedRef.current) {
+          hasInitiallyLoadedRef.current = true;
+          setIsInitialLoading(false);
+        }
+        cardRefs.current = [];
+        // Re-open to half only on 0 → results transition.
+        // Also sync map padding so Mapbox knows the drawer now covers ~52vh —
+        // without this, pin centering and bounds computation stay at PEEK_HEIGHT_PX
+        // until the next user-triggered easeTo. skipNextFetch suppresses the
+        // moveend that setPadding's internal easeTo(duration:0) fires.
+        if (results.length > 0 && prevCampsitesLengthRef.current === 0) {
+          setDrawerState("half");
+          skipNextFetch.current = true;
+          map.setPadding({ top: 0, right: 0, bottom: getDrawerHeightPx("half"), left: 0 });
+        }
+        prevCampsitesLengthRef.current = results.length;
+        setHasMore(newHasMore);
+        const newIdx = selectedIdRef.current
+          ? results.findIndex((c) => c.id === selectedIdRef.current)
+          : -1;
+        setSelectedIdx(newIdx >= 0 ? newIdx : null);
+        if (newIdx < 0) selectedIdRef.current = null;
+        // loadWeatherForViewport sets campsites state (with cache applied) for non-empty
+        // results. For empty results it returns early, so clear the list explicitly.
+        if (results.length === 0) {
+          setCampsites([]);
+        } else {
+          // Fetch weather only for visible pins not already cached client-side.
+          // loadWeatherForViewport increments weatherFetchCounterRef internally, so
+          // any in-flight fetch from a previous loadCampsites call is invalidated.
+          loadWeatherForViewport(map, results);
+        }
+      })
+      .catch(() => {
+        if (id !== fetchCounterRef.current) return;
+        setIsFetching(false);
+        if (!hasInitiallyLoadedRef.current) {
+          hasInitiallyLoadedRef.current = true;
+          setIsInitialLoading(false);
+        }
+      });
   // drawerStateRef, activeFiltersRef, selectedIdRef, cardRefs, skipNextFetch are stable refs.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadWeatherForViewport, setDrawerState, setSelectedIdx]);
