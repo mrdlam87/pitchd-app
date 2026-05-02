@@ -759,7 +759,6 @@ export default function MapView() {
   // Fix when campsite/amenity linkage lands and the two filter surfaces are separated.
   const filterCount = activeFilters.activities.length + activeFilters.pois.length;
 
-  const showDrawer = campsites.length > 0 || selectedPoiId !== null;
 
   return (
     <div className="relative h-full w-full overflow-hidden">
@@ -1006,9 +1005,8 @@ export default function MapView() {
         </div>
       )}
 
-      {/* Bottom drawer — z-50 must exceed marker z-index (max 10) */}
-      {showDrawer && (
-        <BottomDrawer
+      {/* Bottom drawer — always rendered; shows ghost "0 campsites found" during initial load */}
+      <BottomDrawer
           campsites={campsites}
           hasMore={hasMore}
           amenityPois={amenityPois}
@@ -1022,7 +1020,6 @@ export default function MapView() {
           onSelectPin={selectPin}
           isFetching={isFetching}
         />
-      )}
     </div>
   );
 }
