@@ -218,6 +218,13 @@ describe("POST /api/weather/batch", () => {
     const body = await res.json();
     expect(body.results[LOC_A.id]).toEqual(MOCK_FORECAST);
     expect(vi.mocked(fetch)).toHaveBeenCalledOnce();
+
+    // Verify the stale record was replaced — with deleteMany+createMany a bug in the
+    // delete clause could leave the old row untouched and the test wouldn't catch it.
+    const record = await prisma.weatherCache.findUnique({
+      where: { lat_lng: { lat: LOC_A.lat, lng: LOC_A.lng } },
+    });
+    expect(record?.forecastJson).toEqual(MOCK_FORECAST);
   });
 
   // --- Deduplication ---

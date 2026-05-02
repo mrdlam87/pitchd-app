@@ -5,11 +5,12 @@
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/apiAuth";
 import { Prisma } from "@/lib/generated/prisma/client";
+import { WEATHER_MAX_LOCATIONS } from "@/lib/weatherConstants";
 
 const OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast";
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const FETCH_TIMEOUT_MS = 10_000; // 10 seconds per location
-const MAX_LOCATIONS = 100;
+const MAX_LOCATIONS = WEATHER_MAX_LOCATIONS;
 // Maximum concurrent Open-Meteo requests to avoid overwhelming the free tier
 const CONCURRENCY = 10;
 
@@ -193,6 +194,7 @@ export async function POST(req: Request): Promise<Response> {
                 expiresAt,
                 forecastJson,
               })),
+              skipDuplicates: true,
             }),
           ]);
         } catch (cacheErr) {

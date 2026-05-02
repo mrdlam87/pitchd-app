@@ -1,12 +1,12 @@
 import type { Campsite, WeatherDay } from "@/types/map";
 import { DAY_NAMES } from "@/types/map";
+import { WEATHER_MAX_LOCATIONS } from "@/lib/weatherConstants";
 
-// Must not exceed MAX_LOCATIONS in /api/weather/batch/route.ts
-const WEATHER_BATCH_SIZE = 100;
+const WEATHER_BATCH_SIZE = WEATHER_MAX_LOCATIONS;
 
 const MAX_FORECAST_DAYS = 4;
 
-export function extractWeatherForecast(
+function extractWeatherForecast(
   forecast: unknown,
   startDate?: string | null,
   endDate?: string | null,

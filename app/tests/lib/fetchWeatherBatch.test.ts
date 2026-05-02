@@ -106,4 +106,30 @@ describe("fetchWeatherBatch", () => {
       expect(c.weather).toBeNull();
     }
   });
+
+  it("returns weather for first chunk and null for second when second chunk fails", async () => {
+    // 150 campsites → chunk 1 (c0–c99) succeeds, chunk 2 (c100–c149) fails.
+    // Verifies chunks are independent — a failure in one doesn't affect the other.
+    const campsites = makeCampsites(150);
+    vi.mocked(fetch)
+      .mockImplementationOnce((_url: string, init?: RequestInit) => {
+        const body = JSON.parse(init?.body as string) as { locations: { id: string }[] };
+        const results = makeResultsMap(body.locations.map((l) => ({ id: l.id }) as Campsite));
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ results }) } as Response);
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        statusText: "Internal Server Error",
+      } as Response);
+
+    const result = await fetchWeatherBatch(campsites);
+    expect(result).toHaveLength(150);
+    for (const c of result.slice(0, 100)) {
+      expect(c.weather).not.toBeNull();
+    }
+    for (const c of result.slice(100)) {
+      expect(c.weather).toBeNull();
+    }
+  });
 });

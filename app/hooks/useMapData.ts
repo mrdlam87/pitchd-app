@@ -4,7 +4,7 @@ import type { DrawerState } from "@/components/BottomDrawer";
 import { getDrawerHeightPx } from "@/components/BottomDrawer";
 import type { FilterState } from "@/components/FilterPanel";
 import type { AmenityPOI, Campsite, WeatherDay } from "@/types/map";
-import { fetchWeatherBatch, extractWeatherForecast } from "@/lib/fetchWeatherBatch";
+import { fetchWeatherBatch } from "@/lib/fetchWeatherBatch";
 import type mapboxgl from "mapbox-gl";
 
 export type Bounds = { north: number; south: number; east: number; west: number };
