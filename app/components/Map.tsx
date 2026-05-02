@@ -13,7 +13,7 @@ import BottomDrawer, {
   getDrawerHeightPx,
 } from "./BottomDrawer";
 import type { AmenityPOI, Campsite } from "@/types/map";
-import { CORAL, FOREST_GREEN } from "@/lib/tokens";
+import { BORDER, CORAL, FOREST_GREEN, SAGE } from "@/lib/tokens";
 import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayload, type AISearchPayload } from "@/lib/searchResults";
 import { QUICK_CHIPS, AMENITY_CHIPS } from "@/lib/chips";
 import { CampsitePin } from "./CampsitePin";
@@ -215,11 +215,13 @@ export default function MapView() {
     campsites,
     hasMore,
     amenityPois,
+    isInitialLoading,
     weatherCacheRef,
     loadCampsites,
     loadAmenities,
     loadWeatherForViewport,
     setSearchResults,
+    markInitialLoaded,
   } = useMapData({
     drawerStateRef,
     activeFiltersRef,
@@ -434,6 +436,7 @@ export default function MapView() {
         // pan invalidates this fetch and loadWeatherForViewport runs again for the
         // new visible set.
         loadWeatherForViewport(e.target, searchPayload.campsites);
+        markInitialLoaded();
         return;
       }
 
@@ -461,7 +464,7 @@ export default function MapView() {
         loadAmenities(e.target);
       }
     },
-    [loadCampsites, loadAmenities, loadWeatherForViewport, setSearchResults]
+    [loadCampsites, loadAmenities, loadWeatherForViewport, setSearchResults, markInitialLoaded]
   );
 
   const handleMoveEnd = useCallback(
@@ -979,6 +982,28 @@ export default function MapView() {
           );
         })}
       </MapGL>
+
+      {/* Initial load spinner — shown until first campsite fetch resolves.
+          z-20 sits above map markers (max z-index 10) but below the drawer (z-50). */}
+      {isInitialLoading && (
+        <div
+          className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3"
+          style={{ background: "rgba(247,245,240,0.82)", backdropFilter: "blur(4px)" }}
+        >
+          <div
+            className="w-12 h-12 rounded-full animate-spin"
+            style={{ border: `3px solid ${BORDER}`, borderTopColor: CORAL }}
+          />
+          <div className="text-center">
+            <p className="font-serif text-base font-bold mb-1" style={{ color: FOREST_GREEN }}>
+              Finding the best spots…
+            </p>
+            <p className="text-xs" style={{ color: SAGE }}>
+              Loading campsites nearby
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Bottom drawer — z-50 must exceed marker z-index (max 10) */}
       {showDrawer && (

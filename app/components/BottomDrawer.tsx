@@ -508,7 +508,7 @@ export default function BottomDrawer({
         : `${campsites.length} campsite${campsites.length === 1 ? "" : "s"} found`
       : selectedPoi
       ? (poiMeta[selectedPoi.amenityType.key] ?? { label: "POI" }).label
-      : "";
+      : "0 campsites found";
 
   // Peek state: show selected card (or first card) without scrolling
   const peekIdx = selectedIdx ?? 0;

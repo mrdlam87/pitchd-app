@@ -207,6 +207,9 @@ export type UseMapDataReturn = {
   campsites: Campsite[];
   hasMore: boolean;
   amenityPois: AmenityPOI[];
+  // True until the first loadCampsites fetch resolves (browse mode initial load).
+  // Map.tsx uses this to show a centered spinner overlay.
+  isInitialLoading: boolean;
   // Exposed so Map.tsx can pre-populate cache from AI search response weather,
   // avoiding a redundant /api/weather/batch round-trip after results arrive.
   weatherCacheRef: MutableRefObject<Map<string, WeatherDay[] | null>>;
@@ -217,6 +220,8 @@ export type UseMapDataReturn = {
   // Atomically updates campsites state, campsitesRef, and prevCampsitesLengthRef.
   // Use instead of setCampsites for AI-search result paths so all three stay in sync.
   setSearchResults: (campsites: Campsite[]) => void;
+  // Call when AI search results are loaded directly (skips loadCampsites path).
+  markInitialLoaded: () => void;
 };
 
 export function useMapData({
@@ -233,6 +238,7 @@ export function useMapData({
   const [campsites, setCampsites] = useState<Campsite[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [amenityPois, setAmenityPois] = useState<AmenityPOI[]>([]);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   // Monotonic counter — discard results from stale in-flight requests
   const fetchCounterRef = useRef(0);
@@ -249,6 +255,8 @@ export function useMapData({
   const weatherCacheRef = useRef<Map<string, WeatherDay[] | null>>(new Map());
   // Mirrors campsites state for stable callbacks (handleMoveEnd AI pan path).
   const campsitesRef = useRef<Campsite[]>([]);
+  // Guards isInitialLoading so it only clears once (on first loadCampsites resolve).
+  const hasInitiallyLoadedRef = useRef(false);
 
   // Keeps campsitesRef in sync with campsites state so stable callbacks
   // (loadWeatherForViewport default path) always read the latest list.
@@ -333,6 +341,11 @@ export function useMapData({
     []
   );
 
+  const markInitialLoaded = useCallback(() => {
+    hasInitiallyLoadedRef.current = true;
+    setIsInitialLoading(false);
+  }, []);
+
   const loadCampsites = useCallback((map: mapboxgl.Map) => {
     const id = ++fetchCounterRef.current;
     const bounds = computeVisibleBounds(map, getDrawerHeightPx(drawerStateRef.current));
@@ -340,6 +353,10 @@ export function useMapData({
     const amenities = [...filters.activities, ...filters.pois];
     fetchCampsites(bounds, amenities).then(({ results, hasMore: newHasMore }) => {
       if (id !== fetchCounterRef.current) return; // stale fetch — discard
+      if (!hasInitiallyLoadedRef.current) {
+        hasInitiallyLoadedRef.current = true;
+        setIsInitialLoading(false);
+      }
       cardRefs.current = [];
       // Re-open to half only on 0 → results transition.
       // Also sync map padding so Mapbox knows the drawer now covers ~52vh —
@@ -403,10 +420,12 @@ export function useMapData({
     campsites,
     hasMore,
     amenityPois,
+    isInitialLoading,
     weatherCacheRef,
     loadCampsites,
     loadAmenities,
     loadWeatherForViewport,
     setSearchResults,
+    markInitialLoaded,
   };
 }
