@@ -1,7 +1,7 @@
 "use client";
 
 import { Drawer } from "vaul";
-import { CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
+import { BORDER, CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
 import { wmoCodeToEmoji, condColorForCode } from "@/lib/weatherScore";
 import type { AmenityPOI, Campsite, POIMeta, WeatherDay } from "@/types/map";
 import { haversineKm } from "@/lib/distance";
@@ -447,6 +447,7 @@ function DrawerContentList({
 // Vaul snap points: least → most visible.
 // "64px" = peek strip, HALF_VH = half viewport, 1 = full viewport.
 const SNAP_POINTS: (number | string)[] = ["64px", HALF_VH, 1];
+const PEEK_ONLY_SNAP_POINTS: (number | string)[] = [SNAP_POINTS[0]];
 
 function snapForState(s: DrawerState): number | string {
   if (s === "full") return 1;
@@ -480,6 +481,7 @@ type Props = {
   drawerState: DrawerState;
   onDrawerStateChange: (state: DrawerState) => void;
   onSelectPin: (i: number) => void;
+  isFetching?: boolean;
 };
 
 export default function BottomDrawer({
@@ -494,6 +496,7 @@ export default function BottomDrawer({
   drawerState,
   onDrawerStateChange,
   onSelectPin,
+  isFetching = false,
 }: Props) {
   const isFull = drawerState === "full";
 
@@ -508,7 +511,9 @@ export default function BottomDrawer({
         : `${campsites.length} campsite${campsites.length === 1 ? "" : "s"} found`
       : selectedPoi
       ? (poiMeta[selectedPoi.amenityType.key] ?? { label: "POI" }).label
-      : "";
+      : isFetching
+      ? "Finding campsites…"
+      : "0 campsites found";
 
   // Peek state: show selected card (or first card) without scrolling
   const peekIdx = selectedIdx ?? 0;
@@ -517,11 +522,13 @@ export default function BottomDrawer({
     ? (poiMeta[selectedPoi.amenityType.key] ?? { emoji: "📍", label: selectedPoi.amenityType.key, color: FOREST_GREEN })
     : null;
 
+  const hasContent = campsites.length > 0 || selectedPoi !== null;
+
   return (
     <Drawer.Root
-      snapPoints={SNAP_POINTS}
-      activeSnapPoint={snapForState(drawerState)}
-      setActiveSnapPoint={(snap) => onDrawerStateChange(stateForSnap(snap))}
+      snapPoints={hasContent ? SNAP_POINTS : PEEK_ONLY_SNAP_POINTS}
+      activeSnapPoint={hasContent ? snapForState(drawerState) : SNAP_POINTS[0]}
+      setActiveSnapPoint={(snap) => { if (hasContent) onDrawerStateChange(stateForSnap(snap)); }}
       // modal=false: the map and UI above the drawer stay fully interactive.
       modal={false}
       // dismissible=false: peek is the minimum — the drawer never disappears.
@@ -584,26 +591,39 @@ export default function BottomDrawer({
 
             {/* Summary row */}
             <div className="px-4 pb-2 flex items-center justify-between">
-              <div className="text-sm font-semibold" style={{ color: FOREST_GREEN }}>
-                {resultLabel}
-                {campsites.length > 0 && (
-                  <span className="ml-1.5 font-normal text-xs" style={{ color: SAGE }}>
-                    · nearby
-                  </span>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`text-sm font-semibold${isFetching ? " animate-pulse" : ""}`}
+                  style={{ color: FOREST_GREEN }}
+                >
+                  {resultLabel}
+                  {campsites.length > 0 && (
+                    <span className="ml-1.5 font-normal text-xs" style={{ color: SAGE }}>
+                      · nearby
+                    </span>
+                  )}
+                </span>
+                {isFetching && (
+                  <div
+                    className="w-4 h-4 rounded-full animate-spin flex-shrink-0"
+                    style={{ border: `2px solid ${BORDER}`, borderTopColor: CORAL }}
+                  />
                 )}
               </div>
-              {/* More / Less button — tap to cycle up, or collapse from full */}
-              <button
-                type="button"
-                className="text-[11px] font-bold flex-shrink-0 ml-2"
-                style={{ color: CORAL }}
-                onClick={() =>
-                  onDrawerStateChange(drawerState === "full" ? "peek" : cycleUp(drawerState))
-                }
-                aria-label={drawerState === "full" ? "Collapse drawer" : "Expand drawer"}
-              >
-                {drawerState === "full" ? "▼ Less" : "▲ More"}
-              </button>
+              {/* More / Less button — hidden when there's no content to expand into */}
+              {hasContent && (
+                <button
+                  type="button"
+                  className="text-[11px] font-bold flex-shrink-0 ml-2"
+                  style={{ color: CORAL }}
+                  onClick={() =>
+                    onDrawerStateChange(drawerState === "full" ? "peek" : cycleUp(drawerState))
+                  }
+                  aria-label={drawerState === "full" ? "Collapse drawer" : "Expand drawer"}
+                >
+                  {drawerState === "full" ? "▼ Less" : "▲ More"}
+                </button>
+              )}
             </div>
           </div>
 

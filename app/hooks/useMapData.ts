@@ -207,6 +207,11 @@ export type UseMapDataReturn = {
   campsites: Campsite[];
   hasMore: boolean;
   amenityPois: AmenityPOI[];
+  // True until the first loadCampsites fetch resolves (browse mode initial load).
+  // Map.tsx uses this to show a centered spinner overlay.
+  isInitialLoading: boolean;
+  // True while any loadCampsites fetch is in flight (pan/zoom refetches).
+  isFetching: boolean;
   // Exposed so Map.tsx can pre-populate cache from AI search response weather,
   // avoiding a redundant /api/weather/batch round-trip after results arrive.
   weatherCacheRef: MutableRefObject<Map<string, WeatherDay[] | null>>;
@@ -217,6 +222,8 @@ export type UseMapDataReturn = {
   // Atomically updates campsites state, campsitesRef, and prevCampsitesLengthRef.
   // Use instead of setCampsites for AI-search result paths so all three stay in sync.
   setSearchResults: (campsites: Campsite[]) => void;
+  // Call when AI search results are loaded directly (skips loadCampsites path).
+  markInitialLoaded: () => void;
 };
 
 export function useMapData({
@@ -233,6 +240,8 @@ export function useMapData({
   const [campsites, setCampsites] = useState<Campsite[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [amenityPois, setAmenityPois] = useState<AmenityPOI[]>([]);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
 
   // Monotonic counter — discard results from stale in-flight requests
   const fetchCounterRef = useRef(0);
@@ -249,6 +258,8 @@ export function useMapData({
   const weatherCacheRef = useRef<Map<string, WeatherDay[] | null>>(new Map());
   // Mirrors campsites state for stable callbacks (handleMoveEnd AI pan path).
   const campsitesRef = useRef<Campsite[]>([]);
+  // Guards isInitialLoading so it only clears once (on first loadCampsites resolve).
+  const hasInitiallyLoadedRef = useRef(false);
 
   // Keeps campsitesRef in sync with campsites state so stable callbacks
   // (loadWeatherForViewport default path) always read the latest list.
@@ -333,51 +344,72 @@ export function useMapData({
     []
   );
 
+  const markInitialLoaded = useCallback(() => {
+    if (hasInitiallyLoadedRef.current) return;
+    hasInitiallyLoadedRef.current = true;
+    setIsInitialLoading(false);
+  }, []);
+
   const loadCampsites = useCallback((map: mapboxgl.Map) => {
     const id = ++fetchCounterRef.current;
+    setIsFetching(true);
     const bounds = computeVisibleBounds(map, getDrawerHeightPx(drawerStateRef.current));
     const filters = activeFiltersRef.current;
     const amenities = [...filters.activities, ...filters.pois];
-    fetchCampsites(bounds, amenities).then(({ results, hasMore: newHasMore }) => {
-      if (id !== fetchCounterRef.current) return; // stale fetch — discard
-      cardRefs.current = [];
-      // Re-open to half only on 0 → results transition.
-      // Also sync map padding so Mapbox knows the drawer now covers ~52vh —
-      // without this, pin centering and bounds computation stay at PEEK_HEIGHT_PX
-      // until the next user-triggered easeTo. skipNextFetch suppresses the
-      // moveend that setPadding's internal easeTo(duration:0) fires.
-      if (results.length > 0 && prevCampsitesLengthRef.current === 0) {
-        setDrawerState("half");
-        skipNextFetch.current = true;
-        map.setPadding({ top: 0, right: 0, bottom: getDrawerHeightPx("half"), left: 0 });
-      }
-      prevCampsitesLengthRef.current = results.length;
-      setHasMore(newHasMore);
-      const newIdx = selectedIdRef.current
-        ? results.findIndex((c) => c.id === selectedIdRef.current)
-        : -1;
-      setSelectedIdx(newIdx >= 0 ? newIdx : null);
-      if (newIdx < 0) selectedIdRef.current = null;
-      // loadWeatherForViewport sets campsites state (with cache applied) for non-empty
-      // results. For empty results it returns early, so clear the list explicitly.
-      if (results.length === 0) {
-        setCampsites([]);
-      } else {
-        // Fetch weather only for visible pins not already cached client-side.
-        // loadWeatherForViewport increments weatherFetchCounterRef internally, so
-        // any in-flight fetch from a previous loadCampsites call is invalidated.
-        loadWeatherForViewport(map, results);
-      }
-    });
+    fetchCampsites(bounds, amenities)
+      .then(({ results, hasMore: newHasMore }) => {
+        if (id !== fetchCounterRef.current) return; // stale fetch — discard
+        setIsFetching(false);
+        markInitialLoaded();
+        cardRefs.current = [];
+        // Re-open to half only on 0 → results transition.
+        // Also sync map padding so Mapbox knows the drawer now covers ~52vh —
+        // without this, pin centering and bounds computation stay at PEEK_HEIGHT_PX
+        // until the next user-triggered easeTo. skipNextFetch suppresses the
+        // moveend that setPadding's internal easeTo(duration:0) fires.
+        if (results.length > 0 && prevCampsitesLengthRef.current === 0) {
+          setDrawerState("half");
+          skipNextFetch.current = true;
+          map.setPadding({ top: 0, right: 0, bottom: getDrawerHeightPx("half"), left: 0 });
+        }
+        prevCampsitesLengthRef.current = results.length;
+        setHasMore(newHasMore);
+        const newIdx = selectedIdRef.current
+          ? results.findIndex((c) => c.id === selectedIdRef.current)
+          : -1;
+        setSelectedIdx(newIdx >= 0 ? newIdx : null);
+        if (newIdx < 0) selectedIdRef.current = null;
+        // loadWeatherForViewport sets campsites state (with cache applied) for non-empty
+        // results. For empty results it returns early, so clear the list explicitly.
+        if (results.length === 0) {
+          setCampsites([]);
+        } else {
+          // Fetch weather only for visible pins not already cached client-side.
+          // loadWeatherForViewport increments weatherFetchCounterRef internally, so
+          // any in-flight fetch from a previous loadCampsites call is invalidated.
+          loadWeatherForViewport(map, results);
+        }
+      })
+      // fetchCampsites has an internal try/catch and always resolves — this .catch()
+      // is a defensive guard in case that invariant ever changes (e.g. a future refactor
+      // that lets network errors propagate).
+      .catch(() => {
+        if (id !== fetchCounterRef.current) return;
+        setIsFetching(false);
+        markInitialLoaded();
+      });
   // drawerStateRef, activeFiltersRef, selectedIdRef, cardRefs, skipNextFetch are stable refs.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadWeatherForViewport, setDrawerState, setSelectedIdx]);
+  }, [loadWeatherForViewport, markInitialLoaded, setDrawerState, setSelectedIdx]);
 
   const setSearchResults = useCallback((newCampsites: Campsite[]) => {
+    // Clear the initial overlay immediately so AI search arrivals and inline map
+    // searches don't flash the spinner — covers both handleLoad and handleMapSearch paths.
+    markInitialLoaded();
     setCampsites(newCampsites);
     campsitesRef.current = newCampsites;
     prevCampsitesLengthRef.current = newCampsites.length;
-  }, []);
+  }, [markInitialLoaded]);
 
   const loadAmenities = useCallback((map: mapboxgl.Map) => {
     const poiTypes = activeFiltersRef.current.pois;
@@ -403,10 +435,13 @@ export function useMapData({
     campsites,
     hasMore,
     amenityPois,
+    isInitialLoading,
+    isFetching,
     weatherCacheRef,
     loadCampsites,
     loadAmenities,
     loadWeatherForViewport,
     setSearchResults,
+    markInitialLoaded,
   };
 }
