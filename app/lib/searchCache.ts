@@ -55,7 +55,10 @@ export async function getCachedIntent(queryHash: string): Promise<ParsedIntent |
         )
       : [],
     amenityHints: Array.isArray(raw.amenityHints)
-      ? raw.amenityHints.filter((h): h is string => typeof h === "string")
+      ? raw.amenityHints
+          .filter((h): h is string => typeof h === "string")
+          .slice(0, 10)
+          .map((h) => h.slice(0, 100))
       : [],
     startDate:
       typeof raw.startDate === "string" && isValidIsoDate(raw.startDate)
@@ -75,6 +78,7 @@ export async function getCachedIntent(queryHash: string): Promise<ParsedIntent |
       ? raw.poiTypes.filter(
           (p): p is string => typeof p === "string" && (ALLOWED_POI_TYPES as readonly string[]).includes(p)
         )
+      : raw.resultType === "amenities" ? []
       : null,
   };
 }

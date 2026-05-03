@@ -79,7 +79,7 @@ Rules:
 - amenityHints: array of amenity descriptions the user mentioned that are NOT in the amenities list above (e.g. ["firepit", "flush toilets", "river views", "mountain views"]). Empty array if none.
 - startDate / endDate: ISO date strings (YYYY-MM-DD) if dates are mentioned, otherwise null. "this weekend" = upcoming Saturday and Sunday. "next weekend" = the weekend after that.
 - sortBy: "proximity" if user wants closest results, "relevance" if they want best match, null if not mentioned.
-- resultType: "amenities" if the query is clearly about finding a service or amenity POI (dump points, water fill stations, toilets, laundromats) rather than a campsite. "campsites" otherwise. null if ambiguous.
+- resultType: "amenities" if the query is clearly about finding a service or amenity POI (dump points, water fill stations, toilets, laundromats). "campsites" if the query is clearly about finding a campsite or campground. null if ambiguous or unclear.
 - poiTypes: array of POI type keys when resultType is "amenities", chosen from [dump_point, water_fill, toilets, laundromat]. null when resultType is not "amenities".`,
         },
       ],
