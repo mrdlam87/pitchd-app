@@ -1005,8 +1005,8 @@ export default function MapView() {
         </div>
       )}
 
-      {/* Bottom drawer — always rendered; shows ghost "0 campsites found" during initial load */}
-      <BottomDrawer
+      {/* Bottom drawer — hidden during initial load to avoid double loading UI */}
+      {!isInitialLoading && <BottomDrawer
           campsites={campsites}
           hasMore={hasMore}
           amenityPois={amenityPois}
@@ -1019,7 +1019,7 @@ export default function MapView() {
           onDrawerStateChange={handleDrawerStateChange}
           onSelectPin={selectPin}
           isFetching={isFetching}
-        />
+        />}
     </div>
   );
 }
