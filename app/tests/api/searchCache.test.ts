@@ -276,6 +276,16 @@ describe("getCachedIntent", () => {
     expect(result!.poiTypes).toBeNull();
   });
 
+  it("defaults poiTypes to empty array when resultType is 'amenities' but poiTypes is missing", async () => {
+    const queryHash = await seedEntry("premig-amenities-no-poitypes", {
+      location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: null,
+      resultType: "amenities",
+      // poiTypes intentionally absent
+    }, FUTURE);
+    const result = await getCachedIntent(queryHash);
+    expect(result!.poiTypes).toEqual([]);
+  });
+
   it("defaults amenityHints to empty array when missing from a pre-migration entry", async () => {
     const queryHash = await seedEntry("premig-amenityhints", {
       location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: null,

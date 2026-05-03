@@ -135,6 +135,7 @@ Rules:
       ? (parsed.poiTypes as unknown[]).filter(
           (p): p is string => typeof p === "string" && (ALLOWED_POI_TYPES as readonly string[]).includes(p)
         )
+      : parsed.resultType === "amenities" ? []
       : null,
   };
 }
