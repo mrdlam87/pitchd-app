@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import {
   isValidIsoDate,
   ALLOWED_AMENITIES,
+  ALLOWED_POI_TYPES,
   DEFAULT_DRIVE_TIME_HRS,
   MAX_DRIVE_TIME_HRS,
   type ParsedIntent,
@@ -42,12 +43,22 @@ export async function getCachedIntent(queryHash: string): Promise<ParsedIntent |
       typeof raw.location === "string" && raw.location.trim() !== ""
         ? raw.location.trim()
         : null,
+    siteName:
+      typeof raw.siteName === "string" && raw.siteName.trim() !== ""
+        ? raw.siteName.trim()
+        : null,
     driveTimeHrs: Math.min(rawDriveTime, MAX_DRIVE_TIME_HRS),
     // Re-filter amenities in case the entry predates the current ALLOWED_AMENITIES list
     amenities: Array.isArray(raw.amenities)
       ? raw.amenities.filter(
-          (a): a is string => typeof a === "string" && ALLOWED_AMENITIES.includes(a)
+          (a): a is string => typeof a === "string" && (ALLOWED_AMENITIES as readonly string[]).includes(a)
         )
+      : [],
+    amenityHints: Array.isArray(raw.amenityHints)
+      ? raw.amenityHints
+          .filter((h): h is string => typeof h === "string")
+          .slice(0, 10)
+          .map((h) => h.slice(0, 100))
       : [],
     startDate:
       typeof raw.startDate === "string" && isValidIsoDate(raw.startDate)
@@ -59,6 +70,16 @@ export async function getCachedIntent(queryHash: string): Promise<ParsedIntent |
         : null,
     sortBy:
       raw.sortBy === "proximity" || raw.sortBy === "relevance" ? raw.sortBy : null,
+    resultType:
+      raw.resultType === "amenities" ? "amenities"
+      : raw.resultType === "campsites" ? "campsites"
+      : null,
+    poiTypes: Array.isArray(raw.poiTypes)
+      ? raw.poiTypes.filter(
+          (p): p is string => typeof p === "string" && (ALLOWED_POI_TYPES as readonly string[]).includes(p)
+        )
+      : raw.resultType === "amenities" ? []
+      : null,
   };
 }
 
