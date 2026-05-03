@@ -1006,7 +1006,8 @@ export default function MapView() {
       )}
 
       {/* Bottom drawer — hidden during initial load to avoid double loading UI */}
-      {!isInitialLoading && <BottomDrawer
+      {!isInitialLoading && (
+        <BottomDrawer
           campsites={campsites}
           hasMore={hasMore}
           amenityPois={amenityPois}
@@ -1019,7 +1020,8 @@ export default function MapView() {
           onDrawerStateChange={handleDrawerStateChange}
           onSelectPin={selectPin}
           isFetching={isFetching}
-        />}
+        />
+      )}
     </div>
   );
 }
