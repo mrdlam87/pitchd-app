@@ -185,4 +185,129 @@ describe("getCachedIntent", () => {
       expect(result!.sortBy).toBe(sortBy);
     }
   });
+
+  // --- new field defaults for pre-migration entries ---
+
+  it("defaults siteName to null when missing from a pre-migration entry", async () => {
+    const queryHash = await seedEntry("premig-sitename", {
+      location: "Blue Mountains", driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: null,
+      // siteName intentionally absent
+    }, FUTURE);
+    const result = await getCachedIntent(queryHash);
+    expect(result!.siteName).toBeNull();
+  });
+
+  it("returns siteName when present and trims whitespace", async () => {
+    const queryHash = await seedEntry("sitename-trim", {
+      location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: null,
+      siteName: "  Lane Cove campground  ",
+    }, FUTURE);
+    const result = await getCachedIntent(queryHash);
+    expect(result!.siteName).toBe("Lane Cove campground");
+  });
+
+  it("defaults siteName to null when it is not a string", async () => {
+    const queryHash = await seedEntry("sitename-number", {
+      location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: null,
+      siteName: 42,
+    }, FUTURE);
+    const result = await getCachedIntent(queryHash);
+    expect(result!.siteName).toBeNull();
+  });
+
+  it("defaults resultType to null when missing from a pre-migration entry", async () => {
+    const queryHash = await seedEntry("premig-resulttype", {
+      location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: null,
+    }, FUTURE);
+    const result = await getCachedIntent(queryHash);
+    expect(result!.resultType).toBeNull();
+  });
+
+  it("passes resultType 'amenities' through unchanged", async () => {
+    const queryHash = await seedEntry("resulttype-amenities", {
+      location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: null,
+      resultType: "amenities",
+    }, FUTURE);
+    const result = await getCachedIntent(queryHash);
+    expect(result!.resultType).toBe("amenities");
+  });
+
+  it("passes resultType 'campsites' through unchanged", async () => {
+    const queryHash = await seedEntry("resulttype-campsites", {
+      location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: null,
+      resultType: "campsites",
+    }, FUTURE);
+    const result = await getCachedIntent(queryHash);
+    expect(result!.resultType).toBe("campsites");
+  });
+
+  it("coerces an unknown resultType to null", async () => {
+    const queryHash = await seedEntry("resulttype-bad", {
+      location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: null,
+      resultType: "pois",
+    }, FUTURE);
+    const result = await getCachedIntent(queryHash);
+    expect(result!.resultType).toBeNull();
+  });
+
+  it("defaults poiTypes to null when missing from a pre-migration entry", async () => {
+    const queryHash = await seedEntry("premig-poitypes", {
+      location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: null,
+    }, FUTURE);
+    const result = await getCachedIntent(queryHash);
+    expect(result!.poiTypes).toBeNull();
+  });
+
+  it("filters poiTypes to ALLOWED_POI_TYPES only", async () => {
+    const queryHash = await seedEntry("poitypes-filter", {
+      location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: null,
+      poiTypes: ["dump_point", "laundromat", "petrol_station"],
+    }, FUTURE);
+    const result = await getCachedIntent(queryHash);
+    expect(result!.poiTypes).toEqual(["dump_point", "laundromat"]);
+  });
+
+  it("defaults poiTypes to null when it is not an array", async () => {
+    const queryHash = await seedEntry("poitypes-non-array", {
+      location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: null,
+      poiTypes: "dump_point",
+    }, FUTURE);
+    const result = await getCachedIntent(queryHash);
+    expect(result!.poiTypes).toBeNull();
+  });
+
+  it("defaults amenityHints to empty array when missing from a pre-migration entry", async () => {
+    const queryHash = await seedEntry("premig-amenityhints", {
+      location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: null,
+    }, FUTURE);
+    const result = await getCachedIntent(queryHash);
+    expect(result!.amenityHints).toEqual([]);
+  });
+
+  it("passes amenityHints string array through", async () => {
+    const queryHash = await seedEntry("amenityhints-valid", {
+      location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: null,
+      amenityHints: ["firepit", "flush toilets", "river views"],
+    }, FUTURE);
+    const result = await getCachedIntent(queryHash);
+    expect(result!.amenityHints).toEqual(["firepit", "flush toilets", "river views"]);
+  });
+
+  it("filters out non-string amenityHints entries", async () => {
+    const queryHash = await seedEntry("amenityhints-mixed", {
+      location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: null,
+      amenityHints: ["firepit", 42, null, "river views"],
+    }, FUTURE);
+    const result = await getCachedIntent(queryHash);
+    expect(result!.amenityHints).toEqual(["firepit", "river views"]);
+  });
+
+  it("defaults amenityHints to empty array when it is not an array", async () => {
+    const queryHash = await seedEntry("amenityhints-non-array", {
+      location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: null,
+      amenityHints: "firepit",
+    }, FUTURE);
+    const result = await getCachedIntent(queryHash);
+    expect(result!.amenityHints).toEqual([]);
+  });
 });

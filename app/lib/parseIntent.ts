@@ -12,17 +12,29 @@ export const KM_PER_HOUR = 80;
 
 // Amenity keys Claude is allowed to return — filter out hallucinated values.
 // Must match the keys seeded in prisma/seed.ts — keep in sync if the seed changes.
-export const ALLOWED_AMENITIES = ["dog_friendly", "fishing", "hiking", "swimming"];
+export const ALLOWED_AMENITIES = ["dog_friendly", "fishing", "hiking", "swimming"] as const;
+
+// POI type keys Claude is allowed to return for amenity-only queries.
+// Must match AmenityType.key values seeded in prisma/seed.ts.
+export const ALLOWED_POI_TYPES = ["dump_point", "water_fill", "toilets", "laundromat"] as const;
 
 export interface ParsedIntent {
-  // Extracted place name (e.g. "Blue Mountains"). Returned to the client for display
-  // but not yet used to shift the search centre — geocoding is deferred to a later milestone.
+  // Geographic area used to centre the search radius (city, region, state)
   location: string | null;
+  // Specific campsite, campground, or reserve name — distinct from a geographic area
+  siteName: string | null;
   driveTimeHrs: number;
   amenities: string[];
+  // Free-form amenity descriptions Claude extracted but couldn't map to ALLOWED_AMENITIES.
+  // Stored for future ranking; not used by the DB query in this version.
+  amenityHints: string[];
   startDate: string | null;
   endDate: string | null;
   sortBy: "proximity" | "relevance" | null;
+  // Determines which result pipeline the search route uses
+  resultType: "campsites" | "amenities" | null;
+  // POI type keys when resultType === "amenities" — filtered to ALLOWED_POI_TYPES
+  poiTypes: string[] | null;
 }
 
 // ISO date guard — rejects free-text and calendar-invalid dates (e.g. 2026-02-30)
@@ -47,7 +59,7 @@ export async function parseIntentWithClaude(query: string): Promise<ParsedIntent
   const message = await getAnthropicClient().messages.create(
     {
       model: HAIKU_MODEL,
-      max_tokens: 300,
+      max_tokens: 400,
       system: "JSON-only. No explanation, no markdown. Output only a single JSON object.",
       messages: [
         {
@@ -57,14 +69,18 @@ export async function parseIntentWithClaude(query: string): Promise<ParsedIntent
 Today: ${today}
 
 Return ONLY this JSON shape:
-{"location":null,"driveTimeHrs":3,"amenities":[],"startDate":null,"endDate":null,"sortBy":null}
+{"location":null,"siteName":null,"driveTimeHrs":3,"amenities":[],"amenityHints":[],"startDate":null,"endDate":null,"sortBy":null,"resultType":null,"poiTypes":null}
 
 Rules:
-- location: the place name mentioned (e.g. "Blue Mountains", "Victoria") or null if not mentioned. Do not infer from vague queries.
+- location: geographic area used to centre the search radius (city, region, state, e.g. "Blue Mountains", "Victoria") — or null if not mentioned. Do not infer from vague queries.
+- siteName: specific campsite, campground, or reserve name the user is searching for (e.g. "Lane Cove campground", "Royal National Park") — NOT a city or region. Use location for areas. null if not a specific named site.
 - driveTimeHrs: number of hours willing to drive (1–12). Default 3 if not mentioned. "nearby"/"close" ≈ 1, "a few hours" ≈ 3, "half a day" ≈ 6. Use the exact number if stated.
 - amenities: array of matching keys from [dog_friendly, fishing, hiking, swimming] — empty array if none mentioned.
+- amenityHints: array of amenity descriptions the user mentioned that are NOT in the amenities list above (e.g. ["firepit", "flush toilets", "river views", "mountain views"]). Empty array if none.
 - startDate / endDate: ISO date strings (YYYY-MM-DD) if dates are mentioned, otherwise null. "this weekend" = upcoming Saturday and Sunday. "next weekend" = the weekend after that.
-- sortBy: "proximity" if user wants closest results, "relevance" if they want best match, null if not mentioned.`,
+- sortBy: "proximity" if user wants closest results, "relevance" if they want best match, null if not mentioned.
+- resultType: "amenities" if the query is clearly about finding a service or amenity POI (dump points, water fill stations, toilets, laundromats) rather than a campsite. "campsites" otherwise. null if ambiguous.
+- poiTypes: array of POI type keys when resultType is "amenities", chosen from [dump_point, water_fill, toilets, laundromat]. null when resultType is not "amenities".`,
         },
       ],
     },
@@ -84,13 +100,20 @@ Rules:
 
   return {
     location: typeof parsed.location === "string" && parsed.location.trim() !== "" ? parsed.location.trim() : null,
+    siteName: typeof parsed.siteName === "string" && parsed.siteName.trim() !== "" ? parsed.siteName.trim() : null,
     driveTimeHrs: typeof parsed.driveTimeHrs === "number" && parsed.driveTimeHrs >= 1
       ? Math.min(parsed.driveTimeHrs, MAX_DRIVE_TIME_HRS)
       : DEFAULT_DRIVE_TIME_HRS,
     amenities: Array.isArray(parsed.amenities)
       ? (parsed.amenities as unknown[]).filter(
-          (a): a is string => typeof a === "string" && ALLOWED_AMENITIES.includes(a)
+          (a): a is string => typeof a === "string" && (ALLOWED_AMENITIES as readonly string[]).includes(a)
         )
+      : [],
+    amenityHints: Array.isArray(parsed.amenityHints)
+      ? (parsed.amenityHints as unknown[])
+          .filter((h): h is string => typeof h === "string")
+          .slice(0, 10)
+          .map((h) => h.slice(0, 100))
       : [],
     startDate:
       typeof parsed.startDate === "string" && isValidIsoDate(parsed.startDate)
@@ -104,5 +127,14 @@ Rules:
       parsed.sortBy === "proximity" || parsed.sortBy === "relevance"
         ? parsed.sortBy
         : null,
+    resultType:
+      parsed.resultType === "amenities" ? "amenities"
+      : parsed.resultType === "campsites" ? "campsites"
+      : null,
+    poiTypes: Array.isArray(parsed.poiTypes)
+      ? (parsed.poiTypes as unknown[]).filter(
+          (p): p is string => typeof p === "string" && (ALLOWED_POI_TYPES as readonly string[]).includes(p)
+        )
+      : null,
   };
 }
