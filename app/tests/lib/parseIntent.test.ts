@@ -44,7 +44,7 @@ describe("ParsedIntent — new fields shape", () => {
   // These tests are placeholders for sanitiseParsedIntent unit tests.
   // The function is not exported today (the logic lives inline in parseIntentWithClaude).
   // it.todo shows these as pending in Vitest — they do not fail and will not signal redness.
-  // Track extracting sanitiseParsedIntent as a follow-up GitHub issue.
+  // Tracked in https://github.com/mrdlam87/pitchd-app/issues/131
   it.todo("siteName: trims and returns string when present");
   it.todo("siteName: returns null when missing");
   it.todo("siteName: returns null for non-string");

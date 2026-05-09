@@ -112,7 +112,7 @@ Rules:
     amenityHints: Array.isArray(parsed.amenityHints)
       ? (parsed.amenityHints as unknown[])
           .filter((h): h is string => typeof h === "string")
-          .slice(0, 10)
+          .slice(0, 10) // prompt asks Claude for ≤5; 10 is the hard ceiling
           .map((h) => h.slice(0, 100))
       : [],
     startDate:
@@ -132,9 +132,11 @@ Rules:
       : parsed.resultType === "campsites" ? "campsites"
       : null,
     poiTypes: Array.isArray(parsed.poiTypes)
-      ? (parsed.poiTypes as unknown[]).filter(
-          (p): p is string => typeof p === "string" && (ALLOWED_POI_TYPES as readonly string[]).includes(p)
-        )
+      ? Array.from(new Set(
+          (parsed.poiTypes as unknown[]).filter(
+            (p): p is string => typeof p === "string" && (ALLOWED_POI_TYPES as readonly string[]).includes(p)
+          )
+        ))
       : parsed.resultType === "amenities" ? []
       : null,
   };

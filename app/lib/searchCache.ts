@@ -75,9 +75,11 @@ export async function getCachedIntent(queryHash: string): Promise<ParsedIntent |
       : raw.resultType === "campsites" ? "campsites"
       : null,
     poiTypes: Array.isArray(raw.poiTypes)
-      ? raw.poiTypes.filter(
-          (p): p is string => typeof p === "string" && (ALLOWED_POI_TYPES as readonly string[]).includes(p)
-        )
+      ? Array.from(new Set(
+          raw.poiTypes.filter(
+            (p): p is string => typeof p === "string" && (ALLOWED_POI_TYPES as readonly string[]).includes(p)
+          )
+        ))
       : raw.resultType === "amenities" ? []
       : null,
   };
