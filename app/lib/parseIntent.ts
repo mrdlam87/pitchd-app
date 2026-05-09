@@ -59,7 +59,7 @@ export async function parseIntentWithClaude(query: string): Promise<ParsedIntent
   const message = await getAnthropicClient().messages.create(
     {
       model: HAIKU_MODEL,
-      max_tokens: 400,
+      max_tokens: 500,
       system: "JSON-only. No explanation, no markdown. Output only a single JSON object.",
       messages: [
         {
@@ -76,7 +76,7 @@ Rules:
 - siteName: specific campsite, campground, or reserve name the user is searching for (e.g. "Lane Cove campground", "Royal National Park") — NOT a city or region. Use location for areas. null if not a specific named site.
 - driveTimeHrs: number of hours willing to drive (1–12). Default 3 if not mentioned. "nearby"/"close" ≈ 1, "a few hours" ≈ 3, "half a day" ≈ 6. Use the exact number if stated.
 - amenities: array of matching keys from [dog_friendly, fishing, hiking, swimming] — empty array if none mentioned.
-- amenityHints: array of amenity descriptions the user mentioned that are NOT in the amenities list above (e.g. ["firepit", "flush toilets", "river views", "mountain views"]). Empty array if none.
+- amenityHints: array of amenity descriptions the user mentioned that are NOT in the amenities list above (e.g. ["firepit", "flush toilets", "river views", "mountain views"]). At most 5 short phrases. Empty array if none.
 - startDate / endDate: ISO date strings (YYYY-MM-DD) if dates are mentioned, otherwise null. "this weekend" = upcoming Saturday and Sunday. "next weekend" = the weekend after that.
 - sortBy: "proximity" if user wants closest results, "relevance" if they want best match, null if not mentioned.
 - resultType: "amenities" if the query is clearly about finding a service or amenity POI (dump points, water fill stations, toilets, laundromats). "campsites" if the query is clearly about finding a campsite or campground. null if ambiguous or unclear.

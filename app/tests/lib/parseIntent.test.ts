@@ -41,10 +41,10 @@ describe("ALLOWED_POI_TYPES", () => {
 });
 
 describe("ParsedIntent — new fields shape", () => {
-  // These tests import sanitiseParsedIntent and verify that new fields
-  // are validated and defaulted correctly. The function is not exported today
-  // (the logic lives inline in parseIntentWithClaude) — these tests will fail
-  // until we extract and export it.
+  // These tests are placeholders for sanitiseParsedIntent unit tests.
+  // The function is not exported today (the logic lives inline in parseIntentWithClaude).
+  // it.todo shows these as pending in Vitest — they do not fail and will not signal redness.
+  // Track extracting sanitiseParsedIntent as a follow-up GitHub issue.
   it.todo("siteName: trims and returns string when present");
   it.todo("siteName: returns null when missing");
   it.todo("siteName: returns null for non-string");

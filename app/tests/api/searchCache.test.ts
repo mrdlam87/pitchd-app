@@ -320,4 +320,26 @@ describe("getCachedIntent", () => {
     const result = await getCachedIntent(queryHash);
     expect(result!.amenityHints).toEqual([]);
   });
+
+  it("caps amenityHints at 10 items", async () => {
+    const hints = Array.from({ length: 15 }, (_, i) => `hint-${i}`);
+    const queryHash = await seedEntry("amenityhints-over-10", {
+      location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: null,
+      amenityHints: hints,
+    }, FUTURE);
+    const result = await getCachedIntent(queryHash);
+    expect(result!.amenityHints).toHaveLength(10);
+    expect(result!.amenityHints).toEqual(hints.slice(0, 10));
+  });
+
+  it("truncates amenityHints entries longer than 100 chars", async () => {
+    const longHint = "a".repeat(150);
+    const queryHash = await seedEntry("amenityhints-long-hint", {
+      location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: null,
+      amenityHints: [longHint, "short"],
+    }, FUTURE);
+    const result = await getCachedIntent(queryHash);
+    expect(result!.amenityHints[0]).toHaveLength(100);
+    expect(result!.amenityHints[1]).toBe("short");
+  });
 });
