@@ -1,7 +1,7 @@
 // Shared types and constants for passing search results from HomeScreen to MapView.
 // Kept in lib/ so neither component imports from the other.
 
-import type { Campsite } from "@/types/map";
+import type { AmenityPOI, Campsite } from "@/types/map";
 import type { ParsedIntent } from "@/lib/parseIntent";
 
 export const SEARCH_RESULTS_KEY = "pitchd:searchResults";
@@ -27,7 +27,16 @@ export type DirectFilterPayload = {
   chipKey: string;
 };
 
-export type SearchResultsPayload = AISearchPayload | DirectFilterPayload;
+// Amenity-only NL search — POI results returned when resultType === "amenities".
+// Campsite pipeline is skipped entirely; drawer rendering for this kind is handled in #121.
+export type AmenitySearchPayload = {
+  kind: "amenity-search";
+  amenityPois: AmenityPOI[];
+  parsedIntent: ParsedIntent;
+  query: string;
+};
+
+export type SearchResultsPayload = AISearchPayload | DirectFilterPayload | AmenitySearchPayload;
 
 // Parses and validates an unknown value (e.g. from JSON.parse) as a SearchResultsPayload.
 // Returns null if the shape is invalid. Exported for unit testing.
@@ -44,6 +53,15 @@ export function parseSearchResultsPayload(parsed: unknown): SearchResultsPayload
     // DB query layer (campsites route filters on known keys via Prisma enum).
     if (!(f.activities as unknown[]).every((a: unknown) => typeof a === "string")) return null;
     if (!(f.pois as unknown[]).every((p: unknown) => typeof p === "string")) return null;
+    return parsed as SearchResultsPayload;
+  }
+
+  if (obj.kind === "amenity-search") {
+    if (!Array.isArray(obj.amenityPois)) return null;
+    const pois = obj.amenityPois as unknown[];
+    if (!pois.every((p) => p !== null && typeof (p as Record<string, unknown>).lat === "number" && typeof (p as Record<string, unknown>).lng === "number")) {
+      return null;
+    }
     return parsed as SearchResultsPayload;
   }
 

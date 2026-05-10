@@ -222,6 +222,7 @@ export default function MapView() {
     loadAmenities,
     loadWeatherForViewport,
     setSearchResults,
+    setSearchAmenities,
     markInitialLoaded,
   } = useMapData({
     drawerStateRef,
@@ -441,6 +442,15 @@ export default function MapView() {
         return;
       }
 
+      // Amenity-only search arrival — display POI pins, don't lock the map.
+      // Drawer rendering for this kind is handled in #121; browse mode stays active for campsites.
+      if (searchPayload?.kind === "amenity-search") {
+        initialSearchRef.current = null;
+        searchModeRef.current = false;
+        setSearchAmenities(searchPayload.amenityPois);
+        // Fall through to browse mode so the camera and campsite fetch work normally.
+      }
+
       // Search payload was present but returned no campsites — fall back to browse mode.
       // Reset both refs so handleMoveEnd fires normally and geolocation flyTo works.
       searchModeRef.current = false;
@@ -465,7 +475,7 @@ export default function MapView() {
         loadAmenities(e.target);
       }
     },
-    [loadCampsites, loadAmenities, loadWeatherForViewport, setSearchResults, markInitialLoaded]
+    [loadCampsites, loadAmenities, loadWeatherForViewport, setSearchResults, setSearchAmenities, markInitialLoaded]
   );
 
   const handleMoveEnd = useCallback(

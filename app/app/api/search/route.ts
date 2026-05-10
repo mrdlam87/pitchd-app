@@ -150,11 +150,39 @@ export async function POST(req: Request): Promise<Response> {
     const lngDelta =
       radiusKm * DEG_PER_KM / Math.cos((searchLat * Math.PI) / 180);
 
+    // Amenity-only branch — skip the campsite pipeline entirely and return POI results.
+    if (parsedIntent.resultType === "amenities") {
+      const amenityPois = await prisma.amenityPOI.findMany({
+        where: {
+          lat: { gte: searchLat - latDelta, lte: searchLat + latDelta },
+          lng: { gte: searchLng - lngDelta, lte: searchLng + lngDelta },
+          ...(parsedIntent.poiTypes?.length && {
+            amenityType: { key: { in: parsedIntent.poiTypes } },
+          }),
+        },
+        select: {
+          id: true,
+          name: true,
+          lat: true,
+          lng: true,
+          amenityType: { select: { key: true } },
+        },
+        take: RESULT_LIMIT,
+      });
+      return Response.json({ amenityPois, parsedIntent });
+    }
+
     const campsites = await prisma.campsite.findMany({
       where: {
         syncStatus: SyncStatus.active,
         lat: { gte: searchLat - latDelta, lte: searchLat + latDelta },
         lng: { gte: searchLng - lngDelta, lte: searchLng + lngDelta },
+        ...(parsedIntent.siteName && {
+          OR: [
+            { name: { contains: parsedIntent.siteName, mode: "insensitive" } },
+            { region: { contains: parsedIntent.siteName, mode: "insensitive" } },
+          ],
+        }),
         ...(parsedIntent.amenities.length > 0 && {
           amenities: {
             some: {
