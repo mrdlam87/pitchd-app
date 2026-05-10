@@ -45,7 +45,7 @@ export async function getCachedIntent(queryHash: string): Promise<ParsedIntent |
         : null,
     siteName:
       typeof raw.siteName === "string" && raw.siteName.trim() !== ""
-        ? raw.siteName.trim()
+        ? raw.siteName.trim().slice(0, 200)
         : null,
     driveTimeHrs: Math.min(rawDriveTime, MAX_DRIVE_TIME_HRS),
     // Re-filter amenities in case the entry predates the current ALLOWED_AMENITIES list
@@ -56,7 +56,7 @@ export async function getCachedIntent(queryHash: string): Promise<ParsedIntent |
       : [],
     amenityHints: Array.isArray(raw.amenityHints)
       ? raw.amenityHints
-          .filter((h): h is string => typeof h === "string")
+          .filter((h): h is string => typeof h === "string" && h.trim() !== "")
           .slice(0, 10)
           .map((h) => h.slice(0, 100))
       : [],
@@ -74,13 +74,14 @@ export async function getCachedIntent(queryHash: string): Promise<ParsedIntent |
       raw.resultType === "amenities" ? "amenities"
       : raw.resultType === "campsites" ? "campsites"
       : null,
-    poiTypes: Array.isArray(raw.poiTypes)
-      ? Array.from(new Set(
-          raw.poiTypes.filter(
-            (p): p is string => typeof p === "string" && (ALLOWED_POI_TYPES as readonly string[]).includes(p)
-          )
-        ))
-      : raw.resultType === "amenities" ? []
+    poiTypes: raw.resultType === "amenities"
+      ? Array.isArray(raw.poiTypes)
+        ? Array.from(new Set(
+            raw.poiTypes.filter(
+              (p): p is string => typeof p === "string" && (ALLOWED_POI_TYPES as readonly string[]).includes(p)
+            )
+          ))
+        : []
       : null,
   };
 }

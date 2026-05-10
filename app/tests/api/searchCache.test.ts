@@ -258,13 +258,34 @@ describe("getCachedIntent", () => {
     expect(result!.poiTypes).toBeNull();
   });
 
-  it("filters poiTypes to ALLOWED_POI_TYPES only", async () => {
+  it("deduplicates poiTypes returned by Claude", async () => {
+    const queryHash = await seedEntry("poitypes-dupes", {
+      location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: null,
+      resultType: "amenities",
+      poiTypes: ["dump_point", "dump_point", "laundromat"],
+    }, FUTURE);
+    const result = await getCachedIntent(queryHash);
+    expect(result!.poiTypes).toEqual(["dump_point", "laundromat"]);
+  });
+
+  it("filters poiTypes to ALLOWED_POI_TYPES only when resultType is 'amenities'", async () => {
     const queryHash = await seedEntry("poitypes-filter", {
       location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: null,
+      resultType: "amenities",
       poiTypes: ["dump_point", "laundromat", "petrol_station"],
     }, FUTURE);
     const result = await getCachedIntent(queryHash);
     expect(result!.poiTypes).toEqual(["dump_point", "laundromat"]);
+  });
+
+  it("forces poiTypes to null when resultType is not 'amenities'", async () => {
+    const queryHash = await seedEntry("poitypes-wrong-resulttype", {
+      location: null, driveTimeHrs: 3, amenities: [], startDate: null, endDate: null, sortBy: null,
+      resultType: "campsites",
+      poiTypes: ["dump_point"],
+    }, FUTURE);
+    const result = await getCachedIntent(queryHash);
+    expect(result!.poiTypes).toBeNull();
   });
 
   it("defaults poiTypes to null when it is not an array", async () => {

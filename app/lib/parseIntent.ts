@@ -100,7 +100,7 @@ Rules:
 
   return {
     location: typeof parsed.location === "string" && parsed.location.trim() !== "" ? parsed.location.trim() : null,
-    siteName: typeof parsed.siteName === "string" && parsed.siteName.trim() !== "" ? parsed.siteName.trim() : null,
+    siteName: typeof parsed.siteName === "string" && parsed.siteName.trim() !== "" ? parsed.siteName.trim().slice(0, 200) : null,
     driveTimeHrs: typeof parsed.driveTimeHrs === "number" && parsed.driveTimeHrs >= 1
       ? Math.min(parsed.driveTimeHrs, MAX_DRIVE_TIME_HRS)
       : DEFAULT_DRIVE_TIME_HRS,
@@ -111,7 +111,7 @@ Rules:
       : [],
     amenityHints: Array.isArray(parsed.amenityHints)
       ? (parsed.amenityHints as unknown[])
-          .filter((h): h is string => typeof h === "string")
+          .filter((h): h is string => typeof h === "string" && h.trim() !== "")
           .slice(0, 10) // prompt asks Claude for ≤5; 10 is the hard ceiling
           .map((h) => h.slice(0, 100))
       : [],
@@ -131,13 +131,14 @@ Rules:
       parsed.resultType === "amenities" ? "amenities"
       : parsed.resultType === "campsites" ? "campsites"
       : null,
-    poiTypes: Array.isArray(parsed.poiTypes)
-      ? Array.from(new Set(
-          (parsed.poiTypes as unknown[]).filter(
-            (p): p is string => typeof p === "string" && (ALLOWED_POI_TYPES as readonly string[]).includes(p)
-          )
-        ))
-      : parsed.resultType === "amenities" ? []
+    poiTypes: parsed.resultType === "amenities"
+      ? Array.isArray(parsed.poiTypes)
+        ? Array.from(new Set(
+            (parsed.poiTypes as unknown[]).filter(
+              (p): p is string => typeof p === "string" && (ALLOWED_POI_TYPES as readonly string[]).includes(p)
+            )
+          ))
+        : []
       : null,
   };
 }
