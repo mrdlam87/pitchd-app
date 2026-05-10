@@ -171,6 +171,65 @@ describe("parseSearchResultsPayload — AISearchPayload", () => {
   });
 });
 
+describe("parseSearchResultsPayload — AISearchPayload with new ParsedIntent fields", () => {
+  it("accepts a payload where parsedIntent includes siteName", () => {
+    const result = parseSearchResultsPayload({
+      ...validAI,
+      parsedIntent: { amenities: [], siteName: "Lane Cove campground" },
+    });
+    expect(result).not.toBeNull();
+    expect(result?.kind).toBe("ai");
+  });
+
+  it("accepts a payload where parsedIntent includes resultType", () => {
+    const result = parseSearchResultsPayload({
+      ...validAI,
+      parsedIntent: { amenities: [], resultType: "campsites" },
+    });
+    expect(result).not.toBeNull();
+  });
+
+  it("accepts a payload where parsedIntent includes poiTypes", () => {
+    const result = parseSearchResultsPayload({
+      ...validAI,
+      parsedIntent: { amenities: [], poiTypes: ["dump_point"] },
+    });
+    expect(result).not.toBeNull();
+  });
+
+  it("accepts a payload where parsedIntent includes amenityHints", () => {
+    const result = parseSearchResultsPayload({
+      ...validAI,
+      parsedIntent: { amenities: [], amenityHints: ["firepit", "river views"] },
+    });
+    expect(result).not.toBeNull();
+  });
+
+  it("accepts a payload with all new fields present", () => {
+    const result = parseSearchResultsPayload({
+      ...validAI,
+      parsedIntent: {
+        amenities: ["hiking"],
+        siteName: "Royal National Park",
+        resultType: "campsites",
+        poiTypes: null,
+        amenityHints: ["waterfall", "dog friendly"],
+      },
+    });
+    expect(result).not.toBeNull();
+    expect(result?.kind).toBe("ai");
+  });
+
+  it("still rejects a payload where parsedIntent.amenities is not an array (new fields do not affect existing validation)", () => {
+    expect(
+      parseSearchResultsPayload({
+        ...validAI,
+        parsedIntent: { amenities: "hiking", siteName: "Test" },
+      })
+    ).toBeNull();
+  });
+});
+
 describe("parseSearchResultsPayload — invalid input", () => {
   it("returns null for null", () => {
     expect(parseSearchResultsPayload(null)).toBeNull();
