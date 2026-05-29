@@ -230,6 +230,54 @@ describe("parseSearchResultsPayload — AISearchPayload with new ParsedIntent fi
   });
 });
 
+describe("parseSearchResultsPayload — AmenitySearchPayload", () => {
+  const validAmenity = {
+    kind: "amenity-search",
+    amenityPois: [{ id: "1", lat: -33.8, lng: 151.2, name: "Test Dump Point", amenityType: { key: "dump_point" } }],
+    parsedIntent: { amenities: [], resultType: "amenities", poiTypes: ["dump_point"] },
+    query: "dump points near me",
+  };
+
+  it("accepts a valid amenity-search payload", () => {
+    const result = parseSearchResultsPayload(validAmenity);
+    expect(result).not.toBeNull();
+    expect(result?.kind).toBe("amenity-search");
+  });
+
+  it("accepts an amenity-search payload with empty amenityPois array", () => {
+    const result = parseSearchResultsPayload({ ...validAmenity, amenityPois: [] });
+    expect(result).not.toBeNull();
+    expect(result?.kind).toBe("amenity-search");
+  });
+
+  it("returns null when amenityPois is missing", () => {
+    const { amenityPois: _p, ...payload } = validAmenity;
+    expect(parseSearchResultsPayload(payload)).toBeNull();
+  });
+
+  it("returns null when amenityPois is not an array", () => {
+    expect(parseSearchResultsPayload({ ...validAmenity, amenityPois: "not-an-array" })).toBeNull();
+  });
+
+  it("returns null when a POI entry is missing lat", () => {
+    expect(
+      parseSearchResultsPayload({
+        ...validAmenity,
+        amenityPois: [{ id: "1", lng: 151.2 }],
+      })
+    ).toBeNull();
+  });
+
+  it("returns null when a POI entry is missing lng", () => {
+    expect(
+      parseSearchResultsPayload({
+        ...validAmenity,
+        amenityPois: [{ id: "1", lat: -33.8 }],
+      })
+    ).toBeNull();
+  });
+});
+
 describe("parseSearchResultsPayload — invalid input", () => {
   it("returns null for null", () => {
     expect(parseSearchResultsPayload(null)).toBeNull();

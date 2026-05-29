@@ -758,4 +758,212 @@ describe("POST /api/search", () => {
     }));
     expect(res.status).toBe(200);
   });
+
+  // --- siteName filter (Task 2) ---
+
+  it("siteName filter: only returns campsites whose name matches siteName", async () => {
+    const query = "sitename filter name match test";
+    createdHashes.push(hashQuery(query));
+    await prisma.searchCache.deleteMany({ where: { queryHash: hashQuery(query) } });
+
+    const BASE_LAT = -31.95;
+    const BASE_LNG = 141.47;
+    // Two campsites in the same area — only one has the target name
+    const target = await prisma.campsite.create({
+      data: {
+        name: "!Wilsons Promontory Campground",
+        slug: `wilsons-prom-${Date.now()}-${Math.random()}`,
+        lat: -31.96,
+        lng: BASE_LNG,
+        state: "VIC",
+        source: TEST_SOURCE,
+        sourceId: `sitename-target-${Date.now()}-${Math.random()}`,
+      },
+    });
+    const other = await prisma.campsite.create({
+      data: {
+        name: "!Generic Campsite Near Broken Hill",
+        slug: `generic-campsite-${Date.now()}-${Math.random()}`,
+        lat: -31.97,
+        lng: BASE_LNG,
+        state: "NSW",
+        source: TEST_SOURCE,
+        sourceId: `sitename-other-${Date.now()}-${Math.random()}`,
+      },
+    });
+
+    mockCreate.mockResolvedValueOnce({
+      content: [{ type: "text", text: JSON.stringify({
+        location: null,
+        siteName: "Wilsons Promontory",
+        driveTimeHrs: 1,
+        amenities: [],
+        amenityHints: [],
+        startDate: null,
+        endDate: null,
+        sortBy: null,
+        resultType: "campsites",
+        poiTypes: null,
+      }) }],
+    });
+
+    const res = await POST(makeRequest({ query, lat: BASE_LAT, lng: BASE_LNG }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    const ids = body.campsites.map((c: { id: string }) => c.id);
+    expect(ids).toContain(target.id);
+    expect(ids).not.toContain(other.id);
+  });
+
+  it("siteName filter: returns empty campsites when no name matches within bounding box", async () => {
+    const query = "sitename filter no match test";
+    createdHashes.push(hashQuery(query));
+    await prisma.searchCache.deleteMany({ where: { queryHash: hashQuery(query) } });
+
+    const BASE_LAT = -31.95;
+    const BASE_LNG = 141.47;
+    // Campsite that does NOT match the siteName
+    await prisma.campsite.create({
+      data: {
+        name: "!Completely Different Name",
+        slug: `sitename-nomatch-${Date.now()}-${Math.random()}`,
+        lat: -31.96,
+        lng: BASE_LNG,
+        state: "NSW",
+        source: TEST_SOURCE,
+        sourceId: `sitename-nomatch-${Date.now()}-${Math.random()}`,
+      },
+    });
+
+    mockCreate.mockResolvedValueOnce({
+      content: [{ type: "text", text: JSON.stringify({
+        location: null,
+        siteName: "XYZ Campground That Does Not Exist",
+        driveTimeHrs: 1,
+        amenities: [],
+        amenityHints: [],
+        startDate: null,
+        endDate: null,
+        sortBy: null,
+        resultType: "campsites",
+        poiTypes: null,
+      }) }],
+    });
+
+    const res = await POST(makeRequest({ query, lat: BASE_LAT, lng: BASE_LNG }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.campsites).toHaveLength(0);
+  });
+
+  // --- Amenity-only routing (Task 3) ---
+
+  it("amenity routing: returns amenityPois (not campsites) when resultType is 'amenities'", async () => {
+    const query = "amenity routing dump points test";
+    createdHashes.push(hashQuery(query));
+    await prisma.searchCache.deleteMany({ where: { queryHash: hashQuery(query) } });
+
+    const BASE_LAT = -31.95;
+    const BASE_LNG = 141.47;
+
+    // Requires the dump_point AmenityType seed row — skip gracefully if not seeded
+    const amenityType = await prisma.amenityType.findUnique({ where: { key: "dump_point" } });
+    if (!amenityType) {
+      console.warn("[search.test] AmenityType 'dump_point' not seeded — skipping amenity routing test. Run `npm run db:seed`.");
+      return;
+    }
+
+    // Seed an AmenityPOI near the test location
+    const poi = await prisma.amenityPOI.create({
+      data: {
+        name: "!Test Dump Point",
+        lat: -31.96,
+        lng: BASE_LNG,
+        amenityTypeId: amenityType.id,
+        source: "test-search",
+        sourceId: `dump-point-${Date.now()}-${Math.random()}`,
+      },
+    });
+
+    mockCreate.mockResolvedValueOnce({
+      content: [{ type: "text", text: JSON.stringify({
+        location: null,
+        siteName: null,
+        driveTimeHrs: 1,
+        amenities: [],
+        amenityHints: [],
+        startDate: null,
+        endDate: null,
+        sortBy: null,
+        resultType: "amenities",
+        poiTypes: ["dump_point"],
+      }) }],
+    });
+
+    const res = await POST(makeRequest({ query, lat: BASE_LAT, lng: BASE_LNG }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    // Amenity-only route: response must have amenityPois, not campsites
+    expect(body).toHaveProperty("amenityPois");
+    expect(body).not.toHaveProperty("campsites");
+    expect(Array.isArray(body.amenityPois)).toBe(true);
+
+    const poiIds = body.amenityPois.map((p: { id: string }) => p.id);
+    expect(poiIds).toContain(poi.id);
+
+    // Clean up the seeded POI
+    await prisma.amenityPOI.deleteMany({ where: { source: "test-search" } });
+  });
+
+  it("amenity routing: when resultType is 'amenities' but poiTypes is empty, returns all nearby POIs", async () => {
+    const query = "amenity routing no poi types test";
+    createdHashes.push(hashQuery(query));
+    await prisma.searchCache.deleteMany({ where: { queryHash: hashQuery(query) } });
+
+    const BASE_LAT = -31.95;
+    const BASE_LNG = 141.47;
+
+    const amenityType = await prisma.amenityType.findUnique({ where: { key: "water_fill" } });
+    if (!amenityType) {
+      console.warn("[search.test] AmenityType 'water_fill' not seeded — skipping test. Run `npm run db:seed`.");
+      return;
+    }
+
+    const poi = await prisma.amenityPOI.create({
+      data: {
+        name: "!Test Water Fill",
+        lat: -31.96,
+        lng: BASE_LNG,
+        amenityTypeId: amenityType.id,
+        source: "test-search",
+        sourceId: `water-fill-${Date.now()}-${Math.random()}`,
+      },
+    });
+
+    mockCreate.mockResolvedValueOnce({
+      content: [{ type: "text", text: JSON.stringify({
+        location: null,
+        siteName: null,
+        driveTimeHrs: 1,
+        amenities: [],
+        amenityHints: [],
+        startDate: null,
+        endDate: null,
+        sortBy: null,
+        resultType: "amenities",
+        poiTypes: [],
+      }) }],
+    });
+
+    const res = await POST(makeRequest({ query, lat: BASE_LAT, lng: BASE_LNG }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body).toHaveProperty("amenityPois");
+    expect(body.amenityPois.map((p: { id: string }) => p.id)).toContain(poi.id);
+
+    await prisma.amenityPOI.deleteMany({ where: { source: "test-search" } });
+  });
 });

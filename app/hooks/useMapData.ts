@@ -119,6 +119,8 @@ export type UseMapDataReturn = {
   // Atomically updates campsites state, campsitesRef, and prevCampsitesLengthRef.
   // Use instead of setCampsites for AI-search result paths so all three stay in sync.
   setSearchResults: (campsites: Campsite[]) => void;
+  // Sets amenityPois directly from an amenity-search payload arrival.
+  setSearchAmenities: (pois: AmenityPOI[]) => void;
   // Call when AI search results are loaded directly (skips loadCampsites path).
   markInitialLoaded: () => void;
 };
@@ -308,6 +310,11 @@ export function useMapData({
     prevCampsitesLengthRef.current = newCampsites.length;
   }, [markInitialLoaded]);
 
+  const setSearchAmenities = useCallback((pois: AmenityPOI[]) => {
+    markInitialLoaded();
+    setAmenityPois(pois);
+  }, [markInitialLoaded]);
+
   const loadAmenities = useCallback((map: mapboxgl.Map) => {
     const poiTypes = activeFiltersRef.current.pois;
     if (poiTypes.length === 0) {
@@ -339,6 +346,7 @@ export function useMapData({
     loadAmenities,
     loadWeatherForViewport,
     setSearchResults,
+    setSearchAmenities,
     markInitialLoaded,
   };
 }
