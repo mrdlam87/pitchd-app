@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { Drawer } from "vaul";
 import { BORDER, CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
 import { wmoCodeToEmoji, condColorForCode } from "@/lib/weatherScore";
@@ -394,6 +395,55 @@ function POICard({ poi, meta }: { poi: AmenityPOI; meta: POIMeta }) {
   );
 }
 
+// ── Empty search state ─────────────────────────────────────────────────────────
+
+function EmptySearchState({
+  location,
+  onClearSearch,
+  onBroadenSearch,
+}: {
+  location?: string | null;
+  onClearSearch?: () => void;
+  onBroadenSearch?: () => void;
+}) {
+  return (
+    <div
+      className="rounded-2xl p-4 text-center"
+      style={{ background: SURFACE, border: `1.5px solid ${BORDER}`, boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}
+    >
+      <div className="text-2xl mb-2">🏕️</div>
+      <div className="text-sm font-semibold mb-1 font-[family-name:var(--font-dm-sans)]" style={{ color: FOREST_GREEN }}>
+        No campsites found{location ? ` near ${location}` : ""}
+      </div>
+      <div className="text-xs mb-3 font-[family-name:var(--font-dm-sans)]" style={{ color: SAGE }}>
+        Try broadening your search or clearing filters.
+      </div>
+      <div className="flex gap-2 justify-center">
+        {onBroadenSearch && (
+          <button
+            type="button"
+            onClick={onBroadenSearch}
+            className="rounded-full border border-[#e0dbd0] bg-white px-4 py-2 text-xs font-semibold font-[family-name:var(--font-dm-sans)] transition-colors hover:border-[#2d4a2d]"
+            style={{ color: FOREST_GREEN }}
+          >
+            Broaden search
+          </button>
+        )}
+        {onClearSearch && (
+          <button
+            type="button"
+            onClick={onClearSearch}
+            className="rounded-full px-4 py-2 text-xs font-semibold text-white font-[family-name:var(--font-dm-sans)] transition-opacity hover:opacity-80"
+            style={{ background: CORAL }}
+          >
+            Browse area
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── DrawerContentList — scrollable card list (half/full states) ────────────────
 
 function DrawerContentList({
@@ -482,6 +532,10 @@ type Props = {
   onDrawerStateChange: (state: DrawerState) => void;
   onSelectPin: (i: number) => void;
   isFetching?: boolean;
+  isEmpty?: boolean;
+  searchLocation?: string | null;
+  onClearSearch?: () => void;
+  onBroadenSearch?: () => void;
 };
 
 export default function BottomDrawer({
@@ -497,12 +551,47 @@ export default function BottomDrawer({
   onDrawerStateChange,
   onSelectPin,
   isFetching = false,
+  isEmpty = false,
+  searchLocation,
+  onClearSearch,
+  onBroadenSearch,
 }: Props) {
   const isFull = drawerState === "full";
 
   const selectedPoi = selectedPoiId
     ? amenityPois.find((p) => p.id === selectedPoiId) ?? null
     : null;
+
+  // Show empty state when the last search returned 0 results and we're not fetching
+  const showEmptyState = isEmpty && !isFetching && campsites.length === 0 && selectedPoi === null;
+
+  // Vaul/Radix focuses the drawer container (data-vaul-drawer) on initial mount and on
+  // snap-point transitions. This happens during React's commit phase — before React's
+  // synthetic event system can process the focusin event — so onFocus on Drawer.Content
+  // doesn't catch it. A native document-level focusin listener runs post-hydration and
+  // covers both the initial mount case and all subsequent snap transitions.
+  useEffect(() => {
+    const handleFocusin = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (target?.dataset?.vaulDrawer !== undefined && target.tagName === "DIV") {
+        target.blur();
+      }
+    };
+    // Vaul focuses the drawer container in its own useEffect, which runs after ours
+    // (children before parents in React's effect order). Use setTimeout(0) to enqueue
+    // the initial blur as a macrotask, after all pending useEffect callbacks complete.
+    const tid = setTimeout(() => {
+      const active = document.activeElement as HTMLElement | null;
+      if (active?.dataset?.vaulDrawer !== undefined && active.tagName === "DIV") {
+        active.blur();
+      }
+    }, 0);
+    document.addEventListener("focusin", handleFocusin, true);
+    return () => {
+      clearTimeout(tid);
+      document.removeEventListener("focusin", handleFocusin, true);
+    };
+  }, []);
 
   const resultLabel =
     campsites.length > 0
@@ -523,12 +612,14 @@ export default function BottomDrawer({
     : null;
 
   const hasContent = campsites.length > 0 || selectedPoi !== null;
+  // Allow expansion when there's content OR when showing empty state (so the card is fully visible)
+  const allowExpand = hasContent || showEmptyState;
 
   return (
     <Drawer.Root
-      snapPoints={hasContent ? SNAP_POINTS : PEEK_ONLY_SNAP_POINTS}
-      activeSnapPoint={hasContent ? snapForState(drawerState) : SNAP_POINTS[0]}
-      setActiveSnapPoint={(snap) => { if (hasContent) onDrawerStateChange(stateForSnap(snap)); }}
+      snapPoints={allowExpand ? SNAP_POINTS : PEEK_ONLY_SNAP_POINTS}
+      activeSnapPoint={allowExpand ? snapForState(drawerState) : SNAP_POINTS[0]}
+      setActiveSnapPoint={(snap) => { if (allowExpand) onDrawerStateChange(stateForSnap(snap)); }}
       // modal=false: the map and UI above the drawer stay fully interactive.
       modal={false}
       // dismissible=false: peek is the minimum — the drawer never disappears.
@@ -547,6 +638,7 @@ export default function BottomDrawer({
       <Drawer.Portal>
         <Drawer.Content
           className="fixed bottom-0 left-0 right-0 flex flex-col z-50 outline-none"
+          onOpenAutoFocus={(e) => e.preventDefault()}
           style={{
             height: "100dvh",
             background: SURFACE,
@@ -627,37 +719,52 @@ export default function BottomDrawer({
             </div>
           </div>
 
-          {/* Scrollable card list — visible in half and full states */}
+          {/* Scrollable card list (or empty state) — visible in half and full states */}
           {drawerState !== "peek" && (
-            <DrawerContentList
-              campsites={campsites}
-              selectedPoi={selectedPoi}
-              poiMeta={poiMeta}
-              selectedIdx={selectedIdx}
-              userLocation={userLocation}
-              cardRefs={cardRefs}
-              compact={drawerState !== "full"}
-              onSelectPin={onSelectPin}
-            />
+            showEmptyState ? (
+              <div className="overflow-y-auto flex-1 px-4 pt-2 pb-4">
+                <EmptySearchState
+                  location={searchLocation}
+                  onClearSearch={onClearSearch}
+                  onBroadenSearch={onBroadenSearch}
+                />
+              </div>
+            ) : (
+              <DrawerContentList
+                campsites={campsites}
+                selectedPoi={selectedPoi}
+                poiMeta={poiMeta}
+                selectedIdx={selectedIdx}
+                userLocation={userLocation}
+                cardRefs={cardRefs}
+                compact={drawerState !== "full"}
+                onSelectPin={onSelectPin}
+              />
+            )
           )}
 
-          {/* Peek state — show selected card (or first card) without scrolling */}
+          {/* Peek state — show selected card (or first card, or empty state) without scrolling */}
           {drawerState === "peek" && (
             <div className="px-4 pt-2 pb-4 overflow-hidden">
-              {selectedPoi && peekPoiMeta
-                ? <POICard poi={selectedPoi} meta={peekPoiMeta} />
-                : peekCampsite && (
-                    <CampsiteCard
-                      campsite={peekCampsite}
-                      index={peekIdx}
-                      isSelected={selectedIdx === peekIdx}
-                      compact={true}
-                      userLocation={userLocation}
-                      cardRef={() => { /* peek card — ref not used for scrollIntoView */ }}
-                      onSelect={() => onSelectPin(peekIdx)}
-                    />
-                  )
-              }
+              {showEmptyState ? (
+                <EmptySearchState
+                  location={searchLocation}
+                  onClearSearch={onClearSearch}
+                  onBroadenSearch={onBroadenSearch}
+                />
+              ) : selectedPoi && peekPoiMeta ? (
+                <POICard poi={selectedPoi} meta={peekPoiMeta} />
+              ) : peekCampsite ? (
+                <CampsiteCard
+                  campsite={peekCampsite}
+                  index={peekIdx}
+                  isSelected={selectedIdx === peekIdx}
+                  compact={true}
+                  userLocation={userLocation}
+                  cardRef={() => { /* peek card — ref not used for scrollIntoView */ }}
+                  onSelect={() => onSelectPin(peekIdx)}
+                />
+              ) : null}
             </div>
           )}
         </Drawer.Content>
