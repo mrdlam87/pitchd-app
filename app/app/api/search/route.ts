@@ -151,6 +151,8 @@ export async function POST(req: Request): Promise<Response> {
       radiusKm * DEG_PER_KM / Math.cos((searchLat * Math.PI) / 180);
 
     // Amenity-only branch — skip the campsite pipeline entirely and return POI results.
+    // Results are returned in DB insertion order (take: RESULT_LIMIT, no orderBy).
+    // Proximity ranking is not applied here — in dense areas, results may not be nearest-first.
     if (parsedIntent.resultType === "amenities") {
       const amenityPois = await prisma.amenityPOI.findMany({
         where: {

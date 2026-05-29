@@ -125,6 +125,10 @@ export default function MapView() {
   // fall through to browse mode with no campsites. Intentional: sessionStorage is short-lived
   // so legacy entries clear naturally on the next navigation.
   const searchModeRef = useRef(initialSearch?.kind === "ai");
+  // True while amenity-search POI results are displayed — suppresses loadAmenities from
+  // clearing the POI pins when no POI filter chip is active. Cleared when the user applies
+  // filters, clears search, taps a direct-filter or amenity chip.
+  const amenitySearchModeRef = useRef(initialSearch?.kind === "amenity-search");
   // Key of the currently active quick chip (null = browse mode).
   // AI arrivals: chipKey flows through AISearchPayload (defaults to "pitchd" for textarea NL queries).
   // Direct-filter arrivals: no chip is highlighted — the activity shows in the filter count badge.
@@ -447,6 +451,7 @@ export default function MapView() {
       if (searchPayload?.kind === "amenity-search") {
         initialSearchRef.current = null;
         searchModeRef.current = false;
+        amenitySearchModeRef.current = true;
         setSearchAmenities(searchPayload.amenityPois);
         // Fall through to browse mode so the camera and campsite fetch work normally.
       }
@@ -472,7 +477,9 @@ export default function MapView() {
         skipNextFetch.current = true;
         e.target.setPadding({ top: 0, right: 0, bottom: PEEK_HEIGHT_PX, left: 0 });
         loadCampsites(e.target);
-        loadAmenities(e.target);
+        if (!amenitySearchModeRef.current) {
+          loadAmenities(e.target);
+        }
       }
     },
     [loadCampsites, loadAmenities, loadWeatherForViewport, setSearchResults, setSearchAmenities, markInitialLoaded]
@@ -502,7 +509,9 @@ export default function MapView() {
         return;
       }
       loadCampsites(e.target);
-      loadAmenities(e.target);
+      if (!amenitySearchModeRef.current) {
+        loadAmenities(e.target);
+      }
     },
     [loadCampsites, loadAmenities, loadWeatherForViewport]
   );
@@ -589,6 +598,7 @@ export default function MapView() {
       // Applying filters signals intent to browse — exit NL search mode so
       // subsequent moveend events trigger normal browse fetches again.
       searchModeRef.current = false;
+      amenitySearchModeRef.current = false;
       suppressGeoFlyRef.current = false;
       setActiveChip(null);
       activeChipRef.current = null;
@@ -702,6 +712,7 @@ export default function MapView() {
 
   const handleClearSearch = useCallback(() => {
     searchModeRef.current = false;
+    amenitySearchModeRef.current = false;
     suppressGeoFlyRef.current = false;
     setActiveChip(null);
     activeChipRef.current = null;
@@ -723,6 +734,7 @@ export default function MapView() {
 
   const handleAmenityChip = useCallback(
     (poiType: string) => {
+      amenitySearchModeRef.current = false;
       const current = activeFiltersRef.current.pois;
       const next = current.includes(poiType)
         ? current.filter((p: string) => p !== poiType)
@@ -744,6 +756,7 @@ export default function MapView() {
       // filters don't silently carry forward into browse mode. Consistent with handleClearSearch.
       const baseActivities = searchModeRef.current ? [] : activeFiltersRef.current.activities;
       searchModeRef.current = false;
+      amenitySearchModeRef.current = false;
       suppressGeoFlyRef.current = false;
       setSearchContextQuery(null);
       setMapSearchError(null);

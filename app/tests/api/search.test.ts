@@ -860,6 +860,7 @@ describe("POST /api/search", () => {
   // --- Amenity-only routing (Task 3) ---
 
   it("amenity routing: returns amenityPois (not campsites) when resultType is 'amenities'", async () => {
+    expect.assertions(5);
     const query = "amenity routing dump points test";
     createdHashes.push(hashQuery(query));
     await prisma.searchCache.deleteMany({ where: { queryHash: hashQuery(query) } });
@@ -881,7 +882,7 @@ describe("POST /api/search", () => {
         lat: -31.96,
         lng: BASE_LNG,
         amenityTypeId: amenityType.id,
-        source: "test-search",
+        source: "test",
         sourceId: `dump-point-${Date.now()}-${Math.random()}`,
       },
     });
@@ -914,10 +915,11 @@ describe("POST /api/search", () => {
     expect(poiIds).toContain(poi.id);
 
     // Clean up the seeded POI
-    await prisma.amenityPOI.deleteMany({ where: { source: "test-search" } });
+    await prisma.amenityPOI.deleteMany({ where: { source: "test" } });
   });
 
   it("amenity routing: when resultType is 'amenities' but poiTypes is empty, returns all nearby POIs", async () => {
+    expect.assertions(3);
     const query = "amenity routing no poi types test";
     createdHashes.push(hashQuery(query));
     await prisma.searchCache.deleteMany({ where: { queryHash: hashQuery(query) } });
@@ -937,7 +939,7 @@ describe("POST /api/search", () => {
         lat: -31.96,
         lng: BASE_LNG,
         amenityTypeId: amenityType.id,
-        source: "test-search",
+        source: "test",
         sourceId: `water-fill-${Date.now()}-${Math.random()}`,
       },
     });
@@ -964,6 +966,6 @@ describe("POST /api/search", () => {
     expect(body).toHaveProperty("amenityPois");
     expect(body.amenityPois.map((p: { id: string }) => p.id)).toContain(poi.id);
 
-    await prisma.amenityPOI.deleteMany({ where: { source: "test-search" } });
+    await prisma.amenityPOI.deleteMany({ where: { source: "test" } });
   });
 });

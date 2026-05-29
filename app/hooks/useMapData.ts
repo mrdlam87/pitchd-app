@@ -312,6 +312,9 @@ export function useMapData({
 
   const setSearchAmenities = useCallback((pois: AmenityPOI[]) => {
     markInitialLoaded();
+    setCampsites([]);
+    campsitesRef.current = [];
+    prevCampsitesLengthRef.current = 0;
     setAmenityPois(pois);
   }, [markInitialLoaded]);
 
