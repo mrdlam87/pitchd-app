@@ -439,6 +439,39 @@ export default function MapView() {
     };
   }, []);
 
+  // Prevent the Vaul/Radix drawer container (data-vaul-drawer) from stealing keyboard
+  // focus. Radix applies focus via useLayoutEffect on mount and during certain internal
+  // state changes; the native focusin event fires before React's synthetic system, so we
+  // must use a native capture listener. When the drawer steals focus, restore it to the
+  // search input if it was previously focused so the recents dropdown stays visible.
+  useEffect(() => {
+    const handleFocusin = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (target?.dataset?.vaulDrawer !== undefined && target.tagName === "DIV") {
+        target.blur();
+        // relatedTarget on focusin is the element that LOST focus to the drawer.
+        // If the search input was interrupted, restore it so the recents dropdown stays open.
+        const prev = e.relatedTarget as HTMLElement | null;
+        const input = mapSearchInputRef.current;
+        if (prev === input && input && !input.disabled) {
+          input.focus();
+        }
+      }
+    };
+    // setTimeout(0) defers past any Vaul/Radix useEffect callbacks that run after ours.
+    const tid = setTimeout(() => {
+      const active = document.activeElement as HTMLElement | null;
+      if (active?.dataset?.vaulDrawer !== undefined && active.tagName === "DIV") {
+        active.blur();
+      }
+    }, 0);
+    document.addEventListener("focusin", handleFocusin, true);
+    return () => {
+      clearTimeout(tid);
+      document.removeEventListener("focusin", handleFocusin, true);
+    };
+  }, []);
+
   useEffect(() => {
     activeFiltersRef.current = activeFilters;
   }, [activeFilters]);
@@ -858,6 +891,12 @@ export default function MapView() {
                 onChange={(e) => { setMapQuery(e.target.value); setShowRecents(false); }}
                 onKeyDown={(e) => { if (e.key === "Enter") { setShowRecents(false); void handleMapSearch(mapQuery, null); } }}
                 onFocus={() => {
+                  // Cancel any pending blur timer — focus may have briefly bounced
+                  // off the input (e.g. Vaul stealing and releasing it) before returning.
+                  if (blurTimeoutRef.current !== null) {
+                    clearTimeout(blurTimeoutRef.current);
+                    blurTimeoutRef.current = null;
+                  }
                   if (!mapQuery) {
                     const recents = getRecentSearches();
                     if (recents.length > 0) { setRecentSearches(recents); setShowRecents(true); }

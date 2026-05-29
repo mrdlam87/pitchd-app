@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import { Drawer } from "vaul";
 import { BORDER, CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
 import { wmoCodeToEmoji, condColorForCode } from "@/lib/weatherScore";
@@ -565,33 +564,6 @@ export default function BottomDrawer({
   // Show empty state when the last search returned 0 results and we're not fetching
   const showEmptyState = isEmpty && !isFetching && campsites.length === 0 && selectedPoi === null;
 
-  // Vaul/Radix focuses the drawer container (data-vaul-drawer) on initial mount and on
-  // snap-point transitions. This happens during React's commit phase — before React's
-  // synthetic event system can process the focusin event — so onFocus on Drawer.Content
-  // doesn't catch it. A native document-level focusin listener runs post-hydration and
-  // covers both the initial mount case and all subsequent snap transitions.
-  useEffect(() => {
-    const handleFocusin = (e: FocusEvent) => {
-      const target = e.target as HTMLElement;
-      if (target?.dataset?.vaulDrawer !== undefined && target.tagName === "DIV") {
-        target.blur();
-      }
-    };
-    // Vaul focuses the drawer container in its own useEffect, which runs after ours
-    // (children before parents in React's effect order). Use setTimeout(0) to enqueue
-    // the initial blur as a macrotask, after all pending useEffect callbacks complete.
-    const tid = setTimeout(() => {
-      const active = document.activeElement as HTMLElement | null;
-      if (active?.dataset?.vaulDrawer !== undefined && active.tagName === "DIV") {
-        active.blur();
-      }
-    }, 0);
-    document.addEventListener("focusin", handleFocusin, true);
-    return () => {
-      clearTimeout(tid);
-      document.removeEventListener("focusin", handleFocusin, true);
-    };
-  }, []);
 
   const resultLabel =
     campsites.length > 0
