@@ -860,7 +860,6 @@ describe("POST /api/search", () => {
   // --- Amenity-only routing (Task 3) ---
 
   it("amenity routing: returns amenityPois (not campsites) when resultType is 'amenities'", async () => {
-    expect.assertions(5);
     const query = "amenity routing dump points test";
     createdHashes.push(hashQuery(query));
     await prisma.searchCache.deleteMany({ where: { queryHash: hashQuery(query) } });
@@ -874,6 +873,7 @@ describe("POST /api/search", () => {
       console.warn("[search.test] AmenityType 'dump_point' not seeded — skipping amenity routing test. Run `npm run db:seed`.");
       return;
     }
+    expect.assertions(5);
 
     // Seed an AmenityPOI near the test location
     const poi = await prisma.amenityPOI.create({
@@ -919,7 +919,6 @@ describe("POST /api/search", () => {
   });
 
   it("amenity routing: when resultType is 'amenities' but poiTypes is empty, returns all nearby POIs", async () => {
-    expect.assertions(3);
     const query = "amenity routing no poi types test";
     createdHashes.push(hashQuery(query));
     await prisma.searchCache.deleteMany({ where: { queryHash: hashQuery(query) } });
@@ -932,6 +931,7 @@ describe("POST /api/search", () => {
       console.warn("[search.test] AmenityType 'water_fill' not seeded — skipping test. Run `npm run db:seed`.");
       return;
     }
+    expect.assertions(3);
 
     const poi = await prisma.amenityPOI.create({
       data: {
