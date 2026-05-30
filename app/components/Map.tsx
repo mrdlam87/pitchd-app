@@ -835,7 +835,6 @@ export default function MapView() {
         setEmptySearchResult(data.amenityPois.length === 0);
         setSearchAmenities(data.amenityPois);
         setSearchResults([]);
-        setMapQuery("");
         setActiveChip(chipKey);
         activeChipRef.current = chipKey;
         setSearchContextQuery(q.trim());
@@ -855,7 +854,6 @@ export default function MapView() {
       }
       addRecentSearch(q.trim());
       setSearchResults(data.campsites);
-      setMapQuery("");
       if (data.campsites.length > 0 && mapRef.current) {
         // Results — enter search mode and fit the map to the pins
         setDrawerState("half");
@@ -1042,9 +1040,11 @@ export default function MapView() {
           }}
           recentSearches={recentSearches}
           onRecentSelect={(recent) => {
+            setMapQuery(recent);
             setRecentSearches(getRecentSearches());
             void handleMapSearch(recent, null);
           }}
+          onClear={handleClearSearch}
           loading={mapSearchLoading}
           placeholder="Site name, area, or describe your trip…"
           pillTrailing={
@@ -1061,20 +1061,12 @@ export default function MapView() {
             </>
           }
         />
-        {/* Search context label — shown below search bar when in AI search mode */}
-        {searchContextQuery && !mapQuery && (
+        {/* Search context label — shows the AI-interpreted intent below the bar */}
+        {searchContextQuery && searchParsedIntent && buildContextLabel(searchParsedIntent) && (
           <div className="flex items-center gap-1.5 px-1">
             <span className="truncate text-xs text-[#8a9e8a]">
-              {(searchParsedIntent && buildContextLabel(searchParsedIntent)) || searchContextQuery}
+              {buildContextLabel(searchParsedIntent)}
             </span>
-            <button
-              type="button"
-              onMouseDown={(e) => { e.preventDefault(); handleClearSearch(); }}
-              className="flex-shrink-0 text-[10px] font-semibold text-[#8a9e8a] hover:text-[#e8674a] leading-none"
-              aria-label="Clear search and browse area"
-            >
-              ✕ Browse area
-            </button>
           </div>
         )}
 

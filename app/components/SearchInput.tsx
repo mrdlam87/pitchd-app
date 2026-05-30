@@ -22,6 +22,9 @@ interface SearchInputProps {
   pillTrailing?: React.ReactNode;
   onFocus?: () => void;
   onBlur?: () => void;
+  /** Called when the user taps the clear (×) button in the pill. When provided, the
+   *  circular button shows × instead of the search icon whenever the input has a value. */
+  onClear?: () => void;
 }
 
 const DEBOUNCE_MS = 300;
@@ -45,6 +48,7 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
   pillTrailing,
   onFocus: onFocusProp,
   onBlur: onBlurProp,
+  onClear,
 }, ref) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -223,24 +227,36 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
               style={{ color: TEXT }}
             />
           </div>
-          {/* Circular search icon button */}
-          <button
-            onClick={handleSubmit}
-            disabled={!value.trim() || loading}
-            aria-label="Search"
-            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40 ${
-              value.trim() ? "bg-[#e8674a]" : "bg-[#e8f0e8]"
-            }`}
-          >
-            {loading ? (
-              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-            ) : (
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                <circle cx="7" cy="7" r="5" stroke={value.trim() ? "#fff" : "#5a7a5a"} strokeWidth="1.8" />
-                <path d="M11 11l3 3" stroke={value.trim() ? "#fff" : "#5a7a5a"} strokeWidth="1.8" strokeLinecap="round" />
+          {/* Circular action button — × (clear) when value is set, search icon otherwise */}
+          {onClear && value.trim() && !loading ? (
+            <button
+              onClick={() => { onChange(""); onClear(); }}
+              aria-label="Clear search"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#e8f0e8] transition-colors"
+            >
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                <path d="M1 1l10 10M11 1L1 11" stroke="#5a7a5a" strokeWidth="1.8" strokeLinecap="round" />
               </svg>
-            )}
-          </button>
+            </button>
+          ) : (
+            <button
+              onClick={handleSubmit}
+              disabled={!value.trim() || loading}
+              aria-label="Search"
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40 ${
+                value.trim() ? "bg-[#e8674a]" : "bg-[#e8f0e8]"
+              }`}
+            >
+              {loading ? (
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+              ) : (
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                  <circle cx="7" cy="7" r="5" stroke={value.trim() ? "#fff" : "#5a7a5a"} strokeWidth="1.8" />
+                  <path d="M11 11l3 3" stroke={value.trim() ? "#fff" : "#5a7a5a"} strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              )}
+            </button>
+          )}
           {pillTrailing}
         </div>
       ) : (
