@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Drawer } from "vaul";
 import { BORDER, CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
 import { wmoCodeToEmoji, condColorForCode } from "@/lib/weatherScore";
@@ -554,6 +555,48 @@ export default function BottomDrawer({
   onClearSearch,
   onBroadenSearch,
 }: Props) {
+  // Track the visual viewport so the drawer height stays correct when the soft
+  // keyboard opens or the browser URL bar shows/hides.
+  //
+  // Why JS instead of CSS units:
+  //   dvh  — changes with keyboard on iOS (breaks Vaul snap calculations)
+  //   lvh  — may exceed innerHeight when URL bar is visible (snaps land too high)
+  //   100% — relative to Drawer.Portal container, not reliable
+  //
+  // visualViewport.height is always the *visible* area above the keyboard on both
+  // iOS and Android. When it changes, React re-renders with the new height, Vaul's
+  // ResizeObserver fires, and it re-computes snap translations against the new height.
+  //
+  // drawerBottom handles iOS: the layout viewport doesn't shrink when the keyboard
+  // opens, so `fixed bottom-0` would pin the drawer under the keyboard. Offsetting
+  // by (innerHeight - visualViewport.height - visualViewport.offsetTop) lifts the
+  // drawer above the keyboard.
+  const [drawerHeight, setDrawerHeight] = useState<number>(
+    () => (typeof window !== "undefined" ? (window.visualViewport?.height ?? window.innerHeight) : 812)
+  );
+  const [drawerBottom, setDrawerBottom] = useState<number>(0);
+
+  useEffect(() => {
+    function update() {
+      const vv = window.visualViewport;
+      const height = vv?.height ?? window.innerHeight;
+      const bottom = vv
+        ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+        : 0;
+      setDrawerHeight(height);
+      setDrawerBottom(bottom);
+    }
+    update();
+    window.visualViewport?.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
+    return () => {
+      window.visualViewport?.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+
   const isFull = drawerState === "full";
 
   const selectedPoi = selectedPoiId
@@ -608,17 +651,11 @@ export default function BottomDrawer({
     >
       <Drawer.Portal>
         <Drawer.Content
-          className="fixed bottom-0 left-0 right-0 flex flex-col z-50 outline-none"
+          className="fixed left-0 right-0 flex flex-col z-50 outline-none"
           onOpenAutoFocus={(e) => e.preventDefault()}
           style={{
-            // lvh = large viewport height (without URL bars, without keyboard).
-            // dvh follows the visual viewport which shrinks when the soft keyboard
-            // opens on iOS Safari — that change confuses Vaul's snap calculations
-            // and leaves the drawer off-screen after the keyboard is dismissed.
-            // lvh is stable: iOS never resizes the layout viewport for the keyboard,
-            // and Chrome Android is covered by interactive-widget=resizes-content in
-            // the viewport meta (layout.tsx).
-            height: "100lvh",
+            height: drawerHeight,
+            bottom: drawerBottom,
             background: SURFACE,
             borderRadius: isFull ? 0 : "1rem 1rem 0 0",
             borderTop: isFull ? "none" : "1.5px solid #e0dbd0",
