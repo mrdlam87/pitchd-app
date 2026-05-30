@@ -290,6 +290,11 @@ export default function MapView() {
     });
   }, [campsites, goodWeatherOnly]);
 
+  // Ref kept in sync with displayedCampsites so selectPin (a stable useCallback)
+  // can read the latest list without closing over a stale snapshot.
+  const displayedCampsitesRef = useRef(displayedCampsites);
+  useEffect(() => { displayedCampsitesRef.current = displayedCampsites; }, [displayedCampsites]);
+
   // Campsite cluster index — rebuilt only when the displayed campsite list changes.
   const campsiteClusterInstance = useMemo(() => {
     const sc = new Supercluster<{ id: string; idx: number }>(CLUSTER_OPTIONS);
@@ -650,7 +655,7 @@ export default function MapView() {
       setDrawerState("half");
       setSelectedIdx(i);
       setSelectedPoiId(null);
-      const campsite = displayedCampsites[i];
+      const campsite = displayedCampsitesRef.current[i];
       selectedIdRef.current = campsite?.id ?? null;
       if (animate && campsite && mapRef.current) {
         skipNextFetch.current = true;
@@ -686,7 +691,7 @@ export default function MapView() {
         }, DRAWER_TRANSITION_MS);
       }
     },
-    [displayedCampsites]
+    []
   );
 
   const handleApplyFilters = useCallback(
@@ -745,6 +750,8 @@ export default function MapView() {
       }
     } catch (e) {
       console.error("[fetchRegionCampsites]", e);
+    } finally {
+      markInitialLoaded(); // ensures spinner clears even on error/empty result
     }
   }
 
@@ -982,6 +989,7 @@ export default function MapView() {
                   setDrawerState("peek");
                   drawerStateRef.current = "peek";
                   searchModeRef.current = true;
+                  suppressGeoFlyRef.current = true;
                   setSearchContextQuery(s.name);
                 } else {
                   void fetchRegionCampsites(s.name);
