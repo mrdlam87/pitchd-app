@@ -611,7 +611,14 @@ export default function BottomDrawer({
           className="fixed bottom-0 left-0 right-0 flex flex-col z-50 outline-none"
           onOpenAutoFocus={(e) => e.preventDefault()}
           style={{
-            height: "100dvh",
+            // lvh = large viewport height (without URL bars, without keyboard).
+            // dvh follows the visual viewport which shrinks when the soft keyboard
+            // opens on iOS Safari — that change confuses Vaul's snap calculations
+            // and leaves the drawer off-screen after the keyboard is dismissed.
+            // lvh is stable: iOS never resizes the layout viewport for the keyboard,
+            // and Chrome Android is covered by interactive-widget=resizes-content in
+            // the viewport meta (layout.tsx).
+            height: "100lvh",
             background: SURFACE,
             borderRadius: isFull ? 0 : "1rem 1rem 0 0",
             borderTop: isFull ? "none" : "1.5px solid #e0dbd0",

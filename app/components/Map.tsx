@@ -154,12 +154,12 @@ export default function MapView() {
   // AI arrivals: chipKey flows through AISearchPayload (defaults to "pitchd" for textarea NL queries).
   // Direct-filter arrivals: no chip is highlighted — the activity shows in the filter count badge.
   const [activeChip, setActiveChip] = useState<string | null>(
-    initialSearch?.kind === "ai" ? (initialSearch.chipKey ?? "pitchd") : null
+    initialSearch?.kind === "ai" ? (initialSearch.chipKey ?? null) : null
   );
   // Ref mirrors activeChip so stable useCallback closures (e.g. loadWeatherForViewport)
   // can read the current chip key without needing it in their dependency array.
   const activeChipRef = useRef<string | null>(
-    initialSearch?.kind === "ai" ? (initialSearch.chipKey ?? "pitchd") : null
+    initialSearch?.kind === "ai" ? (initialSearch.chipKey ?? null) : null
   );
   // Query string shown as context below the map search input (AI searches only)
   const [searchContextQuery, setSearchContextQuery] = useState<string | null>(
