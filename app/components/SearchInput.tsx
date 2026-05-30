@@ -97,6 +97,7 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
         setShowSuggestions(false);
         setShowRecents(false);
         inputRef.current?.blur();
+      }
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
