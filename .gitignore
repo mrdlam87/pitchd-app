@@ -22,3 +22,9 @@ Thumbs.db
 # Editor
 .vscode/
 .idea/
+
+# Playwright / debug screenshots
+.playwright-mcp/
+*.png
+*.jpg
+*.jpeg
