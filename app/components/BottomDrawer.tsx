@@ -610,7 +610,6 @@ export default function BottomDrawer({
         <Drawer.Content
           className="fixed bottom-0 left-0 right-0 flex flex-col z-50 outline-none"
           onOpenAutoFocus={(e) => e.preventDefault()}
-          onFocusOutside={(e) => e.preventDefault()}
           style={{
             height: "100dvh",
             background: SURFACE,

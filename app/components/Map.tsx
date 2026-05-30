@@ -1011,6 +1011,14 @@ export default function MapView() {
             setRecentSearches(getRecentSearches());
             void handleMapSearch(recent, null);
           }}
+          onFocus={() => {
+            // Collapse drawer when user taps the search bar so the map opens up
+            // and the keyboard doesn't fight with full/half drawer content.
+            if (drawerStateRef.current !== "peek") {
+              setDrawerState("peek");
+              drawerStateRef.current = "peek";
+            }
+          }}
           loading={mapSearchLoading}
           placeholder="Site name, area, or describe your trip…"
           pillTrailing={
