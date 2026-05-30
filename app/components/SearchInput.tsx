@@ -191,7 +191,7 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
               disabled={loading}
-              className="w-full bg-transparent text-sm outline-none disabled:opacity-60 [&::placeholder]:text-[var(--text-muted)]"
+              className="w-full bg-transparent text-sm outline-none disabled:opacity-60 placeholder:text-[#8a9e8a]"
               style={{ color: TEXT }}
             />
           </div>
@@ -231,7 +231,7 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             disabled={loading}
-            className="min-w-0 flex-1 bg-transparent text-sm outline-none disabled:opacity-60 [&::placeholder]:text-[var(--text-muted)]"
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none disabled:opacity-60 placeholder:text-[#8a9e8a]"
             style={{ color: TEXT }}
           />
           <button
