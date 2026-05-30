@@ -14,7 +14,7 @@ import BottomDrawer, {
 } from "./BottomDrawer";
 import type { AmenityPOI, Campsite } from "@/types/map";
 import { BORDER, CORAL, FOREST_GREEN, SAGE, SURFACE_OVERLAY } from "@/lib/tokens";
-import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayload, type AISearchPayload } from "@/lib/searchResults";
+import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayload, type AISearchPayload, type AmenitySearchPayload } from "@/lib/searchResults";
 import type { ParsedIntent } from "@/lib/parseIntent";
 import { getRecentSearches, addRecentSearch } from "@/lib/recentSearches";
 import { QUICK_CHIPS, AMENITY_CHIPS } from "@/lib/chips";
@@ -177,7 +177,7 @@ export default function MapView() {
   // Recent searches dropdown
   const [showRecents, setShowRecents] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  // Ref to the map search input — used by "Broaden search" to refocus it
+  // Ref to the map search input — used by "Edit search" to refocus it
   const mapSearchInputRef = useRef<HTMLInputElement>(null);
   // Wraps the search pill + recents dropdown — used to detect outside clicks
   const searchPillRef = useRef<HTMLDivElement>(null);
@@ -739,7 +739,27 @@ export default function MapView() {
         const data = (await res.json()) as { error?: string };
         throw new Error(data.error ?? "Search failed");
       }
-      const data = (await res.json()) as Pick<AISearchPayload, "campsites" | "parsedIntent">;
+      const data = (await res.json()) as
+        | Pick<AISearchPayload, "campsites" | "parsedIntent">
+        | Pick<AmenitySearchPayload, "amenityPois" | "parsedIntent">;
+
+      // Amenity-only result — route returns amenityPois instead of campsites
+      if ("amenityPois" in data) {
+        addRecentSearch(q.trim());
+        amenitySearchModeRef.current = true;
+        searchModeRef.current = false;
+        setSearchAmenities(data.amenityPois);
+        setSearchResults([]);
+        setMapQuery("");
+        setActiveChip(chipKey);
+        activeChipRef.current = chipKey;
+        setSearchContextQuery(q.trim());
+        setSearchParsedIntent(data.parsedIntent);
+        setDrawerState("half");
+        drawerStateRef.current = "half";
+        return;
+      }
+
       // Pre-populate client weather cache from search response weather so
       // loadWeatherForViewport finds all campsites already cached and skips
       // the extra round-trip to /api/weather/batch.
@@ -788,6 +808,7 @@ export default function MapView() {
       } else {
         // No results — stay in browse mode but show empty state in drawer
         searchModeRef.current = false;
+        amenitySearchModeRef.current = false;
         suppressGeoFlyRef.current = false;
         setActiveChip(null);
         activeChipRef.current = null;
