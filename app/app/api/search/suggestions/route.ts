@@ -60,22 +60,26 @@ export async function GET(req: Request): Promise<Response> {
       }),
     ]);
 
-    // Resolve a representative state for each region group via a single per-region lookup.
-    // groupBy doesn't expose non-grouped columns, so we fetch one campsite per region.
-    const regions: RegionSuggestion[] = await Promise.all(
-      regionGroups.map(async (g) => {
-        const sample = await prisma.campsite.findFirst({
-          where: { region: g.region! },
-          select: { state: true },
-        });
-        return {
-          kind: "region" as const,
-          name: g.region!,
-          count: g._count.region,
-          state: sample?.state ?? "",
-        };
-      })
+    // Resolve a representative state for each region group with a single groupBy query.
+    const regionStates = await prisma.campsite.groupBy({
+      by: ["region", "state"],
+      where: {
+        syncStatus: SyncStatus.active,
+        region: { not: null, contains: q, mode: "insensitive" },
+      },
+      orderBy: { region: "asc" },
+      take: SUGGESTION_LIMIT,
+    });
+    const stateMap = new Map(
+      regionStates.map((r: { region: string | null; state: string }) => [r.region!, r.state])
     );
+
+    const regions: RegionSuggestion[] = regionGroups.map((g) => ({
+      kind: "region" as const,
+      name: g.region!,
+      count: g._count.region,
+      state: stateMap.get(g.region!) ?? "",
+    }));
 
     const campsiteSuggestions: CampsiteSuggestion[] = campsites.map((c) => ({
       kind: "campsite" as const,
