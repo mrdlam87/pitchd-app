@@ -466,24 +466,44 @@ export default function MapView() {
     setRecentSearches(getRecentSearches());
   }, []);
 
-  // Prevent the Vaul/Radix drawer container (data-vaul-drawer) from stealing keyboard
-  // focus. Radix applies focus via useLayoutEffect on mount and during certain internal
-  // state changes; the native focusin event fires before React's synthetic system, so we
-  // must use a native capture listener.
+  // Prevent Radix's FocusScope (inside Vaul's Drawer.Content) from stealing keyboard
+  // focus away from the search input.
+  //
+  // Root cause: Vaul wraps Drawer.Content in a Radix Dialog with FocusScope (trapped=true).
+  // FocusScope intercepts both the focusout (leaving the drawer) and focusin (landing on
+  // the input) events at the document bubble level and redirects focus back inside the drawer.
+  //
+  // Fix — two listeners that block both Radix mechanisms:
+  //   1. focusout capture on document: when focus is leaving a drawer element and going TO
+  //      the search input, stopPropagation() before Radix's handleFocusOut2 (bubble) sees it.
+  //   2. focusin bubble on the input element itself: stopPropagation() after React's capture
+  //      handler fires (so synthetic onFocus works) but before Radix's handleFocusIn2 (bubble)
+  //      sees it. This prevents the redirect if FocusOut2 was somehow bypassed.
+  // The vaul-div capture handler remains as a safety net for page-load steals.
   useEffect(() => {
+    const inputEl = searchInputRef.current?.inputElement();
+
+    // 1. Block Radix handleFocusOut2: focusout on a drawer element going TO our input.
+    const handleFocusout = (e: FocusEvent) => {
+      if (inputEl && e.relatedTarget === inputEl) {
+        e.stopPropagation();
+      }
+    };
+    // 2. Block Radix handleFocusIn2: focusin landing on our input.
+    //    Bubble phase fires after React's capture handler, so synthetic onFocus still works.
+    const stopFocusIn = (e: FocusEvent) => e.stopPropagation();
+    if (inputEl) {
+      inputEl.addEventListener("focusin", stopFocusIn);
+    }
+
+    // 3. Safety net: if Vaul's container div steals focus (e.g. on mount), blur it.
     const handleFocusin = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
       if (target?.dataset?.vaulDrawer !== undefined && target.tagName === "DIV") {
-        const prev = e.relatedTarget as HTMLElement | null;
         target.blur();
-        // If Radix stole focus from an input the user was actively using, give it back.
-        // relatedTarget is null on page-load steals, so this never opens the keyboard
-        // without user interaction.
-        if (prev?.tagName === "INPUT") {
-          prev.focus();
-        }
       }
     };
+
     // setTimeout(0) defers past any Vaul/Radix useEffect callbacks that run after ours.
     const tid = setTimeout(() => {
       const active = document.activeElement as HTMLElement | null;
@@ -491,10 +511,14 @@ export default function MapView() {
         active.blur();
       }
     }, 0);
+
+    document.addEventListener("focusout", handleFocusout, true);
     document.addEventListener("focusin", handleFocusin, true);
     return () => {
       clearTimeout(tid);
+      document.removeEventListener("focusout", handleFocusout, true);
       document.removeEventListener("focusin", handleFocusin, true);
+      if (inputEl) inputEl.removeEventListener("focusin", stopFocusIn);
     };
   }, []);
 
@@ -989,7 +1013,17 @@ export default function MapView() {
           ref={searchInputRef}
           variant="pill"
           value={mapQuery}
-          onChange={(v) => { setMapQuery(v); if (!v) setSearchContextQuery(null); }}
+          onChange={(v) => {
+            setMapQuery(v);
+            if (!v) setSearchContextQuery(null);
+            // Collapse drawer on first keystroke so keyboard + results are both visible.
+            // Done here (not onFocus) to avoid triggering Vaul's focus management during
+            // the drawer state change, which caused an infinite focus/blur loop.
+            if (v && drawerStateRef.current !== "peek") {
+              setDrawerState("peek");
+              drawerStateRef.current = "peek";
+            }
+          }}
           onSearch={(q) => { void handleMapSearch(q, null); }}
           onSuggestionSelect={(s: Suggestion) => {
             if (s.kind === "campsite") {
@@ -1010,14 +1044,6 @@ export default function MapView() {
           onRecentSelect={(recent) => {
             setRecentSearches(getRecentSearches());
             void handleMapSearch(recent, null);
-          }}
-          onFocus={() => {
-            // Collapse drawer when user taps the search bar so the map opens up
-            // and the keyboard doesn't fight with full/half drawer content.
-            if (drawerStateRef.current !== "peek") {
-              setDrawerState("peek");
-              drawerStateRef.current = "peek";
-            }
           }}
           loading={mapSearchLoading}
           placeholder="Site name, area, or describe your trip…"

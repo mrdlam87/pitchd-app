@@ -29,6 +29,7 @@ const MIN_QUERY_LENGTH = 2;
 
 export interface SearchInputHandle {
   focus: () => void;
+  inputElement: () => HTMLInputElement | null;
 }
 
 const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(function SearchInput({
@@ -54,6 +55,7 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
 
   useImperativeHandle(ref, () => ({
     focus: () => inputRef.current?.focus(),
+    inputElement: () => inputRef.current,
   }));
   const containerRef = useRef<HTMLDivElement>(null);
 
