@@ -746,8 +746,9 @@ export default function MapView() {
       // Amenity-only result — route returns amenityPois instead of campsites
       if ("amenityPois" in data) {
         addRecentSearch(q.trim());
-        amenitySearchModeRef.current = true;
+        amenitySearchModeRef.current = data.amenityPois.length > 0;
         searchModeRef.current = false;
+        setEmptySearchResult(false);
         setSearchAmenities(data.amenityPois);
         setSearchResults([]);
         setMapQuery("");
@@ -755,6 +756,9 @@ export default function MapView() {
         activeChipRef.current = chipKey;
         setSearchContextQuery(q.trim());
         setSearchParsedIntent(data.parsedIntent);
+        if (data.amenityPois.length === 0) {
+          setEmptySearchResult(true);
+        }
         setDrawerState("half");
         drawerStateRef.current = "half";
         return;
