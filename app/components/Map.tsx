@@ -984,7 +984,7 @@ export default function MapView() {
           ref={searchInputRef}
           variant="pill"
           value={mapQuery}
-          onChange={(v) => { setMapQuery(v); }}
+          onChange={(v) => { setMapQuery(v); if (!v) setSearchContextQuery(null); }}
           onSearch={(q) => { void handleMapSearch(q, null); }}
           onSuggestionSelect={(s: Suggestion) => {
             if (s.kind === "campsite") {
