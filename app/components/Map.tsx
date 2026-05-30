@@ -449,12 +449,13 @@ export default function MapView() {
       const target = e.target as HTMLElement;
       if (target?.dataset?.vaulDrawer !== undefined && target.tagName === "DIV") {
         target.blur();
-        // relatedTarget on focusin is the element that LOST focus to the drawer.
-        // If the search input was interrupted, restore it so the recents dropdown stays open.
-        const prev = e.relatedTarget as HTMLElement | null;
-        const input = mapSearchInputRef.current;
-        if (prev === input && input && !input.disabled) {
-          input.focus();
+        // focusin fires AFTER focusout, so if the search input just lost focus to the drawer,
+        // onBlur has already started the blurTimeoutRef. Cancel it to keep the recents dropdown
+        // visible. Calling input.focus() here would loop with Radix FocusScope's own focusin
+        // handler — cancelling the timer is sufficient.
+        if (blurTimeoutRef.current !== null) {
+          clearTimeout(blurTimeoutRef.current);
+          blurTimeoutRef.current = null;
         }
       }
     };
