@@ -2,7 +2,8 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { SEARCH_RESULTS_KEY, type AISearchPayload, type AmenitySearchPayload, type DirectFilterPayload } from "@/lib/searchResults";
+import { SEARCH_RESULTS_KEY, type AISearchPayload, type AmenitySearchPayload, type CampsiteDirectPayload, type DirectFilterPayload, type RegionPayload } from "@/lib/searchResults";
+import SearchInput, { type Suggestion } from "@/components/SearchInput";
 import { QUICK_CHIPS } from "@/lib/chips";
 
 // Cycling placeholder prompts — matches prototype EXAMPLE_PROMPTS
@@ -92,7 +93,6 @@ function ScenicPhoto() {
 export default function HomeScreen() {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [focused, setFocused] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -176,6 +176,21 @@ export default function HomeScreen() {
     }
   }
 
+  function handleSuggestionSelect(suggestion: Suggestion) {
+    if (suggestion.kind === "campsite") {
+      const payload: CampsiteDirectPayload = {
+        kind: "campsite-direct",
+        campsite: { id: suggestion.id, name: suggestion.name, lat: suggestion.lat, lng: suggestion.lng },
+      };
+      try { sessionStorage.setItem(SEARCH_RESULTS_KEY, JSON.stringify(payload)); } catch { /* storage full */ }
+      router.push("/map");
+    } else {
+      const payload: RegionPayload = { kind: "region", region: suggestion.name };
+      try { sessionStorage.setItem(SEARCH_RESULTS_KEY, JSON.stringify(payload)); } catch { /* storage full */ }
+      router.push("/map");
+    }
+  }
+
   // Chips with a filterKey skip AI entirely — write a DirectFilterPayload and navigate.
   function handleDirectFilter(filterKey: string, chipKey: string) {
     const payload: DirectFilterPayload = {
@@ -229,46 +244,15 @@ export default function HomeScreen() {
       {/* Search card */}
       <div className="relative z-10 -mt-2 px-4">
         <div className="mb-4 rounded-[20px] bg-white p-4 shadow-[0_4px_24px_rgba(45,74,45,0.15)]">
-          {/* Textarea */}
-          <div
-            className="relative mb-2.5 rounded-xl border bg-[#faf8f4] transition-colors duration-200"
-            style={{ borderColor: focused ? "#2d4a2d" : "#e0dbd0" }}
-          >
-            <textarea
+          <div className="mb-2.5">
+            <SearchInput
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  void handleSearch(query);
-                }
-              }}
-              rows={3}
+              onChange={setQuery}
+              onSearch={(q) => void handleSearch(q)}
+              onSuggestionSelect={handleSuggestionSelect}
               placeholder={EXAMPLE_PROMPTS[promptIdx]}
-              disabled={loading}
-              className="block w-full resize-none bg-transparent pb-10 pl-3.5 pr-3.5 pt-3.5 text-sm leading-[1.55] text-[#1a2e1a] outline-none placeholder:text-[#8a9e8a] disabled:opacity-60"
+              loading={loading}
             />
-
-            {/* Bottom bar inside textarea */}
-            <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between">
-              <span className="text-[10px] text-[#8a9e8a]">Try: &quot;not raining this weekend&quot;</span>
-              <button
-                onClick={() => void handleSearch(query)}
-                disabled={!query.trim() || loading}
-                className={`flex min-w-[60px] items-center justify-center gap-1.5 rounded-[10px] px-4 py-1.5 text-xs font-bold transition-colors duration-150 disabled:cursor-not-allowed ${query.trim() ? "bg-[#e8674a] text-white" : "bg-[#e8ddd4] text-[#8a9e8a]"}`}
-              >
-                {loading ? (
-                  <>
-                    <span className="inline-block h-[11px] w-[11px] animate-spin rounded-full border-2 border-white/35 border-t-white" />
-                    <span>Pitching</span>
-                  </>
-                ) : (
-                  "Pitch"
-                )}
-              </button>
-            </div>
           </div>
 
           {/* Quick filter chips */}
