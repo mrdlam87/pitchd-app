@@ -20,6 +20,8 @@ interface SearchInputProps {
   variant?: "default" | "pill";
   /** Slot rendered inside the pill after the submit button (e.g. divider + Filters button). */
   pillTrailing?: React.ReactNode;
+  onFocus?: () => void;
+  onBlur?: () => void;
 }
 
 const DEBOUNCE_MS = 300;
@@ -40,6 +42,8 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
   loading = false,
   variant = "default",
   pillTrailing,
+  onFocus: onFocusProp,
+  onBlur: onBlurProp,
 }, ref) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -98,10 +102,29 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  function handleFocus() {
+  function openRecentsIfEligible() {
     if (!showSuggestions && value.trim().length < MIN_QUERY_LENGTH && recentSearches?.length) {
       setShowRecents(true);
     }
+  }
+
+  function handleFocus(e: React.FocusEvent<HTMLInputElement>) {
+    onFocusProp?.();
+    // Only open recents on genuine user focus (keyboard Tab, touch-tap from unfocused).
+    // Programmatic .focus() calls (e.g. Vaul focus-restore) have isTrusted=false and
+    // should not show the dropdown.
+    if (e.nativeEvent.isTrusted) {
+      openRecentsIfEligible();
+    }
+  }
+
+  function handleInputClick() {
+    // Covers the case where the input is already focused (no focus event fires on click).
+    openRecentsIfEligible();
+  }
+
+  function handleBlur() {
+    onBlurProp?.();
   }
 
   function handleChange(v: string) {
@@ -188,6 +211,8 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
               value={value}
               onChange={(e) => handleChange(e.target.value)}
               onFocus={handleFocus}
+              onClick={handleInputClick}
+              onBlur={handleBlur}
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
               disabled={loading}
@@ -228,6 +253,8 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
             value={value}
             onChange={(e) => handleChange(e.target.value)}
             onFocus={handleFocus}
+            onClick={handleInputClick}
+            onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             disabled={loading}

@@ -475,7 +475,7 @@ export default function MapView() {
       const target = e.target as HTMLElement;
       if (target?.dataset?.vaulDrawer !== undefined && target.tagName === "DIV") {
         target.blur();
-        // Restore focus to the search input so keystrokes still land there
+        // Restore focus to the search input so keystrokes still land there.
         searchInputRef.current?.focus();
       }
     };
