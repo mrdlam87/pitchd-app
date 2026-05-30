@@ -179,7 +179,9 @@ export default function MapView() {
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   // Ref to the map search input — used by "Broaden search" to refocus it
   const mapSearchInputRef = useRef<HTMLInputElement>(null);
-  // Blur timeout ref — delays dropdown dismissal so clicks on items register
+  // Wraps the search pill + recents dropdown — used to detect outside clicks
+  const searchPillRef = useRef<HTMLDivElement>(null);
+  // Blur timeout ref — keyboard-only fallback to close the recents dropdown
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mapSearchLoading, setMapSearchLoading] = useState(false);
   const [mapSearchError, setMapSearchError] = useState<string | null>(null);
@@ -449,13 +451,11 @@ export default function MapView() {
       const target = e.target as HTMLElement;
       if (target?.dataset?.vaulDrawer !== undefined && target.tagName === "DIV") {
         target.blur();
-        // focusin fires AFTER focusout. If the input just lost focus to the drawer, onBlur
-        // has already started the 150ms close timer. Replace it with a longer one — the drawer
-        // steal is transient (we blurred it above), so we give focus 400ms to settle back to
-        // the input. If nothing re-focuses the input within that window, the dropdown closes.
+        // Cancel the blur timer that fired when focus left the input — the steal is
+        // transient and the pointerdown-outside handler is responsible for closing recents.
         if (blurTimeoutRef.current !== null) {
           clearTimeout(blurTimeoutRef.current);
-          blurTimeoutRef.current = setTimeout(() => setShowRecents(false), 400);
+          blurTimeoutRef.current = null;
         }
       }
     };
@@ -472,6 +472,24 @@ export default function MapView() {
       document.removeEventListener("focusin", handleFocusin, true);
     };
   }, []);
+
+  // Close the recents dropdown on pointerdown outside the search pill.
+  // This is the primary close mechanism — more robust than blur/focus timers
+  // because it is immune to Vaul's focus management and mobile keyboard timing.
+  useEffect(() => {
+    if (!showRecents) return;
+    const handlePointerDown = (e: PointerEvent) => {
+      if (!searchPillRef.current?.contains(e.target as Node)) {
+        setShowRecents(false);
+        if (blurTimeoutRef.current !== null) {
+          clearTimeout(blurTimeoutRef.current);
+          blurTimeoutRef.current = null;
+        }
+      }
+    };
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    return () => document.removeEventListener("pointerdown", handlePointerDown, true);
+  }, [showRecents]);
 
   useEffect(() => {
     activeFiltersRef.current = activeFilters;
@@ -883,7 +901,7 @@ export default function MapView() {
       {/* Floating search bar + quick chips — z-[60] must exceed drawer (z-50) */}
       <div className="absolute top-3 left-3 right-3 z-[60] flex flex-col gap-2">
         {/* Search pill — relative wrapper enables the recents dropdown */}
-        <div className="relative">
+        <div className="relative" ref={searchPillRef}>
           <div className="flex items-center gap-2 rounded-full border border-[#e0dbd0] bg-white px-4 py-2.5 font-[family-name:var(--font-dm-sans)] shadow-md">
             <div className="min-w-0 flex-1">
               <input
@@ -892,8 +910,6 @@ export default function MapView() {
                 onChange={(e) => { setMapQuery(e.target.value); setShowRecents(false); }}
                 onKeyDown={(e) => { if (e.key === "Enter") { setShowRecents(false); void handleMapSearch(mapQuery, null); } }}
                 onFocus={() => {
-                  // Cancel any pending blur timer — focus may have briefly bounced
-                  // off the input (e.g. Vaul stealing and releasing it) before returning.
                   if (blurTimeoutRef.current !== null) {
                     clearTimeout(blurTimeoutRef.current);
                     blurTimeoutRef.current = null;
@@ -903,7 +919,14 @@ export default function MapView() {
                     if (recents.length > 0) { setRecentSearches(recents); setShowRecents(true); }
                   }
                 }}
-                onBlur={() => { blurTimeoutRef.current = setTimeout(() => setShowRecents(false), 150); }}
+                onBlur={(e) => {
+                  // If focus moved to the Vaul drawer container (transient focus steal),
+                  // don't close — the pointerdown-outside listener handles actual dismissal.
+                  const rt = e.relatedTarget as HTMLElement | null;
+                  if (rt?.dataset?.vaulDrawer !== undefined) return;
+                  // Keyboard-only fallback: close recents when focus leaves via Tab/click-away.
+                  blurTimeoutRef.current = setTimeout(() => setShowRecents(false), 200);
+                }}
                 placeholder="Site name, area, or describe your trip…"
                 disabled={mapSearchLoading}
                 className="w-full bg-transparent text-sm text-[#1a2e1a] outline-none placeholder:text-[#8a9e8a] disabled:opacity-60"
@@ -961,8 +984,7 @@ export default function MapView() {
                   key={recent}
                   type="button"
                   onMouseDown={(e) => {
-                    e.preventDefault();
-                    if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
+                    e.preventDefault(); // keep input focused
                     setShowRecents(false);
                     void handleMapSearch(recent, null);
                   }}
