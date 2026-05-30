@@ -975,47 +975,48 @@ export default function MapView() {
 
       {/* Floating search bar + quick chips — z-[60] must exceed drawer (z-50) */}
       <div className="absolute top-3 left-3 right-3 z-[60] flex flex-col gap-2">
-        {/* Search bar — SearchInput handles suggestions, recents, and submission */}
-        <div className="flex items-center gap-2">
-          <div className="min-w-0 flex-1">
-            <SearchInput
-              value={mapQuery}
-              onChange={(v) => { setMapQuery(v); }}
-              onSearch={(q) => { void handleMapSearch(q, null); }}
-              onSuggestionSelect={(s: Suggestion) => {
-                if (s.kind === "campsite") {
-                  setSearchResults([{ id: s.id, name: s.name, lat: s.lat, lng: s.lng, region: null, blurb: null, amenities: [], weather: null }]);
-                  mapRef.current?.getMap().flyTo({ center: [s.lng, s.lat], zoom: 14, duration: 800 });
-                  setDrawerState("peek");
-                  drawerStateRef.current = "peek";
-                  searchModeRef.current = true;
-                  suppressGeoFlyRef.current = true;
-                  setSearchContextQuery(s.name);
-                } else {
-                  void fetchRegionCampsites(s.name);
-                }
-                setGoodWeatherOnly(false);
-                setMapQuery(s.name);
-              }}
-              recentSearches={recentSearches}
-              onRecentSelect={(recent) => {
-                setRecentSearches(getRecentSearches());
-                void handleMapSearch(recent, null);
-              }}
-              loading={mapSearchLoading}
-              placeholder="Search map…"
-            />
-          </div>
-          {/* Filters button */}
-          <button
-            type="button"
-            onClick={() => setShowFilters(true)}
-            aria-label={`Filters${filterCount > 0 ? ` (${filterCount} active)` : ""}`}
-            className="shrink-0 rounded-full border border-[#e0dbd0] bg-white px-3 py-2 text-xs font-bold text-[#e8674a] font-[family-name:var(--font-dm-sans)] shadow-md"
-          >
-            Filters{filterCount > 0 ? ` (${filterCount})` : ""}
-          </button>
-        </div>
+        {/* Search bar — pill variant restores original map styling */}
+        <SearchInput
+          variant="pill"
+          value={mapQuery}
+          onChange={(v) => { setMapQuery(v); }}
+          onSearch={(q) => { void handleMapSearch(q, null); }}
+          onSuggestionSelect={(s: Suggestion) => {
+            if (s.kind === "campsite") {
+              setSearchResults([{ id: s.id, name: s.name, lat: s.lat, lng: s.lng, region: null, blurb: null, amenities: [], weather: null }]);
+              mapRef.current?.getMap().flyTo({ center: [s.lng, s.lat], zoom: 14, duration: 800 });
+              setDrawerState("peek");
+              drawerStateRef.current = "peek";
+              searchModeRef.current = true;
+              suppressGeoFlyRef.current = true;
+              setSearchContextQuery(s.name);
+            } else {
+              void fetchRegionCampsites(s.name);
+            }
+            setGoodWeatherOnly(false);
+            setMapQuery(s.name);
+          }}
+          recentSearches={recentSearches}
+          onRecentSelect={(recent) => {
+            setRecentSearches(getRecentSearches());
+            void handleMapSearch(recent, null);
+          }}
+          loading={mapSearchLoading}
+          placeholder="Site name, area, or describe your trip…"
+          pillTrailing={
+            <>
+              <div className="h-4 w-px shrink-0 bg-[#e0dbd0]" />
+              <button
+                type="button"
+                onClick={() => setShowFilters(true)}
+                aria-label={`Filters${filterCount > 0 ? ` (${filterCount} active)` : ""}`}
+                className="shrink-0 text-xs font-bold text-[#e8674a]"
+              >
+                Filters{filterCount > 0 ? ` (${filterCount})` : ""}
+              </button>
+            </>
+          }
+        />
         {/* Search context label — shown below search bar when in AI search mode */}
         {searchContextQuery && !mapQuery && (
           <div className="flex items-center gap-1.5 px-1">

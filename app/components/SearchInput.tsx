@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type { Suggestion } from "@/app/api/search/suggestions/route";
 import { BORDER, CORAL, FOREST_GREEN, SAGE, TEXT, TEXT_MUTED } from "@/lib/tokens";
 
@@ -15,6 +15,11 @@ interface SearchInputProps {
   onRecentSelect?: (query: string) => void;
   placeholder?: string;
   loading?: boolean;
+  /** "pill" renders the original map search bar style (white rounded-full, circular icon button).
+   *  "default" renders the HomeScreen card style (bordered rounded-xl, "Pitch" button). */
+  variant?: "default" | "pill";
+  /** Slot rendered inside the pill after the submit button (e.g. divider + Filters button). */
+  pillTrailing?: React.ReactNode;
 }
 
 const DEBOUNCE_MS = 300;
@@ -29,6 +34,8 @@ export default function SearchInput({
   onRecentSelect,
   placeholder = "Search campsites…",
   loading = false,
+  variant = "default",
+  pillTrailing,
 }: SearchInputProps) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -157,43 +164,83 @@ export default function SearchInput({
   }
 
   const focused = showSuggestions || showRecents;
+  const isPill = variant === "pill";
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative font-[family-name:var(--font-dm-sans)]">
       {/* Input row */}
-      <div
-        className="flex items-center gap-2 rounded-xl border bg-[#faf8f4] px-3 py-2.5 transition-colors duration-200"
-        style={{ borderColor: focused || value ? FOREST_GREEN : BORDER }}
-      >
-        <span className="shrink-0 text-sm" style={{ color: SAGE }}>🔍</span>
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => handleChange(e.target.value)}
-          onFocus={handleFocus}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          disabled={loading}
-          className="min-w-0 flex-1 bg-transparent text-sm outline-none disabled:opacity-60 [&::placeholder]:text-[var(--text-muted)]"
-          style={{ color: TEXT }}
-        />
-        <button
-          onClick={handleSubmit}
-          disabled={!value.trim() || loading}
-          className="flex shrink-0 min-w-[56px] items-center justify-center gap-1.5 rounded-[8px] px-3 py-1.5 text-xs font-bold transition-colors disabled:cursor-not-allowed"
-          style={
-            value.trim()
-              ? { backgroundColor: CORAL, color: "white" }
-              : { backgroundColor: "#e8ddd4", color: TEXT_MUTED }
-          }
+      {isPill ? (
+        // Pill variant — original map search bar style
+        <div className="flex items-center gap-2 rounded-full border border-[#e0dbd0] bg-white px-4 py-2.5 shadow-md">
+          <div className="min-w-0 flex-1">
+            <input
+              type="text"
+              value={value}
+              onChange={(e) => handleChange(e.target.value)}
+              onFocus={handleFocus}
+              onKeyDown={handleKeyDown}
+              placeholder={placeholder}
+              disabled={loading}
+              className="w-full bg-transparent text-sm outline-none disabled:opacity-60 [&::placeholder]:text-[var(--text-muted)]"
+              style={{ color: TEXT }}
+            />
+          </div>
+          {/* Circular search icon button */}
+          <button
+            onClick={handleSubmit}
+            disabled={!value.trim() || loading}
+            aria-label="Search"
+            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40 ${
+              value.trim() ? "bg-[#e8674a]" : "bg-[#e8f0e8]"
+            }`}
+          >
+            {loading ? (
+              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+            ) : (
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                <circle cx="7" cy="7" r="5" stroke={value.trim() ? "#fff" : "#5a7a5a"} strokeWidth="1.8" />
+                <path d="M11 11l3 3" stroke={value.trim() ? "#fff" : "#5a7a5a"} strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            )}
+          </button>
+          {pillTrailing}
+        </div>
+      ) : (
+        // Default variant — HomeScreen card style
+        <div
+          className="flex items-center gap-2 rounded-xl border bg-[#faf8f4] px-3 py-2.5 transition-colors duration-200"
+          style={{ borderColor: focused || value ? FOREST_GREEN : BORDER }}
         >
-          {loading ? (
-            <span className="inline-block h-[11px] w-[11px] animate-spin rounded-full border-2 border-white/35 border-t-white" />
-          ) : (
-            "Pitch"
-          )}
-        </button>
-      </div>
+          <span className="shrink-0 text-sm" style={{ color: SAGE }}>🔍</span>
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => handleChange(e.target.value)}
+            onFocus={handleFocus}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            disabled={loading}
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none disabled:opacity-60 [&::placeholder]:text-[var(--text-muted)]"
+            style={{ color: TEXT }}
+          />
+          <button
+            onClick={handleSubmit}
+            disabled={!value.trim() || loading}
+            className="flex shrink-0 min-w-[56px] items-center justify-center gap-1.5 rounded-[8px] px-3 py-1.5 text-xs font-bold transition-colors disabled:cursor-not-allowed"
+            style={
+              value.trim()
+                ? { backgroundColor: CORAL, color: "white" }
+                : { backgroundColor: "#e8ddd4", color: TEXT_MUTED }
+            }
+          >
+            {loading ? (
+              <span className="inline-block h-[11px] w-[11px] animate-spin rounded-full border-2 border-white/35 border-t-white" />
+            ) : (
+              "Pitch"
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Suggestions dropdown */}
       {showSuggestions && suggestions.length > 0 && (
