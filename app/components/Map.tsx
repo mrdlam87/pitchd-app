@@ -466,15 +466,6 @@ export default function MapView() {
     setRecentSearches(getRecentSearches());
   }, []);
 
-  // Resize the Mapbox canvas when the visual viewport changes (e.g. mobile keyboard opens/closes).
-  // Without this, the map goes blank after the keyboard dismisses because the canvas dimensions
-  // no longer match the container.
-  useEffect(() => {
-    const handleViewportResize = () => { mapRef.current?.getMap().resize(); };
-    window.visualViewport?.addEventListener("resize", handleViewportResize);
-    return () => window.visualViewport?.removeEventListener("resize", handleViewportResize);
-  }, []);
-
   // Prevent the Vaul/Radix drawer container (data-vaul-drawer) from stealing keyboard
   // focus. Radix applies focus via useLayoutEffect on mount and during certain internal
   // state changes; the native focusin event fires before React's synthetic system, so we
@@ -484,8 +475,8 @@ export default function MapView() {
       const target = e.target as HTMLElement;
       if (target?.dataset?.vaulDrawer !== undefined && target.tagName === "DIV") {
         target.blur();
-        // Restore focus to the search input so keystrokes still land there.
-        searchInputRef.current?.focus();
+        // Do NOT refocus the search input here — doing so opens the mobile keyboard
+        // on page load when Radix initialises focus on the drawer container.
       }
     };
     // setTimeout(0) defers past any Vaul/Radix useEffect callbacks that run after ours.
