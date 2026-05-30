@@ -174,7 +174,7 @@ export default function SearchInput({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={loading}
-          className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#8a9e8a] disabled:opacity-60"
+          className="min-w-0 flex-1 bg-transparent text-sm outline-none disabled:opacity-60 [&::placeholder]:text-[var(--text-muted)]"
           style={{ color: TEXT }}
         />
         <button
@@ -233,7 +233,9 @@ export default function SearchInput({
                 setShowRecents(false);
                 onRecentSelect?.(recent);
               }}
-              className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-[#f7f5f0] ${
+              className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
+                i === highlightedIdx ? "bg-[#f0f5f0]" : "hover:bg-[#f7f5f0]"
+              } ${
                 i < recentSearches.length - 1 ? "border-b border-[#f0ede8]" : ""
               }`}
               style={{ color: TEXT }}
