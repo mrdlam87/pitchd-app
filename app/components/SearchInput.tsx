@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Suggestion } from "@/app/api/search/suggestions/route";
+import { BORDER, CORAL, FOREST_GREEN, SAGE, TEXT, TEXT_MUTED } from "@/lib/tokens";
 
 export type { Suggestion };
 
@@ -82,7 +83,7 @@ export default function SearchInput({
   }, []);
 
   function handleFocus() {
-    if (value.trim().length < MIN_QUERY_LENGTH && recentSearches?.length) {
+    if (!showSuggestions && value.trim().length < MIN_QUERY_LENGTH && recentSearches?.length) {
       setShowRecents(true);
     }
   }
@@ -98,14 +99,16 @@ export default function SearchInput({
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    const activeDropdown = showSuggestions ? suggestions : [];
+    const isShowingRecents = showRecents && !showSuggestions;
+    const activeList = isShowingRecents ? (recentSearches ?? []) : suggestions;
+
     if (!showSuggestions && !showRecents) {
       if (e.key === "Enter") { e.preventDefault(); handleSubmit(); }
       return;
     }
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setHighlightedIdx((i) => Math.min(i + 1, activeDropdown.length - 1));
+      setHighlightedIdx((i) => Math.min(i + 1, activeList.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setHighlightedIdx((i) => Math.max(i - 1, -1));
@@ -115,8 +118,15 @@ export default function SearchInput({
       setHighlightedIdx(-1);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (showSuggestions && highlightedIdx >= 0) {
-        selectSuggestion(suggestions[highlightedIdx]);
+      if (highlightedIdx >= 0) {
+        if (isShowingRecents) {
+          const recent = activeList[highlightedIdx] as string;
+          setShowRecents(false);
+          setHighlightedIdx(-1);
+          onRecentSelect?.(recent);
+        } else {
+          selectSuggestion(suggestions[highlightedIdx]);
+        }
       } else {
         handleSubmit();
       }
@@ -153,9 +163,9 @@ export default function SearchInput({
       {/* Input row */}
       <div
         className="flex items-center gap-2 rounded-xl border bg-[#faf8f4] px-3 py-2.5 transition-colors duration-200"
-        style={{ borderColor: focused || value ? "#2d4a2d" : "#e0dbd0" }}
+        style={{ borderColor: focused || value ? FOREST_GREEN : BORDER }}
       >
-        <span className="shrink-0 text-sm text-[#5a7a5a]">🔍</span>
+        <span className="shrink-0 text-sm" style={{ color: SAGE }}>🔍</span>
         <input
           type="text"
           value={value}
@@ -164,14 +174,18 @@ export default function SearchInput({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={loading}
-          className="min-w-0 flex-1 bg-transparent text-sm text-[#1a2e1a] outline-none placeholder:text-[#8a9e8a] disabled:opacity-60"
+          className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#8a9e8a] disabled:opacity-60"
+          style={{ color: TEXT }}
         />
         <button
           onClick={handleSubmit}
           disabled={!value.trim() || loading}
-          className={`flex shrink-0 min-w-[56px] items-center justify-center gap-1.5 rounded-[8px] px-3 py-1.5 text-xs font-bold transition-colors disabled:cursor-not-allowed ${
-            value.trim() ? "bg-[#e8674a] text-white" : "bg-[#e8ddd4] text-[#8a9e8a]"
-          }`}
+          className="flex shrink-0 min-w-[56px] items-center justify-center gap-1.5 rounded-[8px] px-3 py-1.5 text-xs font-bold transition-colors disabled:cursor-not-allowed"
+          style={
+            value.trim()
+              ? { backgroundColor: CORAL, color: "white" }
+              : { backgroundColor: "#e8ddd4", color: TEXT_MUTED }
+          }
         >
           {loading ? (
             <span className="inline-block h-[11px] w-[11px] animate-spin rounded-full border-2 border-white/35 border-t-white" />
@@ -183,7 +197,7 @@ export default function SearchInput({
 
       {/* Suggestions dropdown */}
       {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-2xl border border-[#e0dbd0] bg-white shadow-[0_8px_24px_rgba(45,74,45,0.12)]">
+        <div className="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-2xl border bg-white shadow-[0_8px_24px_rgba(45,74,45,0.12)]" style={{ borderColor: BORDER }}>
           {suggestions.map((s, i) => (
             <button
               key={s.kind === "campsite" ? s.id : `region-${s.name}`}
@@ -194,10 +208,10 @@ export default function SearchInput({
             >
               <span className="text-base">{s.kind === "campsite" ? "⛺" : "📍"}</span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13px] font-semibold text-[#1a2e1a]">
+                <span className="block truncate text-[13px] font-semibold" style={{ color: TEXT }}>
                   {s.name}
                 </span>
-                <span className="block truncate text-[11px] text-[#5a7a5a]">
+                <span className="block truncate text-[11px]" style={{ color: SAGE }}>
                   {s.kind === "campsite"
                     ? [s.region, s.state].filter(Boolean).join(", ")
                     : `Region · ${s.state} · ${s.count} campsite${s.count === 1 ? "" : "s"}`}
@@ -210,7 +224,7 @@ export default function SearchInput({
 
       {/* Recents dropdown (map bar only — shown when input is empty/short) */}
       {showRecents && !showSuggestions && recentSearches && recentSearches.length > 0 && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-2xl border border-[#e0dbd0] bg-white shadow-[0_8px_24px_rgba(45,74,45,0.12)]">
+        <div className="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-2xl border bg-white shadow-[0_8px_24px_rgba(45,74,45,0.12)]" style={{ borderColor: BORDER }}>
           {recentSearches.map((recent, i) => (
             <button
               key={recent}
@@ -219,11 +233,12 @@ export default function SearchInput({
                 setShowRecents(false);
                 onRecentSelect?.(recent);
               }}
-              className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-[#1a2e1a] transition-colors hover:bg-[#f7f5f0] ${
+              className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-[#f7f5f0] ${
                 i < recentSearches.length - 1 ? "border-b border-[#f0ede8]" : ""
               }`}
+              style={{ color: TEXT }}
             >
-              <span className="text-[#5a7a5a]">🕐</span>
+              <span style={{ color: SAGE }}>🕐</span>
               <span className="flex-1 truncate">{recent}</span>
             </button>
           ))}
