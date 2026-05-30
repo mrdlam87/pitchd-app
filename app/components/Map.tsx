@@ -791,6 +791,9 @@ export default function MapView() {
   // Inline NL search — stays on the map, replaces results without navigating home.
   async function handleMapSearch(q: string, chipKey: string | null = null) {
     if (!q.trim() || mapSearchLoading) return;
+    // Sync the search bar to whatever query is being run — chip searches populate the bar
+    // so the user always knows what was searched (mirrors HomeScreen → Map behaviour).
+    setMapQuery(q);
     setMapSearchLoading(true);
     setMapSearchError(null);
     setEmptySearchResult(false);
