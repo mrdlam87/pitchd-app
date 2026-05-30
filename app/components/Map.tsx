@@ -795,12 +795,10 @@ export default function MapView() {
     setMapSearchError(null);
     setEmptySearchResult(false);
     setGoodWeatherOnly(false);
-    // Highlight the chip immediately so it reflects the pending search state.
-    // Reverted to null in the catch block (error) or the no-results branch.
-    if (chipKey !== null) {
-      setActiveChip(chipKey);
-      activeChipRef.current = chipKey;
-    }
+    // For chip searches, highlight immediately. For bar searches (chipKey=null),
+    // clear any previously active chip — bar searches don't represent a chip selection.
+    setActiveChip(chipKey);
+    activeChipRef.current = chipKey;
     // Use the current map centre as the search origin so chip searches stay in the
     // area you're viewing — not the user's GPS location which may be far away.
     const mapCenter = mapRef.current?.getMap().getCenter();
@@ -859,8 +857,8 @@ export default function MapView() {
         setDrawerState("half");
         drawerStateRef.current = "half";
         searchModeRef.current = true;
-        setActiveChip(chipKey ?? "pitchd");
-        activeChipRef.current = chipKey ?? "pitchd";
+        setActiveChip(chipKey);
+        activeChipRef.current = chipKey;
         setSearchParsedIntent(data.parsedIntent);
         setAiSyncedActivities(data.parsedIntent.amenities);
         // Intentionally replace activities (not merge) — the new query redefines
@@ -1061,14 +1059,6 @@ export default function MapView() {
             </>
           }
         />
-        {/* Search context label — shows the AI-interpreted intent below the bar */}
-        {searchContextQuery && searchParsedIntent && buildContextLabel(searchParsedIntent) && (
-          <div className="flex items-center gap-1.5 px-1">
-            <span className="truncate text-xs text-[#8a9e8a]">
-              {buildContextLabel(searchParsedIntent)}
-            </span>
-          </div>
-        )}
 
         {/* Search error */}
         {mapSearchError && (
@@ -1120,7 +1110,9 @@ export default function MapView() {
             // AI chips have no filterKey and are kind="quick" — only they trigger mapSearchLoading.
             // weatherFilter and freeFilter are not AI chips.
             const isAiChip = chip.kind === "quick" && filterKey === null && !isWeatherChip && !isFreeChip;
-            const isDisabled = isAiChip && mapSearchLoading;
+            // Only disable the chip that triggered the current load, not all AI chips.
+            // Bar searches (no activeChip) never disable any chip.
+            const isDisabled = isAiChip && mapSearchLoading && activeChip === chip.key;
             return (
               <button
                 key={chip.key}
