@@ -21,7 +21,7 @@ import { QUICK_CHIPS, AMENITY_CHIPS } from "@/lib/chips";
 import { CampsitePin } from "./CampsitePin";
 import { AmenityPin, type AmenityPinMeta } from "./AmenityPin";
 import { useMapData } from "@/hooks/useMapData";
-import SearchInput from "@/components/SearchInput";
+import SearchInput, { type SearchInputHandle } from "@/components/SearchInput";
 import type { Suggestion } from "@/components/SearchInput";
 import { weatherScore } from "@/lib/weatherScore";
 
@@ -179,6 +179,8 @@ export default function MapView() {
   );
   // Recent searches — loaded on mount and refreshed after each search for the SearchInput dropdown
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  // Ref to the SearchInput — used to restore focus after Vaul steals it
+  const searchInputRef = useRef<SearchInputHandle>(null);
   // Blur timeout ref — used in cleanup to cancel any pending blur timer
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mapSearchLoading, setMapSearchLoading] = useState(false);
@@ -473,6 +475,8 @@ export default function MapView() {
       const target = e.target as HTMLElement;
       if (target?.dataset?.vaulDrawer !== undefined && target.tagName === "DIV") {
         target.blur();
+        // Restore focus to the search input so keystrokes still land there
+        searchInputRef.current?.focus();
       }
     };
     // setTimeout(0) defers past any Vaul/Radix useEffect callbacks that run after ours.
@@ -977,6 +981,7 @@ export default function MapView() {
       <div className="absolute top-3 left-3 right-3 z-[60] flex flex-col gap-2">
         {/* Search bar — pill variant restores original map styling */}
         <SearchInput
+          ref={searchInputRef}
           variant="pill"
           value={mapQuery}
           onChange={(v) => { setMapQuery(v); }}

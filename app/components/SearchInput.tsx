@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { Suggestion } from "@/app/api/search/suggestions/route";
 import { BORDER, CORAL, FOREST_GREEN, SAGE, TEXT, TEXT_MUTED } from "@/lib/tokens";
 
@@ -25,7 +25,11 @@ interface SearchInputProps {
 const DEBOUNCE_MS = 300;
 const MIN_QUERY_LENGTH = 2;
 
-export default function SearchInput({
+export interface SearchInputHandle {
+  focus: () => void;
+}
+
+const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(function SearchInput({
   value,
   onChange,
   onSearch,
@@ -36,12 +40,17 @@ export default function SearchInput({
   loading = false,
   variant = "default",
   pillTrailing,
-}: SearchInputProps) {
+}, ref) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showRecents, setShowRecents] = useState(false);
   const [highlightedIdx, setHighlightedIdx] = useState(-1);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    focus: () => inputRef.current?.focus(),
+  }));
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Debounced suggestions fetch
@@ -174,6 +183,7 @@ export default function SearchInput({
         <div className="flex items-center gap-2 rounded-full border border-[#e0dbd0] bg-white px-4 py-2.5 shadow-md">
           <div className="min-w-0 flex-1">
             <input
+              ref={inputRef}
               type="text"
               value={value}
               onChange={(e) => handleChange(e.target.value)}
@@ -213,6 +223,7 @@ export default function SearchInput({
         >
           <span className="shrink-0 text-sm" style={{ color: SAGE }}>🔍</span>
           <input
+            ref={inputRef}
             type="text"
             value={value}
             onChange={(e) => handleChange(e.target.value)}
@@ -295,4 +306,7 @@ export default function SearchInput({
       )}
     </div>
   );
-}
+});
+
+SearchInput.displayName = "SearchInput";
+export default SearchInput;
