@@ -474,9 +474,14 @@ export default function MapView() {
     const handleFocusin = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
       if (target?.dataset?.vaulDrawer !== undefined && target.tagName === "DIV") {
+        const prev = e.relatedTarget as HTMLElement | null;
         target.blur();
-        // Do NOT refocus the search input here — doing so opens the mobile keyboard
-        // on page load when Radix initialises focus on the drawer container.
+        // If Radix stole focus from an input the user was actively using, give it back.
+        // relatedTarget is null on page-load steals, so this never opens the keyboard
+        // without user interaction.
+        if (prev?.tagName === "INPUT") {
+          prev.focus();
+        }
       }
     };
     // setTimeout(0) defers past any Vaul/Radix useEffect callbacks that run after ours.
