@@ -748,7 +748,7 @@ export default function MapView() {
         addRecentSearch(q.trim());
         amenitySearchModeRef.current = data.amenityPois.length > 0;
         searchModeRef.current = false;
-        setEmptySearchResult(false);
+        setEmptySearchResult(data.amenityPois.length === 0);
         setSearchAmenities(data.amenityPois);
         setSearchResults([]);
         setMapQuery("");
@@ -756,9 +756,6 @@ export default function MapView() {
         activeChipRef.current = chipKey;
         setSearchContextQuery(q.trim());
         setSearchParsedIntent(data.parsedIntent);
-        if (data.amenityPois.length === 0) {
-          setEmptySearchResult(true);
-        }
         setDrawerState("half");
         drawerStateRef.current = "half";
         return;
@@ -816,6 +813,7 @@ export default function MapView() {
         suppressGeoFlyRef.current = false;
         setActiveChip(null);
         activeChipRef.current = null;
+        setSearchAmenities([]);
         setSearchContextQuery(q.trim());
         setSearchParsedIntent(data.parsedIntent);
         setEmptySearchResult(true);
