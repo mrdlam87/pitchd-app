@@ -410,7 +410,6 @@ function EmptySearchState({
       className="rounded-2xl p-4 text-center"
       style={{ background: SURFACE, border: `1.5px solid ${BORDER}`, boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}
     >
-      <div className="text-2xl mb-2">🏕️</div>
       <div className="text-sm font-semibold mb-1 font-[family-name:var(--font-dm-sans)]" style={{ color: FOREST_GREEN }}>
         No campsites found{location ? ` near ${location}` : ""}
       </div>
@@ -425,7 +424,7 @@ function EmptySearchState({
             className="rounded-full border border-[#e0dbd0] bg-white px-4 py-2 text-xs font-semibold font-[family-name:var(--font-dm-sans)] transition-colors hover:border-[#2d4a2d]"
             style={{ color: FOREST_GREEN }}
           >
-            Broaden search
+            Edit search
           </button>
         )}
         {onClearSearch && (
@@ -562,7 +561,7 @@ export default function BottomDrawer({
     : null;
 
   // Show empty state when the last search returned 0 results and we're not fetching
-  const showEmptyState = isEmpty && !isFetching && campsites.length === 0 && selectedPoi === null;
+  const showEmptyState = isEmpty && !isFetching && campsites.length === 0 && amenityPois.length === 0 && selectedPoi === null;
 
 
   const resultLabel =

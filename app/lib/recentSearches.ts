@@ -14,6 +14,7 @@ export function getRecentSearches(): string[] {
 }
 
 export function addRecentSearch(query: string): void {
+  if (query.length > 200) return;
   try {
     const current = getRecentSearches();
     const deduped = [query, ...current.filter((s) => s !== query)].slice(0, MAX);
