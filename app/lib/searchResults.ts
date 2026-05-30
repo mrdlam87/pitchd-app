@@ -62,6 +62,10 @@ export function parseSearchResultsPayload(parsed: unknown): SearchResultsPayload
     if (!pois.every((p) => p !== null && typeof (p as Record<string, unknown>).lat === "number" && typeof (p as Record<string, unknown>).lng === "number")) {
       return null;
     }
+    if (typeof obj.query !== "string") return null;
+    const pi = (obj.parsedIntent ?? {}) as Record<string, unknown>;
+    if (!Array.isArray(pi.amenities)) return null;
+    if (!(pi.amenities as unknown[]).every((a: unknown) => typeof a === "string")) return null;
     return parsed as SearchResultsPayload;
   }
 

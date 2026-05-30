@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { SEARCH_RESULTS_KEY, type AISearchPayload, type DirectFilterPayload } from "@/lib/searchResults";
+import { SEARCH_RESULTS_KEY, type AISearchPayload, type AmenitySearchPayload, type DirectFilterPayload } from "@/lib/searchResults";
 import { QUICK_CHIPS } from "@/lib/chips";
 
 // Cycling placeholder prompts — matches prototype EXAMPLE_PROMPTS
@@ -153,15 +153,14 @@ export default function HomeScreen() {
         throw new Error(data.error ?? "Search failed");
       }
 
-      const data = (await res.json()) as Pick<AISearchPayload, "campsites" | "parsedIntent">;
+      const data = await res.json() as
+        | Pick<AISearchPayload, "campsites" | "parsedIntent">
+        | Pick<AmenitySearchPayload, "amenityPois" | "parsedIntent">;
 
-      const payload: AISearchPayload = {
-        kind: "ai",
-        campsites: data.campsites,
-        parsedIntent: data.parsedIntent,
-        query: q.trim(),
-        ...(chipKey && { chipKey }),
-      };
+      const payload: AISearchPayload | AmenitySearchPayload =
+        "amenityPois" in data
+          ? { kind: "amenity-search", amenityPois: data.amenityPois, parsedIntent: data.parsedIntent, query: q.trim() }
+          : { kind: "ai", campsites: data.campsites, parsedIntent: data.parsedIntent, query: q.trim(), ...(chipKey && { chipKey }) };
       // Wrap setItem separately — QuotaExceededError must not swallow a successful search.
       // If storage is full the map still loads; it just won't pre-populate with results.
       try {

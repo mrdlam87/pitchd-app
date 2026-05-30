@@ -873,6 +873,7 @@ describe("POST /api/search", () => {
       console.warn("[search.test] AmenityType 'dump_point' not seeded — skipping amenity routing test. Run `npm run db:seed`.");
       return;
     }
+    expect.assertions(5);
 
     // Seed an AmenityPOI near the test location
     const poi = await prisma.amenityPOI.create({
@@ -881,7 +882,7 @@ describe("POST /api/search", () => {
         lat: -31.96,
         lng: BASE_LNG,
         amenityTypeId: amenityType.id,
-        source: "test-search",
+        source: "test",
         sourceId: `dump-point-${Date.now()}-${Math.random()}`,
       },
     });
@@ -914,7 +915,7 @@ describe("POST /api/search", () => {
     expect(poiIds).toContain(poi.id);
 
     // Clean up the seeded POI
-    await prisma.amenityPOI.deleteMany({ where: { source: "test-search" } });
+    await prisma.amenityPOI.deleteMany({ where: { source: "test" } });
   });
 
   it("amenity routing: when resultType is 'amenities' but poiTypes is empty, returns all nearby POIs", async () => {
@@ -930,6 +931,7 @@ describe("POST /api/search", () => {
       console.warn("[search.test] AmenityType 'water_fill' not seeded — skipping test. Run `npm run db:seed`.");
       return;
     }
+    expect.assertions(3);
 
     const poi = await prisma.amenityPOI.create({
       data: {
@@ -937,7 +939,7 @@ describe("POST /api/search", () => {
         lat: -31.96,
         lng: BASE_LNG,
         amenityTypeId: amenityType.id,
-        source: "test-search",
+        source: "test",
         sourceId: `water-fill-${Date.now()}-${Math.random()}`,
       },
     });
@@ -964,6 +966,6 @@ describe("POST /api/search", () => {
     expect(body).toHaveProperty("amenityPois");
     expect(body.amenityPois.map((p: { id: string }) => p.id)).toContain(poi.id);
 
-    await prisma.amenityPOI.deleteMany({ where: { source: "test-search" } });
+    await prisma.amenityPOI.deleteMany({ where: { source: "test" } });
   });
 });
