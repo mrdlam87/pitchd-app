@@ -117,4 +117,12 @@ describe("GET /api/search/suggestions", () => {
     expect(body.suggestions.some((s) => s.kind === "campsite" || s.kind === "region")).toBe(true);
     expect(body.suggestions.every((s) => s.kind !== "location")).toBe(true);
   });
+
+  it("returns other suggestions when Mapbox fetch throws", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("network"));
+    const res = await GET(makeRequest("blue"));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { suggestions: Array<{ kind: string }> };
+    expect(body.suggestions.every((s) => s.kind !== "location")).toBe(true);
+  });
 });

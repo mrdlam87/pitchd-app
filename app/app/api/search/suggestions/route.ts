@@ -33,19 +33,19 @@ export type LocationSuggestion = {
 export type Suggestion = CampsiteSuggestion | RegionSuggestion | LocationSuggestion;
 
 async function fetchLocationSuggestions(q: string): Promise<LocationSuggestion[]> {
+  // TODO: use a dedicated MAPBOX_SERVER_TOKEN (no NEXT_PUBLIC_ prefix) to avoid
+  // leaking the token in server-side request logs if scope ever changes.
   const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
   if (!token) return [];
   try {
     const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?country=AU&types=place,locality,neighborhood&limit=${LOCATION_LIMIT}&access_token=${token}`;
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
     if (!res.ok) return [];
-    const data = await res.json() as { features: Array<{ text: string; center: [number, number] }> };
-    return data.features.map((f) => ({
-      kind: "location" as const,
-      name: f.text,
-      lat: f.center[1],
-      lng: f.center[0],
-    }));
+    const data = await res.json() as { features?: Array<{ text: string; center: [number, number] }> };
+    if (!Array.isArray(data.features)) return [];
+    return data.features
+      .filter((f) => f.text && Array.isArray(f.center) && f.center.length >= 2)
+      .map((f) => ({ kind: "location" as const, name: f.text, lat: f.center[1], lng: f.center[0] }));
   } catch {
     return [];
   }
