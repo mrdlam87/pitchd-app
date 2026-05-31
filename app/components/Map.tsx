@@ -526,6 +526,25 @@ export default function MapView() {
     activeFiltersRef.current = activeFilters;
   }, [activeFilters]);
 
+  // When the soft keyboard opens the visual viewport shrinks. On some Android
+  // devices this causes Mapbox to fire moveend (container resize), which would
+  // trigger a browse fetch and wipe current search results. Suppress the next
+  // moveend whenever the viewport height drops (keyboard open).
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.visualViewport) return;
+    let lastHeight = window.visualViewport.height;
+    function onVvResize() {
+      const h = window.visualViewport!.height;
+      if (h < lastHeight - 50) {
+        // Height dropped by >50px — keyboard is opening; suppress next moveend.
+        skipNextFetch.current = true;
+      }
+      lastHeight = h;
+    }
+    window.visualViewport.addEventListener("resize", onVvResize);
+    return () => window.visualViewport!.removeEventListener("resize", onVvResize);
+  }, []);
+
 
   useEffect(() => {
     campsiteClustersRef.current = campsiteClusters;
