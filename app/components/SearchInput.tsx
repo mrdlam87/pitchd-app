@@ -55,6 +55,7 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
   const [showRecents, setShowRecents] = useState(false);
   const [highlightedIdx, setHighlightedIdx] = useState(-1);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const justSelectedRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useImperativeHandle(ref, () => ({
@@ -68,6 +69,10 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     debounceRef.current = setTimeout(async () => {
+      if (justSelectedRef.current) {
+        justSelectedRef.current = false;
+        return;
+      }
       if (value.trim().length < MIN_QUERY_LENGTH) {
         setSuggestions([]);
         setShowSuggestions(false);
@@ -192,6 +197,7 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
     setShowSuggestions(false);
     setShowRecents(false);
     setSuggestions([]);
+    justSelectedRef.current = true;
     onSuggestionSelect(s);
   }
 
