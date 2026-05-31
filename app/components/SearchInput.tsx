@@ -93,20 +93,30 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
     };
   }, [value]);
 
-  // Close dropdowns on outside click
+  // Close dropdowns when the user interacts outside the search container —
+  // covers mouse clicks (desktop) and touch taps/drags (mobile). touchstart
+  // is what fires when a user drags the drawer handle or taps the map, so
+  // mousedown alone was insufficient on mobile.
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
+    function handleOutside(e: MouseEvent | TouchEvent) {
+      const target =
+        e.type === "touchstart"
+          ? ((e as TouchEvent).touches[0]?.target as Node | null)
+          : (e.target as Node);
+      if (target && containerRef.current && !containerRef.current.contains(target)) {
         setShowSuggestions(false);
         setShowRecents(false);
         inputRef.current?.blur();
       }
     }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("mousedown", handleOutside);
+    // passive: true — we never call preventDefault here, so the browser can
+    // optimise scroll/touch handling without waiting for this listener.
+    document.addEventListener("touchstart", handleOutside, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("touchstart", handleOutside);
+    };
   }, []);
 
   function openRecentsIfEligible() {
