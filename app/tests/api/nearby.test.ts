@@ -111,4 +111,26 @@ describe("GET /api/search/nearby", () => {
     expect(typeof body.hasMore).toBe("boolean");
     expect(body.hasMore).toBe(false);
   });
+
+  it("returns hasMore: true and caps results at 50 when more than 50 campsites are within range", async () => {
+    // Seed 51 campsites at ~10 km increments from TEST_ORIGIN, all well within 100 km.
+    // Offset in lat only (~1.11 km per 0.01 deg) keeps all within ~6 km.
+    const extra = Array.from({ length: 51 }, (_, i) => ({
+      name: `!Nearby Overflow ${i}`,
+      slug: `!nearby-overflow-${i}-test`,
+      lat: -29.0 + i * 0.001,
+      lng: 135.0,
+      state: "SA" as const,
+      source: TEST_SOURCE,
+      syncStatus: SyncStatus.active,
+    }));
+    await prisma.campsite.deleteMany({ where: { source: TEST_SOURCE } });
+    await prisma.campsite.createMany({ data: extra });
+
+    const res = await GET(makeRequest(TEST_ORIGIN));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { campsites: unknown[]; hasMore: boolean };
+    expect(body.hasMore).toBe(true);
+    expect(body.campsites).toHaveLength(50);
+  });
 });
