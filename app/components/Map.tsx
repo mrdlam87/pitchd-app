@@ -870,6 +870,11 @@ export default function MapView() {
         setEmptySearchResult(true);
         setDrawerState("half");
         drawerStateRef.current = "half";
+        // Fly to the city even when no results — keeps the map context consistent
+        // with the "near [City]" label shown in the drawer.
+        if (mapRef.current) {
+          mapRef.current.getMap().flyTo({ center: [lng, lat], zoom: 10, duration: 800 });
+        }
       }
     } catch (e) {
       console.error("[fetchLocationCampsites]", e);
@@ -1153,6 +1158,7 @@ export default function MapView() {
               void fetchRegionCampsites(s.name);
             } else {
               // Location suggestion — fetch campsites nearby
+              suppressGeoFlyRef.current = true;
               void fetchLocationCampsites(s.name, s.lat, s.lng);
             }
           }}
