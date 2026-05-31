@@ -181,10 +181,7 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
       e.preventDefault();
       if (highlightedIdx >= 0) {
         if (isShowingRecents) {
-          const recent = activeList[highlightedIdx] as string;
-          setShowRecents(false);
-          setHighlightedIdx(-1);
-          onRecentSelect?.(recent);
+          selectRecent(activeList[highlightedIdx] as string);
         } else {
           selectSuggestion(suggestions[highlightedIdx]);
         }
@@ -200,6 +197,13 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
     setSuggestions([]);
     justSelectedRef.current = true;
     onSuggestionSelect(s);
+  }
+
+  function selectRecent(recent: string) {
+    setShowRecents(false);
+    setHighlightedIdx(-1);
+    justSelectedRef.current = true;
+    onRecentSelect?.(recent);
   }
 
   function handleSubmit() {
@@ -358,8 +362,7 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
               key={recent}
               onMouseDown={(e) => {
                 e.preventDefault();
-                setShowRecents(false);
-                onRecentSelect?.(recent);
+                selectRecent(recent);
               }}
               className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
                 i === highlightedIdx ? "bg-[#f0f5f0]" : "hover:bg-[#f7f5f0]"

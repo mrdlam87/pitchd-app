@@ -846,6 +846,29 @@ export default function MapView() {
     }
   }
 
+  // When a recent is selected, check suggestions first so location/region recents route
+  // correctly instead of falling through to NL search.
+  async function handleRecentSelect(recent: string) {
+    setMapQuery(recent);
+    setRecentSearches(getRecentSearches());
+    try {
+      const res = await fetch(`/api/search/suggestions?q=${encodeURIComponent(recent)}`);
+      if (res.ok) {
+        const { suggestions } = await res.json() as { suggestions: Suggestion[] };
+        const exactLoc = suggestions.find(
+          (s): s is Extract<Suggestion, { kind: "location" }> =>
+            s.kind === "location" && s.name.toLowerCase() === recent.toLowerCase()
+        );
+        if (exactLoc) { void fetchLocationCampsites(exactLoc.name, exactLoc.lat, exactLoc.lng); return; }
+        const exactRegion = suggestions.find(
+          (s) => s.kind === "region" && s.name.toLowerCase() === recent.toLowerCase()
+        );
+        if (exactRegion) { void fetchRegionCampsites(exactRegion.name); return; }
+      }
+    } catch { /* fall through to NL search */ }
+    void handleMapSearch(recent, null);
+  }
+
   async function fetchLocationCampsites(name: string, lat: number, lng: number) {
     setActiveChip(null);
     activeChipRef.current = null;
@@ -1173,9 +1196,7 @@ export default function MapView() {
           }}
           recentSearches={recentSearches}
           onRecentSelect={(recent) => {
-            setMapQuery(recent);
-            setRecentSearches(getRecentSearches());
-            void handleMapSearch(recent, null);
+            void handleRecentSelect(recent);
           }}
           onClear={handleClearSearch}
           loading={mapSearchLoading}
