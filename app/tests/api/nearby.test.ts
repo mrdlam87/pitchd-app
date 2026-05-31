@@ -62,6 +62,16 @@ describe("GET /api/search/nearby", () => {
     expect(res.status).toBe(400);
   });
 
+  it("returns 400 when lat or lng is Infinity", async () => {
+    const res = await GET(makeRequest({ lat: "Infinity", lng: "151.2" }));
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when lat is out of range", async () => {
+    const res = await GET(makeRequest({ lat: "91", lng: "151.2" }));
+    expect(res.status).toBe(400);
+  });
+
   it("returns campsites within 100 km and excludes those beyond", async () => {
     const res = await GET(makeRequest(TEST_ORIGIN));
     expect(res.status).toBe(200);

@@ -38,8 +38,8 @@ export async function GET(req: Request): Promise<Response> {
   const lat = Number(latParam);
   const lng = Number(lngParam);
 
-  if (isNaN(lat) || isNaN(lng)) {
-    return Response.json({ error: "lat and lng must be valid numbers" }, { status: 400 });
+  if (!isFinite(lat) || !isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return Response.json({ error: "lat and lng must be valid coordinates" }, { status: 400 });
   }
 
   const pad = DEFAULT_RADIUS_KM * DEG_PER_KM;
