@@ -70,6 +70,7 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
 
     debounceRef.current = setTimeout(async () => {
       if (justSelectedRef.current) {
+        justSelectedRef.current = false;
         return;
       }
       if (value.trim().length < MIN_QUERY_LENGTH) {
@@ -324,7 +325,7 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
                   ? s.id
                   : s.kind === "region"
                     ? `region-${s.name}`
-                    : `location-${s.lat}-${s.lng}`
+                    : `location-${s.name}-${s.lat}`
               }
               onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s); }}
               className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
