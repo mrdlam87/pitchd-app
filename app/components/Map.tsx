@@ -229,6 +229,11 @@ export default function MapView() {
   // skipNextFetch suppresses the moveend handler for one event — used when code
   // calls easeTo/setPadding programmatically to avoid triggering a redundant fetch.
   const skipNextFetch = useRef(false);
+  // Timestamp (ms) until which moveend fetches are suppressed. Used when the soft
+  // keyboard opens — Android resizes the viewport which causes Mapbox to fire one or
+  // more moveend events. A time-window guard (rather than a one-shot bool) suppresses
+  // all of them regardless of how many Mapbox emits during the resize animation.
+  const suppressFetchUntilRef = useRef(0);
   // Mirrors drawerState so loadCampsites (a stable useCallback) always reads the latest value
   const drawerStateRef = useRef<DrawerState>("peek");
   // Mirrors the selected campsite's ID so loadCampsites (stable callback) can
@@ -526,18 +531,19 @@ export default function MapView() {
     activeFiltersRef.current = activeFilters;
   }, [activeFilters]);
 
-  // When the soft keyboard opens the visual viewport shrinks. On some Android
-  // devices this causes Mapbox to fire moveend (container resize), which would
-  // trigger a browse fetch and wipe current search results. Suppress the next
-  // moveend whenever the viewport height drops (keyboard open).
+  // When the soft keyboard opens on Android the visual viewport shrinks, which
+  // causes Mapbox to fire one or more moveend events as it resizes its canvas.
+  // A one-shot skipNextFetch flag is insufficient — Mapbox can fire 2-3 moveend
+  // events during the keyboard animation. Use a time-window guard instead:
+  // suppress ALL moveend fetches for 1.5 s whenever the viewport height drops
+  // by more than 50 px (reliable proxy for "keyboard is opening").
   useEffect(() => {
     if (typeof window === "undefined" || !window.visualViewport) return;
     let lastHeight = window.visualViewport.height;
     function onVvResize() {
       const h = window.visualViewport!.height;
       if (h < lastHeight - 50) {
-        // Height dropped by >50px — keyboard is opening; suppress next moveend.
-        skipNextFetch.current = true;
+        suppressFetchUntilRef.current = Date.now() + 1500;
       }
       lastHeight = h;
     }
@@ -659,6 +665,10 @@ export default function MapView() {
 
       if (skipNextFetch.current) {
         skipNextFetch.current = false;
+        return;
+      }
+      // Keyboard-open guard: suppress all fetches for 1.5 s after viewport shrinks.
+      if (Date.now() < suppressFetchUntilRef.current) {
         return;
       }
       // While NL search results are active, suppress browse fetches but still
