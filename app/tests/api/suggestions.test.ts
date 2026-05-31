@@ -43,9 +43,11 @@ describe("GET /api/search/suggestions", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns 400 when query is shorter than 2 chars", async () => {
+  it("returns 200 with empty suggestions when query is shorter than 2 chars", async () => {
     const res = await GET(makeRequest("b"));
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
+    const data = await res.json() as { suggestions: unknown[] };
+    expect(data.suggestions).toEqual([]);
   });
 
   it("returns empty suggestions for no match", async () => {

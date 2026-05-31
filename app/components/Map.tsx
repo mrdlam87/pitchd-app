@@ -21,8 +21,7 @@ import { QUICK_CHIPS, AMENITY_CHIPS } from "@/lib/chips";
 import { CampsitePin } from "./CampsitePin";
 import { AmenityPin, type AmenityPinMeta } from "./AmenityPin";
 import { useMapData } from "@/hooks/useMapData";
-import SearchInput, { type SearchInputHandle } from "@/components/SearchInput";
-import type { Suggestion } from "@/components/SearchInput";
+import SearchInput, { type SearchInputHandle, type Suggestion } from "@/components/SearchInput";
 import { weatherScore } from "@/lib/weatherScore";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -787,6 +786,8 @@ export default function MapView() {
   );
 
   async function fetchRegionCampsites(region: string) {
+    setMapSearchLoading(true);
+    setMapSearchError(null);
     try {
       let lat = DEFAULT_VIEWPORT.latitude;
       let lng = DEFAULT_VIEWPORT.longitude;
@@ -799,21 +800,33 @@ export default function MapView() {
       } catch { /* use defaults */ }
 
       const params = new URLSearchParams({ name: region, lat: String(lat), lng: String(lng) });
+      if (freeOnlyRef.current) params.set("free", "true");
       const res = await fetch(`/api/search/region?${params}`);
-      if (!res.ok) return;
+      if (!res.ok) {
+        setMapSearchError("Could not load region campsites. Please try again.");
+        return;
+      }
       const data = await res.json() as { campsites: Campsite[] };
       setSearchResults(data.campsites);
       searchModeRef.current = true;
       setSearchContextQuery(region);
       if (data.campsites.length > 0 && mapRef.current) {
-        fitToCampsites(mapRef.current.getMap(), data.campsites, getDrawerHeightPx("half"));
+        const map = mapRef.current.getMap();
+        fitToCampsites(map, data.campsites, getDrawerHeightPx("half"));
+        setDrawerState("half");
+        drawerStateRef.current = "half";
+        loadWeatherForViewport(map, data.campsites);
+      } else {
+        setEmptySearchResult(true);
         setDrawerState("half");
         drawerStateRef.current = "half";
       }
     } catch (e) {
       console.error("[fetchRegionCampsites]", e);
+      setMapSearchError("Could not load region campsites. Please try again.");
     } finally {
-      markInitialLoaded(); // ensures spinner clears even on error/empty result
+      setMapSearchLoading(false);
+      markInitialLoaded();
     }
   }
 
@@ -827,6 +840,8 @@ export default function MapView() {
     setMapSearchError(null);
     setEmptySearchResult(false);
     setGoodWeatherOnly(false);
+    setFreeOnly(false);
+    freeOnlyRef.current = false;
     // For chip searches, highlight immediately. For bar searches (chipKey=null),
     // clear any previously active chip — bar searches don't represent a chip selection.
     setActiveChip(chipKey);
@@ -956,6 +971,8 @@ export default function MapView() {
     setMapSearchError(null);
     setAiSyncedActivities([]);
     setGoodWeatherOnly(false);
+    setFreeOnly(false);
+    freeOnlyRef.current = false;
     // Reset AI-inferred activities and dates so browse results aren't silently
     // filtered after the user exits search mode. pois are preserved — they reflect
     // explicit user choices (amenity chips / filter panel) not AI inference.
@@ -1002,6 +1019,9 @@ export default function MapView() {
       setActiveChip(null);
       activeChipRef.current = null;
       setAiSyncedActivities([]);
+      setGoodWeatherOnly(false);
+      setFreeOnly(false);
+      freeOnlyRef.current = false;
       const next = baseActivities.includes(filterKey)
         ? baseActivities.filter((a: string) => a !== filterKey)
         : [...baseActivities, filterKey];
@@ -1054,6 +1074,12 @@ export default function MapView() {
           }}
           onSearch={(q) => { void handleMapSearch(q, null); }}
           onSuggestionSelect={(s: Suggestion) => {
+            setGoodWeatherOnly(false);
+            setFreeOnly(false);
+            freeOnlyRef.current = false;
+            addRecentSearch(s.name);
+            setRecentSearches(getRecentSearches());
+            setMapQuery(s.name);
             if (s.kind === "campsite") {
               setSearchResults([{ id: s.id, name: s.name, lat: s.lat, lng: s.lng, region: null, blurb: null, amenities: [], weather: null }]);
               mapRef.current?.getMap().flyTo({ center: [s.lng, s.lat], zoom: 14, duration: 800 });
@@ -1065,8 +1091,6 @@ export default function MapView() {
             } else {
               void fetchRegionCampsites(s.name);
             }
-            setGoodWeatherOnly(false);
-            setMapQuery(s.name);
           }}
           recentSearches={recentSearches}
           onRecentSelect={(recent) => {
@@ -1323,6 +1347,7 @@ export default function MapView() {
           isEmpty={emptySearchResult}
           searchLocation={searchParsedIntent?.location ?? null}
           onClearSearch={handleClearSearch}
+          onBroadenSearch={() => searchInputRef.current?.focus()}
         />
       )}
     </div>

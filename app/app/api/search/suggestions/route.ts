@@ -34,7 +34,7 @@ export async function GET(req: Request): Promise<Response> {
   const q = (searchParams.get("q") ?? "").trim();
 
   if (q.length < MIN_QUERY_LENGTH) {
-    return Response.json({ suggestions: [] }, { status: 400 });
+    return Response.json({ suggestions: [] });
   }
 
   try {
@@ -60,15 +60,14 @@ export async function GET(req: Request): Promise<Response> {
       }),
     ]);
 
-    // Resolve a representative state for each region group with a single groupBy query.
+    // Resolve a representative state for each region group. Scoped to the exact
+    // regions from the first query so ordering differences can't produce misses.
     const regionStates = await prisma.campsite.groupBy({
       by: ["region", "state"],
       where: {
         syncStatus: SyncStatus.active,
-        region: { not: null, contains: q, mode: "insensitive" },
+        region: { in: regionGroups.map((g) => g.region!) },
       },
-      orderBy: { region: "asc" },
-      take: SUGGESTION_LIMIT,
     });
     const stateMap = new Map(
       regionStates.map((r: { region: string | null; state: string }) => [r.region!, r.state])

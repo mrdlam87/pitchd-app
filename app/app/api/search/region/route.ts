@@ -38,7 +38,7 @@ export async function GET(req: Request): Promise<Response> {
     const campsites = await prisma.campsite.findMany({
       where: {
         syncStatus: SyncStatus.active,
-        region: { contains: name, mode: "insensitive" },
+        region: { equals: name, mode: "insensitive" },
         ...(free && { isFree: true }),
       },
       select: {

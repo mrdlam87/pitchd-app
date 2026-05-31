@@ -272,7 +272,7 @@ export default function HomeScreen() {
 
           {/* Quick filter chips */}
           <div className="flex gap-1.5 overflow-x-auto py-0.5 [scrollbar-width:none]">
-            {QUICK_CHIPS.map((chip) => (
+            {QUICK_CHIPS.filter((chip) => !("weatherFilter" in chip) && !("freeFilter" in chip)).map((chip) => (
               <button
                 key={chip.key}
                 onClick={() => chip.filterKey ? handleDirectFilter(chip.filterKey, chip.key) : void handleSearch(chip.query, chip.key)}
