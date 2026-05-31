@@ -319,7 +319,13 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
         <div className="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-2xl border bg-white shadow-[0_8px_24px_rgba(45,74,45,0.12)]" style={{ borderColor: BORDER }}>
           {suggestions.map((s, i) => (
             <button
-              key={s.kind === "campsite" ? s.id : `region-${s.name}`}
+              key={
+                s.kind === "campsite"
+                  ? s.id
+                  : s.kind === "region"
+                    ? `region-${s.name}`
+                    : `location-${s.name}`
+              }
               onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s); }}
               className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
                 i === highlightedIdx ? "bg-[#f0f5f0]" : "hover:bg-[#f7f5f0]"
