@@ -14,7 +14,7 @@ import BottomDrawer, {
 } from "./BottomDrawer";
 import type { AmenityPOI, Campsite } from "@/types/map";
 import { BORDER, CORAL, FOREST_GREEN, SAGE, SURFACE_OVERLAY } from "@/lib/tokens";
-import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayload, type AISearchPayload, type AmenitySearchPayload } from "@/lib/searchResults";
+import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayload, type AISearchPayload, type AmenitySearchPayload, type LocationPayload } from "@/lib/searchResults";
 import type { ParsedIntent } from "@/lib/parseIntent";
 import { getRecentSearches, addRecentSearch } from "@/lib/recentSearches";
 import { QUICK_CHIPS, AMENITY_CHIPS } from "@/lib/chips";
@@ -834,6 +834,44 @@ export default function MapView() {
     }
   }
 
+  async function fetchLocationCampsites(name: string, lat: number, lng: number) {
+    setActiveChip(null);
+    activeChipRef.current = null;
+    setMapSearchLoading(true);
+    setMapSearchError(null);
+    try {
+      const params = new URLSearchParams({ lat: String(lat), lng: String(lng) });
+      if (freeOnlyRef.current) params.set("free", "true");
+      const res = await fetch(`/api/search/nearby?${params}`);
+      if (!res.ok) {
+        setMapSearchError("Could not load nearby campsites. Please try again.");
+        return;
+      }
+      const data = await res.json() as { campsites: Campsite[]; hasMore: boolean };
+      setSearchResults(data.campsites);
+      setHasMore(data.hasMore);
+      searchModeRef.current = true;
+      setSearchContextQuery(name);
+      if (data.campsites.length > 0 && mapRef.current) {
+        const map = mapRef.current.getMap();
+        fitToCampsites(map, data.campsites, getDrawerHeightPx("half"));
+        setDrawerState("half");
+        drawerStateRef.current = "half";
+        loadWeatherForViewport(map, data.campsites);
+      } else {
+        setEmptySearchResult(true);
+        setDrawerState("half");
+        drawerStateRef.current = "half";
+      }
+    } catch (e) {
+      console.error("[fetchLocationCampsites]", e);
+      setMapSearchError("Could not load nearby campsites. Please try again.");
+    } finally {
+      setMapSearchLoading(false);
+      markInitialLoaded();
+    }
+  }
+
   // Inline NL search — stays on the map, replaces results without navigating home.
   async function handleMapSearch(q: string, chipKey: string | null = null) {
     if (!q.trim() || mapSearchLoading) return;
@@ -1103,8 +1141,11 @@ export default function MapView() {
                   if (mapRef.current) loadWeatherForViewport(mapRef.current.getMap(), [campsite]);
                 })
                 .catch(() => { /* leave the minimal seed in place */ });
-            } else {
+            } else if (s.kind === "region") {
               void fetchRegionCampsites(s.name);
+            } else {
+              // Location suggestion — fetch campsites nearby
+              void fetchLocationCampsites(s.name, s.lat, s.lng);
             }
           }}
           recentSearches={recentSearches}

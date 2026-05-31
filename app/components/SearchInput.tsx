@@ -333,7 +333,9 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
                 <span className="block truncate text-[11px]" style={{ color: SAGE }}>
                   {s.kind === "campsite"
                     ? [s.region, s.state].filter(Boolean).join(", ")
-                    : `Region · ${s.state} · ${s.count} campsite${s.count === 1 ? "" : "s"}`}
+                    : s.kind === "region"
+                      ? `Region · ${s.state} · ${s.count} campsite${s.count === 1 ? "" : "s"}`
+                      : "Show campsites nearby"}
                 </span>
               </span>
             </button>
