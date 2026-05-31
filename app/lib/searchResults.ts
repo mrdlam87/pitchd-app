@@ -67,7 +67,7 @@ export function parseSearchResultsPayload(parsed: unknown): SearchResultsPayload
   if (obj.kind === "campsite-direct") {
     const c = obj.campsite as Record<string, unknown>;
     if (typeof c?.id !== "string" || typeof c?.name !== "string") return null;
-    if (typeof c?.lat !== "number" || typeof c?.lng !== "number") return null;
+    if (!Number.isFinite(c?.lat) || !Number.isFinite(c?.lng)) return null;
     return parsed as SearchResultsPayload;
   }
 
@@ -78,7 +78,7 @@ export function parseSearchResultsPayload(parsed: unknown): SearchResultsPayload
 
   if (obj.kind === "location") {
     if (typeof obj.name !== "string" || obj.name.trim() === "") return null;
-    if (typeof obj.lat !== "number" || typeof obj.lng !== "number") return null;
+    if (!Number.isFinite(obj.lat) || !Number.isFinite(obj.lng)) return null;
     return parsed as SearchResultsPayload;
   }
 
