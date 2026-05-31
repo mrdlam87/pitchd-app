@@ -57,6 +57,7 @@ export async function GET(req: Request): Promise<Response> {
         lng: { gte: lng - lngPad, lte: lng + lngPad },
         ...(free && { isFree: true }),
       },
+      take: 500,
       select: {
         id: true,
         name: true,

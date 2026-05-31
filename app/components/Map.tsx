@@ -944,7 +944,7 @@ export default function MapView() {
         setSearchResults([]);
         setActiveChip(chipKey);
         activeChipRef.current = chipKey;
-        setSearchContextQuery(q.trim());
+        setSearchContextQuery(null);
         setSearchParsedIntent(data.parsedIntent);
         setDrawerState("half");
         drawerStateRef.current = "half";
@@ -986,7 +986,7 @@ export default function MapView() {
         };
         setActiveFilters(aiFilters);
         activeFiltersRef.current = aiFilters;
-        setSearchContextQuery(q.trim());
+        setSearchContextQuery(null);
         skipNextFetch.current = true;
         suppressGeoFlyRef.current = true;
         fitToCampsites(mapRef.current.getMap(), data.campsites, getDrawerHeightPx("half"));
@@ -1003,7 +1003,7 @@ export default function MapView() {
         setActiveChip(null);
         activeChipRef.current = null;
         setSearchAmenities([]);
-        setSearchContextQuery(q.trim());
+        setSearchContextQuery(null);
         setSearchParsedIntent(data.parsedIntent);
         setEmptySearchResult(true);
         setDrawerState("half");
@@ -1164,7 +1164,7 @@ export default function MapView() {
                 .catch(() => { /* leave the minimal seed in place */ });
             } else if (s.kind === "region") {
               void fetchRegionCampsites(s.name);
-            } else {
+            } else if (s.kind === "location") {
               // Location suggestion — fetch campsites nearby
               suppressGeoFlyRef.current = true;
               void fetchLocationCampsites(s.name, s.lat, s.lng);
