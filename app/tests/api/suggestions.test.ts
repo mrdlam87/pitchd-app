@@ -23,7 +23,7 @@ function makeRequest(q: string) {
 
 beforeEach(async () => {
   mockAuth.mockResolvedValue(AUTHED_SESSION);
-  process.env.NEXT_PUBLIC_MAPBOX_TOKEN = "test-token";
+  process.env.MAPBOX_SERVER_TOKEN = "test-token";
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
     ok: true,
     json: async () => ({ features: [] }),
@@ -39,7 +39,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   vi.unstubAllGlobals();
-  delete process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+  delete process.env.MAPBOX_SERVER_TOKEN;
   await prisma.campsite.deleteMany({ where: { source: TEST_SOURCE } });
 });
 

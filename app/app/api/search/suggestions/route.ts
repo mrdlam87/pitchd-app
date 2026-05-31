@@ -5,6 +5,7 @@ import { SyncStatus } from "@/lib/generated/prisma/enums";
 const MIN_QUERY_LENGTH = 2;
 const SUGGESTION_LIMIT = 4;
 const LOCATION_LIMIT = 2;
+const MAX_TOTAL_SUGGESTIONS = 7;
 
 export type CampsiteSuggestion = {
   kind: "campsite";
@@ -33,13 +34,16 @@ export type LocationSuggestion = {
 export type Suggestion = CampsiteSuggestion | RegionSuggestion | LocationSuggestion;
 
 async function fetchLocationSuggestions(q: string): Promise<LocationSuggestion[]> {
-  // TODO: use a dedicated MAPBOX_SERVER_TOKEN (no NEXT_PUBLIC_ prefix) to avoid
-  // leaking the token in server-side request logs if scope ever changes.
-  const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+  // Prefer MAPBOX_SERVER_TOKEN (server-only, not in client bundle or URL logs).
+  // Fall back to NEXT_PUBLIC_MAPBOX_TOKEN for environments that only set the public var.
+  const token = process.env.MAPBOX_SERVER_TOKEN ?? process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
   if (!token) return [];
   try {
-    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?country=AU&types=place,locality,neighborhood&limit=${LOCATION_LIMIT}&access_token=${token}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?country=AU&types=place,locality,neighborhood&limit=${LOCATION_LIMIT}`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(800),
+    });
     if (!res.ok) return [];
     const data = await res.json() as { features?: Array<{ text: string; center: [number, number] }> };
     if (!Array.isArray(data.features)) return [];
@@ -98,8 +102,8 @@ export async function GET(req: Request): Promise<Response> {
       ...c,
     }));
 
-    // Locations first (city-level intent), then regions, then campsites.
-    const suggestions: Suggestion[] = [...locationSuggestions, ...regions, ...campsiteSuggestions];
+    // Locations first (city-level intent), then regions, then campsites. Cap total.
+    const suggestions: Suggestion[] = [...locationSuggestions, ...regions, ...campsiteSuggestions].slice(0, MAX_TOTAL_SUGGESTIONS);
 
     return Response.json({ suggestions });
   } catch (e) {
