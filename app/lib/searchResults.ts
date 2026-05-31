@@ -48,7 +48,15 @@ export type RegionPayload = {
   region: string;
 };
 
-export type SearchResultsPayload = AISearchPayload | DirectFilterPayload | AmenitySearchPayload | CampsiteDirectPayload | RegionPayload;
+// Location-based proximity search — shows campsites near a geocoded city or town.
+export type LocationPayload = {
+  kind: "location";
+  name: string;
+  lat: number;
+  lng: number;
+};
+
+export type SearchResultsPayload = AISearchPayload | DirectFilterPayload | AmenitySearchPayload | CampsiteDirectPayload | RegionPayload | LocationPayload;
 
 // Parses and validates an unknown value (e.g. from JSON.parse) as a SearchResultsPayload.
 // Returns null if the shape is invalid. Exported for unit testing.
@@ -65,6 +73,12 @@ export function parseSearchResultsPayload(parsed: unknown): SearchResultsPayload
 
   if (obj.kind === "region") {
     if (typeof obj.region !== "string" || obj.region.trim() === "") return null;
+    return parsed as SearchResultsPayload;
+  }
+
+  if (obj.kind === "location") {
+    if (typeof obj.name !== "string" || obj.name.trim() === "") return null;
+    if (typeof obj.lat !== "number" || typeof obj.lng !== "number") return null;
     return parsed as SearchResultsPayload;
   }
 
