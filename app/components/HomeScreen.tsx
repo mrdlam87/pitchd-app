@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { SEARCH_RESULTS_KEY, type AISearchPayload, type AmenitySearchPayload, type DirectFilterPayload, type LocationPayload, type RegionPayload, type CampsiteDirectPayload } from "@/lib/searchResults";
+import { SEARCH_RESULTS_KEY, type AISearchPayload, type AmenitySearchPayload, type DirectFilterPayload } from "@/lib/searchResults";
 import { QUICK_CHIPS } from "@/lib/chips";
 
 // Cycling placeholder prompts — matches prototype EXAMPLE_PROMPTS

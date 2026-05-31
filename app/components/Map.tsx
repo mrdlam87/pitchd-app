@@ -621,6 +621,14 @@ export default function MapView() {
         return;
       }
 
+      // Location suggestion arrival — fetch campsites near the resolved coordinates.
+      if (searchPayload?.kind === "location") {
+        initialSearchRef.current = null;
+        suppressGeoFlyRef.current = true;
+        void fetchLocationCampsites(searchPayload.name, searchPayload.lat, searchPayload.lng);
+        return;
+      }
+
       // Search payload was present but returned no campsites — fall back to browse mode.
       // Reset both refs so handleMoveEnd fires normally and geolocation flyTo works.
       searchModeRef.current = false;
