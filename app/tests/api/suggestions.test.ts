@@ -23,6 +23,10 @@ function makeRequest(q: string) {
 
 beforeEach(async () => {
   mockAuth.mockResolvedValue(AUTHED_SESSION);
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ features: [] }),
+  } as Response));
   await prisma.campsite.createMany({
     data: [
       { name: "!Blue Mountains Campsite", slug: "!blue-mountains-campsite-test", lat: -33.7, lng: 150.3, state: "NSW", region: "Blue Mountains", source: TEST_SOURCE, syncStatus: SyncStatus.active },
@@ -33,6 +37,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.unstubAllGlobals();
   await prisma.campsite.deleteMany({ where: { source: TEST_SOURCE } });
 });
 
@@ -82,5 +87,34 @@ describe("GET /api/search/suggestions", () => {
     const res = await GET(makeRequest("BlueRemoved"));
     const body = await res.json() as { suggestions: Array<{ name: string }> };
     expect(body.suggestions.find((s) => s.name === "!BlueRemoved")).toBeUndefined();
+  });
+
+  it("returns location suggestions when Mapbox returns results", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        features: [{ text: "!TestCity", center: [151.0, -33.5] }],
+      }),
+    } as Response);
+    const res = await GET(makeRequest("!TestCity"));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { suggestions: Array<{ kind: string; name: string; lat: number; lng: number }> };
+    const loc = body.suggestions.find((s) => s.kind === "location");
+    expect(loc).toBeDefined();
+    expect(loc?.name).toBe("!TestCity");
+    expect(typeof loc?.lat).toBe("number");
+    expect(typeof loc?.lng).toBe("number");
+  });
+
+  it("returns no location suggestions when Mapbox call fails", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({}),
+    } as Response);
+    const res = await GET(makeRequest("blue"));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { suggestions: Array<{ kind: string }> };
+    expect(body.suggestions.some((s) => s.kind === "campsite" || s.kind === "region")).toBe(true);
+    expect(body.suggestions.every((s) => s.kind !== "location")).toBe(true);
   });
 });

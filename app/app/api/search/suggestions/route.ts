@@ -4,6 +4,7 @@ import { SyncStatus } from "@/lib/generated/prisma/enums";
 
 const MIN_QUERY_LENGTH = 2;
 const SUGGESTION_LIMIT = 4;
+const LOCATION_LIMIT = 2;
 
 export type CampsiteSuggestion = {
   kind: "campsite";
@@ -22,7 +23,33 @@ export type RegionSuggestion = {
   state: string;
 };
 
-export type Suggestion = CampsiteSuggestion | RegionSuggestion;
+export type LocationSuggestion = {
+  kind: "location";
+  name: string;
+  lat: number;
+  lng: number;
+};
+
+export type Suggestion = CampsiteSuggestion | RegionSuggestion | LocationSuggestion;
+
+async function fetchLocationSuggestions(q: string): Promise<LocationSuggestion[]> {
+  const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+  if (!token) return [];
+  try {
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?country=AU&types=place,locality,neighborhood&limit=${LOCATION_LIMIT}&access_token=${token}`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json() as { features: Array<{ text: string; center: [number, number] }> };
+    return data.features.map((f) => ({
+      kind: "location" as const,
+      name: f.text,
+      lat: f.center[1],
+      lng: f.center[0],
+    }));
+  } catch {
+    return [];
+  }
+}
 
 export async function GET(req: Request): Promise<Response> {
   const authError = await requireAuth();
@@ -36,7 +63,7 @@ export async function GET(req: Request): Promise<Response> {
   }
 
   try {
-    const [campsites, regionGroups] = await Promise.all([
+    const [campsites, regionGroups, locationSuggestions] = await Promise.all([
       prisma.campsite.findMany({
         where: {
           syncStatus: SyncStatus.active,
@@ -56,6 +83,7 @@ export async function GET(req: Request): Promise<Response> {
         orderBy: { _count: { region: "desc" } },
         take: SUGGESTION_LIMIT,
       }),
+      fetchLocationSuggestions(q),
     ]);
 
     const regions: RegionSuggestion[] = regionGroups.map((g) => ({
@@ -70,8 +98,8 @@ export async function GET(req: Request): Promise<Response> {
       ...c,
     }));
 
-    // Regions first, then campsites — regions are broader and more useful for navigation.
-    const suggestions: Suggestion[] = [...regions, ...campsiteSuggestions];
+    // Locations first (city-level intent), then regions, then campsites.
+    const suggestions: Suggestion[] = [...locationSuggestions, ...regions, ...campsiteSuggestions];
 
     return Response.json({ suggestions });
   } catch (e) {
