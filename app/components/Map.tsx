@@ -1097,7 +1097,10 @@ export default function MapView() {
               fetch(`/api/campsites/${s.id}`)
                 .then((r) => r.ok ? r.json() : null)
                 .then((full: { id: string; name: string; lat: number; lng: number; region: string | null; blurb: string | null; amenities: { key: string; label: string; icon: string; color: string }[] } | null) => {
-                  if (full) setSearchResults([{ ...full, weather: null }]);
+                  if (!full) return;
+                  const campsite = { ...full, weather: null };
+                  setSearchResults([campsite]);
+                  if (mapRef.current) loadWeatherForViewport(mapRef.current.getMap(), [campsite]);
                 })
                 .catch(() => { /* leave the minimal seed in place */ });
             } else {
