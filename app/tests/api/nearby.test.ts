@@ -98,6 +98,7 @@ describe("GET /api/search/nearby", () => {
   it("returns hasMore: false when results are under the limit", async () => {
     const res = await GET(makeRequest(TEST_ORIGIN));
     const body = await res.json() as { campsites: unknown[]; hasMore: boolean };
+    expect(typeof body.hasMore).toBe("boolean");
     expect(body.hasMore).toBe(false);
   });
 });

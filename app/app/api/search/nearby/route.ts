@@ -31,6 +31,9 @@ export async function GET(req: Request): Promise<Response> {
   if (latParam === null || lngParam === null) {
     return Response.json({ error: "lat and lng are required" }, { status: 400 });
   }
+  if (latParam.trim() === "" || lngParam.trim() === "") {
+    return Response.json({ error: "lat and lng are required" }, { status: 400 });
+  }
 
   const lat = Number(latParam);
   const lng = Number(lngParam);
@@ -66,15 +69,15 @@ export async function GET(req: Request): Promise<Response> {
       },
     });
 
-    const withDist = campsites
+    const filtered = campsites
       .map((c) => ({ c: { ...c, amenities: c.amenities.map((a) => a.amenityType) }, d: haversineKm(lat, lng, c.lat, c.lng) }))
       .filter(({ d }) => d <= DEFAULT_RADIUS_KM)
-      .sort((a, b) => a.d - b.d)
-      .slice(0, RESULT_LIMIT);
+      .sort((a, b) => a.d - b.d);
 
-    const hasMore = withDist.length === RESULT_LIMIT;
+    const hasMore = filtered.length > RESULT_LIMIT;
+    const page = filtered.slice(0, RESULT_LIMIT);
 
-    return Response.json({ campsites: withDist.map(({ c }) => c), hasMore });
+    return Response.json({ campsites: page.map(({ c }) => c), hasMore });
   } catch (e) {
     console.error("[GET /api/search/nearby]", e);
     return Response.json({ error: "Internal server error" }, { status: 500 });
