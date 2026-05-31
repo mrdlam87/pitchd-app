@@ -187,6 +187,10 @@ export default function MapView() {
   const [goodWeatherOnly, setGoodWeatherOnly] = useState(false);
   const [freeOnly, setFreeOnly] = useState(false);
   const freeOnlyRef = useRef(false);
+  // Stores the origin coords of the active location search so the Free chip can
+  // re-run fetchLocationCampsites instead of falling back to viewport browse.
+  // Cleared whenever the user exits location mode.
+  const locationCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
   // Suppresses the geolocation flyTo when search results are loaded so the camera
   // doesn't pan away from the result bounds.
   // Safe today: MapView unmounts on navigation so this is never permanently stuck.
@@ -845,8 +849,10 @@ export default function MapView() {
   async function fetchLocationCampsites(name: string, lat: number, lng: number) {
     setActiveChip(null);
     activeChipRef.current = null;
+    setEmptySearchResult(false);
     setMapSearchLoading(true);
     setMapSearchError(null);
+    locationCoordsRef.current = { lat, lng };
     try {
       const params = new URLSearchParams({ lat: String(lat), lng: String(lng) });
       if (freeOnlyRef.current) params.set("free", "true");
@@ -888,6 +894,7 @@ export default function MapView() {
   // Inline NL search — stays on the map, replaces results without navigating home.
   async function handleMapSearch(q: string, chipKey: string | null = null) {
     if (!q.trim() || mapSearchLoading) return;
+    locationCoordsRef.current = null;
     // Sync the search bar to whatever query is being run — chip searches populate the bar
     // so the user always knows what was searched (mirrors HomeScreen → Map behaviour).
     setMapQuery(q);
@@ -1017,6 +1024,7 @@ export default function MapView() {
     searchModeRef.current = false;
     amenitySearchModeRef.current = false;
     suppressGeoFlyRef.current = false;
+    locationCoordsRef.current = null;
     setActiveChip(null);
     activeChipRef.current = null;
     setSearchContextQuery(null);
@@ -1225,9 +1233,12 @@ export default function MapView() {
                       const next = !freeOnly;
                       setFreeOnly(next);
                       freeOnlyRef.current = next;
-                      if (mapRef.current) {
-                        const map = mapRef.current.getMap();
-                        loadCampsites(map);
+                      const locCoords = locationCoordsRef.current;
+                      if (locCoords) {
+                        suppressGeoFlyRef.current = true;
+                        void fetchLocationCampsites(searchContextQuery ?? "", locCoords.lat, locCoords.lng);
+                      } else if (mapRef.current) {
+                        loadCampsites(mapRef.current.getMap());
                       }
                     }
                   : filterKey !== null
@@ -1417,7 +1428,7 @@ export default function MapView() {
           onSelectPin={selectPin}
           isFetching={isFetching}
           isEmpty={emptySearchResult}
-          searchLocation={searchParsedIntent?.location ?? null}
+          searchLocation={searchParsedIntent?.location ?? searchContextQuery}
           onClearSearch={handleClearSearch}
           onBroadenSearch={() => searchInputRef.current?.focus()}
         />
