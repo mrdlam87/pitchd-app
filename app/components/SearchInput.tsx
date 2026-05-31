@@ -70,7 +70,6 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
 
     debounceRef.current = setTimeout(async () => {
       if (justSelectedRef.current) {
-        justSelectedRef.current = false;
         return;
       }
       if (value.trim().length < MIN_QUERY_LENGTH) {
@@ -149,6 +148,7 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
   }
 
   function handleChange(v: string) {
+    justSelectedRef.current = false;
     onChange(v);
     if (v.trim().length >= MIN_QUERY_LENGTH) {
       setShowRecents(false);
