@@ -42,14 +42,17 @@ export async function GET(req: Request): Promise<Response> {
     return Response.json({ error: "lat and lng must be valid coordinates" }, { status: 400 });
   }
 
-  const pad = DEFAULT_RADIUS_KM * DEG_PER_KM;
+  const latPad = DEFAULT_RADIUS_KM * DEG_PER_KM;
+  // Longitude degrees shrink with latitude (cos factor). Widen the lng window so
+  // campsites near the bounding box edge are not excluded before haversine filters them.
+  const lngPad = latPad / Math.cos((lat * Math.PI) / 180);
 
   try {
     const campsites = await prisma.campsite.findMany({
       where: {
         syncStatus: SyncStatus.active,
-        lat: { gte: lat - pad, lte: lat + pad },
-        lng: { gte: lng - pad, lte: lng + pad },
+        lat: { gte: lat - latPad, lte: lat + latPad },
+        lng: { gte: lng - lngPad, lte: lng + lngPad },
         ...(free && { isFree: true }),
       },
       select: {
