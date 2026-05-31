@@ -65,11 +65,9 @@ export async function GET(req: Request): Promise<Response> {
     }));
 
     if (hasLocation) {
-      results.sort(
-        (a, b) =>
-          haversineKm(userLat, userLng, a.lat, a.lng) -
-          haversineKm(userLat, userLng, b.lat, b.lng)
-      );
+      const withDist = results.map((c) => ({ c, d: haversineKm(userLat, userLng, c.lat, c.lng) }));
+      withDist.sort((a, b) => a.d - b.d);
+      return Response.json({ campsites: withDist.map(({ c }) => c) });
     }
 
     return Response.json({ campsites: results });

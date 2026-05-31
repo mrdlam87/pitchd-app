@@ -22,7 +22,6 @@ export const metadata: Metadata = {
   description: "AI-powered camping travel and planning companion for Australian campers.",
 };
 
-
 export default function RootLayout({
   children,
 }: Readonly<{

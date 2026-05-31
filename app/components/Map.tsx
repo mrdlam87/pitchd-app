@@ -786,6 +786,8 @@ export default function MapView() {
   );
 
   async function fetchRegionCampsites(region: string) {
+    setActiveChip(null);
+    activeChipRef.current = null;
     setMapSearchLoading(true);
     setMapSearchError(null);
     try {
@@ -793,7 +795,7 @@ export default function MapView() {
       let lng = DEFAULT_VIEWPORT.longitude;
       try {
         const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 3000 })
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 1000 })
         );
         lat = pos.coords.latitude;
         lng = pos.coords.longitude;

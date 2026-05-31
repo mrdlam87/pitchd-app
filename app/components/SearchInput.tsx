@@ -239,12 +239,12 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
           {/* Circular action button — × (clear) when value is set, search icon otherwise */}
           {onClear && value.trim() && !loading ? (
             <button
-              onClick={() => { onChange(""); onClear(); }}
+              onClick={() => { onChange(""); setSuggestions([]); setShowSuggestions(false); onClear(); }}
               aria-label="Clear search"
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#e8f0e8] transition-colors"
             >
               <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-                <path d="M1 1l10 10M11 1L1 11" stroke="#5a7a5a" strokeWidth="1.8" strokeLinecap="round" />
+                <path d="M1 1l10 10M11 1L1 11" stroke={SAGE} strokeWidth="1.8" strokeLinecap="round" />
               </svg>
             </button>
           ) : (
@@ -260,8 +260,8 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
                 <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
               ) : (
                 <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                  <circle cx="7" cy="7" r="5" stroke={value.trim() ? "#fff" : "#5a7a5a"} strokeWidth="1.8" />
-                  <path d="M11 11l3 3" stroke={value.trim() ? "#fff" : "#5a7a5a"} strokeWidth="1.8" strokeLinecap="round" />
+                  <circle cx="7" cy="7" r="5" stroke={value.trim() ? "#fff" : SAGE} strokeWidth="1.8" />
+                  <path d="M11 11l3 3" stroke={value.trim() ? "#fff" : SAGE} strokeWidth="1.8" strokeLinecap="round" />
                 </svg>
               )}
             </button>

@@ -1,5 +1,3 @@
-// GET /api/search/suggestions
-// Prefix-match campsites and regions for typeahead suggestions.
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/apiAuth";
 import { SyncStatus } from "@/lib/generated/prisma/enums";
@@ -49,7 +47,7 @@ export async function GET(req: Request): Promise<Response> {
         take: SUGGESTION_LIMIT,
       }),
       prisma.campsite.groupBy({
-        by: ["region"],
+        by: ["region", "state"],
         where: {
           syncStatus: SyncStatus.active,
           region: { not: null, contains: q, mode: "insensitive" },
@@ -60,24 +58,11 @@ export async function GET(req: Request): Promise<Response> {
       }),
     ]);
 
-    // Resolve a representative state for each region group. Scoped to the exact
-    // regions from the first query so ordering differences can't produce misses.
-    const regionStates = await prisma.campsite.groupBy({
-      by: ["region", "state"],
-      where: {
-        syncStatus: SyncStatus.active,
-        region: { in: regionGroups.map((g) => g.region!) },
-      },
-    });
-    const stateMap = new Map(
-      regionStates.map((r: { region: string | null; state: string }) => [r.region!, r.state])
-    );
-
     const regions: RegionSuggestion[] = regionGroups.map((g) => ({
       kind: "region" as const,
       name: g.region!,
       count: g._count.region,
-      state: stateMap.get(g.region!) ?? "",
+      state: g.state,
     }));
 
     const campsiteSuggestions: CampsiteSuggestion[] = campsites.map((c) => ({
