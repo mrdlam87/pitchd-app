@@ -52,7 +52,8 @@ Run this before merging any PR that touches Map.tsx, BottomDrawer.tsx, SearchInp
 
 ## 6. Context label
 
-- [ ] There is **no** visible context label below the search bar in normal use — the label only appears if `searchContextQuery` is set while the bar is empty, which does not occur in the current UI flows
+- [ ] In normal browse mode (no active search), there is **no** context label below the search bar
+- [ ] After selecting a **location suggestion** (city/town), the drawer shows the city name as the search context (e.g. "near Melbourne") in the empty-state message — see §11a and §12 for full location search checks
 
 ---
 

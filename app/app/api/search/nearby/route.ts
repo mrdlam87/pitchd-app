@@ -57,6 +57,10 @@ export async function GET(req: Request): Promise<Response> {
         lng: { gte: lng - lngPad, lte: lng + lngPad },
         ...(free && { isFree: true }),
       },
+      // Safety cap: bounds memory for dense bounding boxes. At current AU data
+      // density a 200 km² box rarely exceeds ~200 rows, so 500 is conservative.
+      // If the box ever holds >500 rows, campsites beyond the cap are silently
+      // excluded before haversine filtering — acceptable for MVP scale.
       take: 500,
       select: {
         id: true,

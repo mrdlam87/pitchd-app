@@ -884,6 +884,7 @@ export default function MapView() {
       }
     } catch (e) {
       console.error("[fetchLocationCampsites]", e);
+      locationCoordsRef.current = null;
       setMapSearchError("Could not load nearby campsites. Please try again.");
     } finally {
       setMapSearchLoading(false);
