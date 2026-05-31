@@ -270,6 +270,7 @@ export default function MapView() {
     loadAmenities,
     loadWeatherForViewport,
     setSearchResults,
+    setHasMore,
     setSearchAmenities,
     markInitialLoaded,
   } = useMapData({
@@ -808,8 +809,9 @@ export default function MapView() {
         setMapSearchError("Could not load region campsites. Please try again.");
         return;
       }
-      const data = await res.json() as { campsites: Campsite[] };
+      const data = await res.json() as { campsites: Campsite[]; hasMore: boolean };
       setSearchResults(data.campsites);
+      setHasMore(data.hasMore);
       searchModeRef.current = true;
       setSearchContextQuery(region);
       if (data.campsites.length > 0 && mapRef.current) {
@@ -1083,13 +1085,21 @@ export default function MapView() {
             setRecentSearches(getRecentSearches());
             setMapQuery(s.name);
             if (s.kind === "campsite") {
-              setSearchResults([{ id: s.id, name: s.name, lat: s.lat, lng: s.lng, region: null, blurb: null, amenities: [], weather: null }]);
+              // Seed immediately with minimal data so the pin appears without delay,
+              // then hydrate with the full record (amenities, blurb) once fetched.
+              setSearchResults([{ id: s.id, name: s.name, lat: s.lat, lng: s.lng, region: s.region ?? null, blurb: null, amenities: [], weather: null }]);
               mapRef.current?.getMap().flyTo({ center: [s.lng, s.lat], zoom: 14, duration: 800 });
               setDrawerState("peek");
               drawerStateRef.current = "peek";
               searchModeRef.current = true;
               suppressGeoFlyRef.current = true;
               setSearchContextQuery(s.name);
+              fetch(`/api/campsites/${s.id}`)
+                .then((r) => r.ok ? r.json() : null)
+                .then((full: { id: string; name: string; lat: number; lng: number; region: string | null; blurb: string | null; amenities: { key: string; label: string; icon: string; color: string }[] } | null) => {
+                  if (full) setSearchResults([{ ...full, weather: null }]);
+                })
+                .catch(() => { /* leave the minimal seed in place */ });
             } else {
               void fetchRegionCampsites(s.name);
             }
@@ -1148,6 +1158,8 @@ export default function MapView() {
                 ? () => {
                     const hasWeatherData = campsites.some((c) => c.weather && c.weather.length > 0);
                     if (!hasWeatherData) return;
+                    setSelectedIdx(null);
+                    selectedIdRef.current = null;
                     setGoodWeatherOnly((prev) => !prev);
                   }
                 : isFreeChip

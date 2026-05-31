@@ -121,6 +121,7 @@ export type UseMapDataReturn = {
   // Atomically updates campsites state, campsitesRef, and prevCampsitesLengthRef.
   // Use instead of setCampsites for AI-search result paths so all three stay in sync.
   setSearchResults: (campsites: Campsite[]) => void;
+  setHasMore: Dispatch<SetStateAction<boolean>>;
   // Sets amenityPois directly from an amenity-search payload arrival.
   setSearchAmenities: (pois: AmenityPOI[]) => void;
   // Call when AI search results are loaded directly (skips loadCampsites path).
@@ -352,6 +353,7 @@ export function useMapData({
     loadAmenities,
     loadWeatherForViewport,
     setSearchResults,
+    setHasMore,
     setSearchAmenities,
     markInitialLoaded,
   };

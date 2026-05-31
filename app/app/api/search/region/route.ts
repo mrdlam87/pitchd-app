@@ -64,13 +64,15 @@ export async function GET(req: Request): Promise<Response> {
       amenities: c.amenities.map((a) => a.amenityType),
     }));
 
+    const hasMore = campsites.length === RESULT_LIMIT;
+
     if (hasLocation) {
       const withDist = results.map((c) => ({ c, d: haversineKm(userLat, userLng, c.lat, c.lng) }));
       withDist.sort((a, b) => a.d - b.d);
-      return Response.json({ campsites: withDist.map(({ c }) => c) });
+      return Response.json({ campsites: withDist.map(({ c }) => c), hasMore });
     }
 
-    return Response.json({ campsites: results });
+    return Response.json({ campsites: results, hasMore });
   } catch (e) {
     console.error("[GET /api/search/region]", e);
     return Response.json({ error: "Internal server error" }, { status: 500 });
