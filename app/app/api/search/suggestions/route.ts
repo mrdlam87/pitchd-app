@@ -3,9 +3,9 @@ import { requireAuth } from "@/lib/apiAuth";
 import { SyncStatus } from "@/lib/generated/prisma/enums";
 
 const MIN_QUERY_LENGTH = 2;
-const SUGGESTION_LIMIT = 4;
+const CAMPSITE_LIMIT = 4;
+const REGION_LIMIT = 2;
 const LOCATION_LIMIT = 2;
-const MAX_TOTAL_SUGGESTIONS = 7;
 
 export type CampsiteSuggestion = {
   kind: "campsite";
@@ -39,11 +39,10 @@ async function fetchLocationSuggestions(q: string): Promise<LocationSuggestion[]
   const token = process.env.MAPBOX_SERVER_TOKEN ?? process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
   if (!token) return [];
   try {
-    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?country=AU&types=place,locality,neighborhood&limit=${LOCATION_LIMIT}`;
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(800),
-    });
+    if (q.length > 200) return [];
+    // Mapbox Geocoding v5 requires the token as a query param — Bearer header is v6-only.
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?country=AU&types=place,locality,neighborhood&limit=${LOCATION_LIMIT}&access_token=${token}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(800) });
     if (!res.ok) return [];
     const data = await res.json() as { features?: Array<{ text: string; center: [number, number] }> };
     if (!Array.isArray(data.features)) return [];
@@ -75,7 +74,7 @@ export async function GET(req: Request): Promise<Response> {
         },
         select: { id: true, name: true, lat: true, lng: true, region: true, state: true },
         orderBy: { name: "asc" },
-        take: SUGGESTION_LIMIT,
+        take: CAMPSITE_LIMIT,
       }),
       prisma.campsite.groupBy({
         by: ["region", "state"],
@@ -85,7 +84,7 @@ export async function GET(req: Request): Promise<Response> {
         },
         _count: { region: true },
         orderBy: { _count: { region: "desc" } },
-        take: SUGGESTION_LIMIT,
+        take: REGION_LIMIT,
       }),
       fetchLocationSuggestions(q),
     ]);
@@ -102,8 +101,10 @@ export async function GET(req: Request): Promise<Response> {
       ...c,
     }));
 
-    // Locations first (city-level intent), then regions, then campsites. Cap total.
-    const suggestions: Suggestion[] = [...locationSuggestions, ...regions, ...campsiteSuggestions].slice(0, MAX_TOTAL_SUGGESTIONS);
+    // Locations first (city-level intent), then regions, then campsites.
+    // Each group is already capped at its limit by the DB/API query, so campsite
+    // results are never crowded out by a large location or region set.
+    const suggestions: Suggestion[] = [...locationSuggestions, ...regions, ...campsiteSuggestions];
 
     return Response.json({ suggestions });
   } catch (e) {
