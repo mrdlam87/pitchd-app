@@ -45,7 +45,9 @@ export async function GET(req: Request): Promise<Response> {
   const latPad = DEFAULT_RADIUS_KM * DEG_PER_KM;
   // Longitude degrees shrink with latitude (cos factor). Widen the lng window so
   // campsites near the bounding box edge are not excluded before haversine filters them.
-  const lngPad = latPad / Math.cos((lat * Math.PI) / 180);
+  // Cap at 180 to prevent near-pole coordinates (lat ≈ ±90) from producing a ~1e16
+  // pad that turns the DB query into a full table scan.
+  const lngPad = Math.min(latPad / Math.cos((lat * Math.PI) / 180), 180);
 
   try {
     const campsites = await prisma.campsite.findMany({
