@@ -30,6 +30,7 @@ model Campsite {
   blurb           String?
   bookingRequired Boolean           @default(false)
   bookingUrl      String?
+  isFree          Boolean?
   source          String
   sourceId        String?
   lastSyncedAt    DateTime?

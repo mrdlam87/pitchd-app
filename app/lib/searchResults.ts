@@ -36,13 +36,37 @@ export type AmenitySearchPayload = {
   query: string;
 };
 
-export type SearchResultsPayload = AISearchPayload | DirectFilterPayload | AmenitySearchPayload;
+// Direct campsite navigation — links directly to a specific campsite without search results.
+export type CampsiteDirectPayload = {
+  kind: "campsite-direct";
+  campsite: { id: string; name: string; lat: number; lng: number };
+};
+
+// Region-based search — shows all campsites in a specific region.
+export type RegionPayload = {
+  kind: "region";
+  region: string;
+};
+
+export type SearchResultsPayload = AISearchPayload | DirectFilterPayload | AmenitySearchPayload | CampsiteDirectPayload | RegionPayload;
 
 // Parses and validates an unknown value (e.g. from JSON.parse) as a SearchResultsPayload.
 // Returns null if the shape is invalid. Exported for unit testing.
 export function parseSearchResultsPayload(parsed: unknown): SearchResultsPayload | null {
   if (typeof parsed !== "object" || parsed === null) return null;
   const obj = parsed as Record<string, unknown>;
+
+  if (obj.kind === "campsite-direct") {
+    const c = obj.campsite as Record<string, unknown>;
+    if (typeof c?.id !== "string" || typeof c?.name !== "string") return null;
+    if (typeof c?.lat !== "number" || typeof c?.lng !== "number") return null;
+    return parsed as SearchResultsPayload;
+  }
+
+  if (obj.kind === "region") {
+    if (typeof obj.region !== "string" || obj.region.trim() === "") return null;
+    return parsed as SearchResultsPayload;
+  }
 
   if (obj.kind === "direct") {
     if (typeof obj.chipKey !== "string") return null;

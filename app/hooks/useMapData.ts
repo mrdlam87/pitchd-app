@@ -11,7 +11,7 @@ export type Bounds = { north: number; south: number; east: number; west: number 
 
 type FetchResult = { results: Campsite[]; hasMore: boolean };
 
-async function fetchCampsites(bounds: Bounds, amenities: string[] = []): Promise<FetchResult> {
+async function fetchCampsites(bounds: Bounds, amenities: string[] = [], free = false): Promise<FetchResult> {
   const params = new URLSearchParams({
     north: String(bounds.north),
     south: String(bounds.south),
@@ -19,6 +19,7 @@ async function fetchCampsites(bounds: Bounds, amenities: string[] = []): Promise
     west:  String(bounds.west),
   });
   amenities.forEach((key) => params.append("amenities", key));
+  if (free) params.set("free", "true");
   try {
     const res = await fetch(`/api/campsites?${params}`);
     if (!res.ok) {
@@ -92,6 +93,7 @@ export type UseMapDataOptions = {
   drawerStateRef: MutableRefObject<DrawerState>;
   activeFiltersRef: MutableRefObject<FilterState>;
   activeChipRef: MutableRefObject<string | null>;
+  freeOnlyRef: MutableRefObject<boolean>;
   selectedIdRef: MutableRefObject<string | null>;
   cardRefs: MutableRefObject<(HTMLDivElement | null)[]>;
   skipNextFetch: MutableRefObject<boolean>;
@@ -119,6 +121,7 @@ export type UseMapDataReturn = {
   // Atomically updates campsites state, campsitesRef, and prevCampsitesLengthRef.
   // Use instead of setCampsites for AI-search result paths so all three stay in sync.
   setSearchResults: (campsites: Campsite[]) => void;
+  setHasMore: Dispatch<SetStateAction<boolean>>;
   // Sets amenityPois directly from an amenity-search payload arrival.
   setSearchAmenities: (pois: AmenityPOI[]) => void;
   // Call when AI search results are loaded directly (skips loadCampsites path).
@@ -129,6 +132,7 @@ export function useMapData({
   drawerStateRef,
   activeFiltersRef,
   activeChipRef,
+  freeOnlyRef,
   selectedIdRef,
   cardRefs,
   skipNextFetch,
@@ -255,7 +259,7 @@ export function useMapData({
     const bounds = computeVisibleBounds(map, getDrawerHeightPx(drawerStateRef.current));
     const filters = activeFiltersRef.current;
     const amenities = [...filters.activities, ...filters.pois];
-    fetchCampsites(bounds, amenities)
+    fetchCampsites(bounds, amenities, freeOnlyRef.current)
       .then(({ results, hasMore: newHasMore }) => {
         if (id !== fetchCounterRef.current) return; // stale fetch — discard
         setIsFetching(false);
@@ -297,7 +301,7 @@ export function useMapData({
         setIsFetching(false);
         markInitialLoaded();
       });
-  // drawerStateRef, activeFiltersRef, selectedIdRef, cardRefs, skipNextFetch are stable refs.
+  // drawerStateRef, activeFiltersRef, freeOnlyRef, selectedIdRef, cardRefs, skipNextFetch are stable refs.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadWeatherForViewport, markInitialLoaded, setDrawerState, setSelectedIdx]);
 
@@ -349,6 +353,7 @@ export function useMapData({
     loadAmenities,
     loadWeatherForViewport,
     setSearchResults,
+    setHasMore,
     setSearchAmenities,
     markInitialLoaded,
   };

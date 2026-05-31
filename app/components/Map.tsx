@@ -21,6 +21,8 @@ import { QUICK_CHIPS, AMENITY_CHIPS } from "@/lib/chips";
 import { CampsitePin } from "./CampsitePin";
 import { AmenityPin, type AmenityPinMeta } from "./AmenityPin";
 import { useMapData } from "@/hooks/useMapData";
+import SearchInput, { type SearchInputHandle, type Suggestion } from "@/components/SearchInput";
+import { weatherScore } from "@/lib/weatherScore";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -151,12 +153,12 @@ export default function MapView() {
   // AI arrivals: chipKey flows through AISearchPayload (defaults to "pitchd" for textarea NL queries).
   // Direct-filter arrivals: no chip is highlighted — the activity shows in the filter count badge.
   const [activeChip, setActiveChip] = useState<string | null>(
-    initialSearch?.kind === "ai" ? (initialSearch.chipKey ?? "pitchd") : null
+    initialSearch?.kind === "ai" ? (initialSearch.chipKey ?? null) : null
   );
   // Ref mirrors activeChip so stable useCallback closures (e.g. loadWeatherForViewport)
   // can read the current chip key without needing it in their dependency array.
   const activeChipRef = useRef<string | null>(
-    initialSearch?.kind === "ai" ? (initialSearch.chipKey ?? "pitchd") : null
+    initialSearch?.kind === "ai" ? (initialSearch.chipKey ?? null) : null
   );
   // Query string shown as context below the map search input (AI searches only)
   const [searchContextQuery, setSearchContextQuery] = useState<string | null>(
@@ -174,17 +176,17 @@ export default function MapView() {
       ? (initialSearch.query ?? "")
       : ""
   );
-  // Recent searches dropdown
-  const [showRecents, setShowRecents] = useState(false);
+  // Recent searches — loaded on mount and refreshed after each search for the SearchInput dropdown
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  // Ref to the map search input — used by "Edit search" to refocus it
-  const mapSearchInputRef = useRef<HTMLInputElement>(null);
-  // Wraps the search pill + recents dropdown — used to detect outside clicks
-  const searchPillRef = useRef<HTMLDivElement>(null);
-  // Blur timeout ref — keyboard-only fallback to close the recents dropdown
+  // Ref to the SearchInput — used to restore focus after Vaul steals it
+  const searchInputRef = useRef<SearchInputHandle>(null);
+  // Blur timeout ref — used in cleanup to cancel any pending blur timer
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mapSearchLoading, setMapSearchLoading] = useState(false);
   const [mapSearchError, setMapSearchError] = useState<string | null>(null);
+  const [goodWeatherOnly, setGoodWeatherOnly] = useState(false);
+  const [freeOnly, setFreeOnly] = useState(false);
+  const freeOnlyRef = useRef(false);
   // Suppresses the geolocation flyTo when search results are loaded so the camera
   // doesn't pan away from the result bounds.
   // Safe today: MapView unmounts on navigation so this is never permanently stuck.
@@ -226,6 +228,11 @@ export default function MapView() {
   // skipNextFetch suppresses the moveend handler for one event — used when code
   // calls easeTo/setPadding programmatically to avoid triggering a redundant fetch.
   const skipNextFetch = useRef(false);
+  // Timestamp (ms) until which moveend fetches are suppressed. Used when the soft
+  // keyboard opens — Android resizes the viewport which causes Mapbox to fire one or
+  // more moveend events. A time-window guard (rather than a one-shot bool) suppresses
+  // all of them regardless of how many Mapbox emits during the resize animation.
+  const suppressFetchUntilRef = useRef(0);
   // Mirrors drawerState so loadCampsites (a stable useCallback) always reads the latest value
   const drawerStateRef = useRef<DrawerState>("peek");
   // Mirrors the selected campsite's ID so loadCampsites (stable callback) can
@@ -263,12 +270,14 @@ export default function MapView() {
     loadAmenities,
     loadWeatherForViewport,
     setSearchResults,
+    setHasMore,
     setSearchAmenities,
     markInitialLoaded,
   } = useMapData({
     drawerStateRef,
     activeFiltersRef,
     activeChipRef,
+    freeOnlyRef,
     selectedIdRef,
     cardRefs,
     skipNextFetch,
@@ -277,18 +286,34 @@ export default function MapView() {
     setSelectedPoiId,
   });
 
-  // Campsite cluster index — rebuilt only when the campsite list changes.
+  // Campsites after applying the client-side Good weather toggle.
+  // When goodWeatherOnly is false, all campsites are shown.
+  const GOOD_WEATHER_THRESHOLD = 45;
+  const displayedCampsites = useMemo(() => {
+    if (!goodWeatherOnly) return campsites;
+    return campsites.filter((c) => {
+      if (!c.weather || c.weather.length === 0) return false;
+      return weatherScore(c.weather) >= GOOD_WEATHER_THRESHOLD;
+    });
+  }, [campsites, goodWeatherOnly]);
+
+  // Ref kept in sync with displayedCampsites so selectPin (a stable useCallback)
+  // can read the latest list without closing over a stale snapshot.
+  const displayedCampsitesRef = useRef(displayedCampsites);
+  useEffect(() => { displayedCampsitesRef.current = displayedCampsites; }, [displayedCampsites]);
+
+  // Campsite cluster index — rebuilt only when the displayed campsite list changes.
   const campsiteClusterInstance = useMemo(() => {
     const sc = new Supercluster<{ id: string; idx: number }>(CLUSTER_OPTIONS);
     sc.load(
-      campsites.map((c, i) => ({
+      displayedCampsites.map((c, i) => ({
         type: "Feature" as const,
         geometry: { type: "Point" as const, coordinates: [c.lng, c.lat] },
         properties: { id: c.id, idx: i },
       }))
     );
     return sc;
-  }, [campsites]);
+  }, [displayedCampsites]);
 
   // Amenity POI cluster index — rebuilt only when the amenity list changes.
   const amenityClusterInstance = useMemo(() => {
@@ -441,24 +466,49 @@ export default function MapView() {
     };
   }, []);
 
-  // Prevent the Vaul/Radix drawer container (data-vaul-drawer) from stealing keyboard
-  // focus. Radix applies focus via useLayoutEffect on mount and during certain internal
-  // state changes; the native focusin event fires before React's synthetic system, so we
-  // must use a native capture listener. When the drawer steals focus, restore it to the
-  // search input if it was previously focused so the recents dropdown stays visible.
+  // Load recent searches once on mount so SearchInput can show them immediately on focus.
   useEffect(() => {
+    setRecentSearches(getRecentSearches());
+  }, []);
+
+  // Prevent Radix's FocusScope (inside Vaul's Drawer.Content) from stealing keyboard
+  // focus away from the search input.
+  //
+  // Root cause: Vaul wraps Drawer.Content in a Radix Dialog with FocusScope (trapped=true).
+  // FocusScope intercepts both the focusout (leaving the drawer) and focusin (landing on
+  // the input) events at the document bubble level and redirects focus back inside the drawer.
+  //
+  // Fix — two listeners that block both Radix mechanisms:
+  //   1. focusout capture on document: when focus is leaving a drawer element and going TO
+  //      the search input, stopPropagation() before Radix's handleFocusOut2 (bubble) sees it.
+  //   2. focusin bubble on the input element itself: stopPropagation() after React's capture
+  //      handler fires (so synthetic onFocus works) but before Radix's handleFocusIn2 (bubble)
+  //      sees it. This prevents the redirect if FocusOut2 was somehow bypassed.
+  // The vaul-div capture handler remains as a safety net for page-load steals.
+  useEffect(() => {
+    const inputEl = searchInputRef.current?.inputElement();
+
+    // 1. Block Radix handleFocusOut2: focusout on a drawer element going TO our input.
+    const handleFocusout = (e: FocusEvent) => {
+      if (inputEl && e.relatedTarget === inputEl) {
+        e.stopPropagation();
+      }
+    };
+    // 2. Block Radix handleFocusIn2: focusin landing on our input.
+    //    Bubble phase fires after React's capture handler, so synthetic onFocus still works.
+    const stopFocusIn = (e: FocusEvent) => e.stopPropagation();
+    if (inputEl) {
+      inputEl.addEventListener("focusin", stopFocusIn);
+    }
+
+    // 3. Safety net: if Vaul's container div steals focus (e.g. on mount), blur it.
     const handleFocusin = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
       if (target?.dataset?.vaulDrawer !== undefined && target.tagName === "DIV") {
         target.blur();
-        // Cancel the blur timer that fired when focus left the input — the steal is
-        // transient and the pointerdown-outside handler is responsible for closing recents.
-        if (blurTimeoutRef.current !== null) {
-          clearTimeout(blurTimeoutRef.current);
-          blurTimeoutRef.current = null;
-        }
       }
     };
+
     // setTimeout(0) defers past any Vaul/Radix useEffect callbacks that run after ours.
     const tid = setTimeout(() => {
       const active = document.activeElement as HTMLElement | null;
@@ -466,34 +516,40 @@ export default function MapView() {
         active.blur();
       }
     }, 0);
+
+    document.addEventListener("focusout", handleFocusout, true);
     document.addEventListener("focusin", handleFocusin, true);
     return () => {
       clearTimeout(tid);
+      document.removeEventListener("focusout", handleFocusout, true);
       document.removeEventListener("focusin", handleFocusin, true);
+      if (inputEl) inputEl.removeEventListener("focusin", stopFocusIn);
     };
   }, []);
-
-  // Close the recents dropdown on pointerdown outside the search pill.
-  // This is the primary close mechanism — more robust than blur/focus timers
-  // because it is immune to Vaul's focus management and mobile keyboard timing.
-  useEffect(() => {
-    if (!showRecents) return;
-    const handlePointerDown = (e: PointerEvent) => {
-      if (!searchPillRef.current?.contains(e.target as Node)) {
-        setShowRecents(false);
-        if (blurTimeoutRef.current !== null) {
-          clearTimeout(blurTimeoutRef.current);
-          blurTimeoutRef.current = null;
-        }
-      }
-    };
-    document.addEventListener("pointerdown", handlePointerDown, true);
-    return () => document.removeEventListener("pointerdown", handlePointerDown, true);
-  }, [showRecents]);
 
   useEffect(() => {
     activeFiltersRef.current = activeFilters;
   }, [activeFilters]);
+
+  // When the soft keyboard opens on Android the visual viewport shrinks, which
+  // causes Mapbox to fire one or more moveend events as it resizes its canvas.
+  // A one-shot skipNextFetch flag is insufficient — Mapbox can fire 2-3 moveend
+  // events during the keyboard animation. Use a time-window guard instead:
+  // suppress ALL moveend fetches for 1.5 s whenever the viewport height drops
+  // by more than 50 px (reliable proxy for "keyboard is opening").
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.visualViewport) return;
+    let lastHeight = window.visualViewport.height;
+    function onVvResize() {
+      const h = window.visualViewport!.height;
+      if (h < lastHeight - 50) {
+        suppressFetchUntilRef.current = Date.now() + 1500;
+      }
+      lastHeight = h;
+    }
+    window.visualViewport.addEventListener("resize", onVvResize);
+    return () => window.visualViewport!.removeEventListener("resize", onVvResize);
+  }, []);
 
 
   useEffect(() => {
@@ -544,6 +600,27 @@ export default function MapView() {
         // Fall through to browse mode so the camera and campsite fetch work normally.
       }
 
+      // Single campsite direct link — show that campsite only and fly to it.
+      if (searchPayload?.kind === "campsite-direct") {
+        initialSearchRef.current = null;
+        const c = searchPayload.campsite;
+        setSearchResults([{ id: c.id, name: c.name, lat: c.lat, lng: c.lng, region: null, blurb: null, amenities: [], weather: null }]);
+        searchModeRef.current = true;
+        suppressGeoFlyRef.current = true;
+        e.target.flyTo({ center: [c.lng, c.lat], zoom: 14, duration: 800 });
+        setDrawerState("peek");
+        drawerStateRef.current = "peek";
+        return;
+      }
+
+      // Region search arrival — fetch all campsites in the region asynchronously.
+      if (searchPayload?.kind === "region") {
+        initialSearchRef.current = null;
+        suppressGeoFlyRef.current = true;
+        void fetchRegionCampsites(searchPayload.region);
+        return;
+      }
+
       // Search payload was present but returned no campsites — fall back to browse mode.
       // Reset both refs so handleMoveEnd fires normally and geolocation flyTo works.
       searchModeRef.current = false;
@@ -588,6 +665,10 @@ export default function MapView() {
 
       if (skipNextFetch.current) {
         skipNextFetch.current = false;
+        return;
+      }
+      // Keyboard-open guard: suppress all fetches for 1.5 s after viewport shrinks.
+      if (Date.now() < suppressFetchUntilRef.current) {
         return;
       }
       // While NL search results are active, suppress browse fetches but still
@@ -636,7 +717,7 @@ export default function MapView() {
       setDrawerState("half");
       setSelectedIdx(i);
       setSelectedPoiId(null);
-      const campsite = campsites[i];
+      const campsite = displayedCampsitesRef.current[i];
       selectedIdRef.current = campsite?.id ?? null;
       if (animate && campsite && mapRef.current) {
         skipNextFetch.current = true;
@@ -672,7 +753,7 @@ export default function MapView() {
         }, DRAWER_TRANSITION_MS);
       }
     },
-    [campsites]
+    []
   );
 
   const handleApplyFilters = useCallback(
@@ -705,18 +786,70 @@ export default function MapView() {
     [loadCampsites, loadAmenities],
   );
 
+  async function fetchRegionCampsites(region: string) {
+    setActiveChip(null);
+    activeChipRef.current = null;
+    setMapSearchLoading(true);
+    setMapSearchError(null);
+    try {
+      let lat = DEFAULT_VIEWPORT.latitude;
+      let lng = DEFAULT_VIEWPORT.longitude;
+      try {
+        const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 1000 })
+        );
+        lat = pos.coords.latitude;
+        lng = pos.coords.longitude;
+      } catch { /* use defaults */ }
+
+      const params = new URLSearchParams({ name: region, lat: String(lat), lng: String(lng) });
+      if (freeOnlyRef.current) params.set("free", "true");
+      const res = await fetch(`/api/search/region?${params}`);
+      if (!res.ok) {
+        setMapSearchError("Could not load region campsites. Please try again.");
+        return;
+      }
+      const data = await res.json() as { campsites: Campsite[]; hasMore: boolean };
+      setSearchResults(data.campsites);
+      setHasMore(data.hasMore);
+      searchModeRef.current = true;
+      setSearchContextQuery(region);
+      if (data.campsites.length > 0 && mapRef.current) {
+        const map = mapRef.current.getMap();
+        fitToCampsites(map, data.campsites, getDrawerHeightPx("half"));
+        setDrawerState("half");
+        drawerStateRef.current = "half";
+        loadWeatherForViewport(map, data.campsites);
+      } else {
+        setEmptySearchResult(true);
+        setDrawerState("half");
+        drawerStateRef.current = "half";
+      }
+    } catch (e) {
+      console.error("[fetchRegionCampsites]", e);
+      setMapSearchError("Could not load region campsites. Please try again.");
+    } finally {
+      setMapSearchLoading(false);
+      markInitialLoaded();
+    }
+  }
+
   // Inline NL search — stays on the map, replaces results without navigating home.
   async function handleMapSearch(q: string, chipKey: string | null = null) {
     if (!q.trim() || mapSearchLoading) return;
+    // Sync the search bar to whatever query is being run — chip searches populate the bar
+    // so the user always knows what was searched (mirrors HomeScreen → Map behaviour).
+    setMapQuery(q);
     setMapSearchLoading(true);
     setMapSearchError(null);
     setEmptySearchResult(false);
-    // Highlight the chip immediately so it reflects the pending search state.
-    // Reverted to null in the catch block (error) or the no-results branch.
-    if (chipKey !== null) {
-      setActiveChip(chipKey);
-      activeChipRef.current = chipKey;
-    }
+    setGoodWeatherOnly(false);
+    setFreeOnly(false);
+    freeOnlyRef.current = false;
+    // For chip searches, highlight immediately. For bar searches (chipKey=null),
+    // clear any previously active chip — bar searches don't represent a chip selection.
+    setActiveChip(chipKey);
+    activeChipRef.current = chipKey;
     // Use the current map centre as the search origin so chip searches stay in the
     // area you're viewing — not the user's GPS location which may be far away.
     const mapCenter = mapRef.current?.getMap().getCenter();
@@ -751,7 +884,6 @@ export default function MapView() {
         setEmptySearchResult(data.amenityPois.length === 0);
         setSearchAmenities(data.amenityPois);
         setSearchResults([]);
-        setMapQuery("");
         setActiveChip(chipKey);
         activeChipRef.current = chipKey;
         setSearchContextQuery(q.trim());
@@ -771,14 +903,13 @@ export default function MapView() {
       }
       addRecentSearch(q.trim());
       setSearchResults(data.campsites);
-      setMapQuery("");
       if (data.campsites.length > 0 && mapRef.current) {
         // Results — enter search mode and fit the map to the pins
         setDrawerState("half");
         drawerStateRef.current = "half";
         searchModeRef.current = true;
-        setActiveChip(chipKey ?? "pitchd");
-        activeChipRef.current = chipKey ?? "pitchd";
+        setActiveChip(chipKey);
+        activeChipRef.current = chipKey;
         setSearchParsedIntent(data.parsedIntent);
         setAiSyncedActivities(data.parsedIntent.amenities);
         // Intentionally replace activities (not merge) — the new query redefines
@@ -843,6 +974,9 @@ export default function MapView() {
     setMapQuery("");
     setMapSearchError(null);
     setAiSyncedActivities([]);
+    setGoodWeatherOnly(false);
+    setFreeOnly(false);
+    freeOnlyRef.current = false;
     // Reset AI-inferred activities and dates so browse results aren't silently
     // filtered after the user exits search mode. pois are preserved — they reflect
     // explicit user choices (amenity chips / filter panel) not AI inference.
@@ -889,6 +1023,9 @@ export default function MapView() {
       setActiveChip(null);
       activeChipRef.current = null;
       setAiSyncedActivities([]);
+      setGoodWeatherOnly(false);
+      setFreeOnly(false);
+      freeOnlyRef.current = false;
       const next = baseActivities.includes(filterKey)
         ? baseActivities.filter((a: string) => a !== filterKey)
         : [...baseActivities, filterKey];
@@ -923,103 +1060,76 @@ export default function MapView() {
 
       {/* Floating search bar + quick chips — z-[60] must exceed drawer (z-50) */}
       <div className="absolute top-3 left-3 right-3 z-[60] flex flex-col gap-2">
-        {/* Search pill — relative wrapper enables the recents dropdown */}
-        <div className="relative" ref={searchPillRef}>
-          <div className="flex items-center gap-2 rounded-full border border-[#e0dbd0] bg-white px-4 py-2.5 font-[family-name:var(--font-dm-sans)] shadow-md">
-            <div className="min-w-0 flex-1">
-              <input
-                ref={mapSearchInputRef}
-                value={mapQuery}
-                onChange={(e) => { setMapQuery(e.target.value); setShowRecents(false); }}
-                onKeyDown={(e) => { if (e.key === "Enter") { setShowRecents(false); void handleMapSearch(mapQuery, null); } }}
-                onFocus={() => {
-                  if (blurTimeoutRef.current !== null) {
-                    clearTimeout(blurTimeoutRef.current);
-                    blurTimeoutRef.current = null;
-                  }
-                  if (!mapQuery) {
-                    const recents = getRecentSearches();
-                    if (recents.length > 0) { setRecentSearches(recents); setShowRecents(true); }
-                  }
-                }}
-                onBlur={(e) => {
-                  // If focus moved to the Vaul drawer container (transient focus steal),
-                  // don't close — the pointerdown-outside listener handles actual dismissal.
-                  const rt = e.relatedTarget as HTMLElement | null;
-                  if (rt?.dataset?.vaulDrawer !== undefined) return;
-                  // Keyboard-only fallback: close recents when focus leaves via Tab/click-away.
-                  blurTimeoutRef.current = setTimeout(() => setShowRecents(false), 200);
-                }}
-                placeholder="Site name, area, or describe your trip…"
-                disabled={mapSearchLoading}
-                className="w-full bg-transparent text-sm text-[#1a2e1a] outline-none placeholder:text-[#8a9e8a] disabled:opacity-60"
-              />
-              {searchContextQuery && !mapQuery && (
-                <div className="mt-0.5 flex items-center gap-1.5">
-                  <span className="truncate text-xs text-[#8a9e8a]">
-                    {(searchParsedIntent && buildContextLabel(searchParsedIntent)) || searchContextQuery}
-                  </span>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => { e.preventDefault(); handleClearSearch(); }}
-                    className="flex-shrink-0 text-[10px] font-semibold text-[#8a9e8a] hover:text-[#e8674a] leading-none"
-                    aria-label="Clear search and browse area"
-                  >
-                    ✕ Browse area
-                  </button>
-                </div>
-              )}
-            </div>
-            {/* Search icon */}
-            <button
-              type="button"
-              onClick={() => { setShowRecents(false); void handleMapSearch(mapQuery, null); }}
-              disabled={!mapQuery.trim() || mapSearchLoading}
-              aria-label="Search"
-              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40 ${mapQuery.trim() ? "bg-[#e8674a]" : "bg-[#e8f0e8]"}`}
-            >
-              {mapSearchLoading ? (
-                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-              ) : (
-                <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                  <circle cx="7" cy="7" r="5" stroke={mapQuery.trim() ? "#fff" : "#5a7a5a"} strokeWidth="1.8" />
-                  <path d="M11 11l3 3" stroke={mapQuery.trim() ? "#fff" : "#5a7a5a"} strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
-              )}
-            </button>
-            <div className="h-4 w-px shrink-0 bg-[#e0dbd0]" />
-            {/* Filters button — inside pill, matching original layout */}
-            <button
-              type="button"
-              onClick={() => setShowFilters(true)}
-              aria-label={`Filters${filterCount > 0 ? ` (${filterCount} active)` : ""}`}
-              className="shrink-0 text-xs font-bold text-[#e8674a] font-[family-name:var(--font-dm-sans)]"
-            >
-              Filters{filterCount > 0 ? ` (${filterCount})` : ""}
-            </button>
-          </div>
-          {/* Recent searches dropdown */}
-          {showRecents && recentSearches.length > 0 && (
-            <div className="absolute left-0 right-0 top-full mt-1 rounded-2xl border border-[#e0dbd0] bg-white shadow-lg overflow-hidden z-10 font-[family-name:var(--font-dm-sans)]">
-              <div className="px-4 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-[1.5px] text-[#8a9e8a]">Recent</div>
-              {recentSearches.map((recent) => (
-                <button
-                  key={recent}
-                  type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault(); // keep input focused
-                    setShowRecents(false);
-                    void handleMapSearch(recent, null);
-                  }}
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-[#1a2e1a] hover:bg-[#f7f5f0] active:bg-[#f0ede8]"
-                >
-                  <span className="text-[#8a9e8a] text-xs">↺</span>
-                  <span className="truncate">{recent}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Search bar — pill variant restores original map styling */}
+        <SearchInput
+          ref={searchInputRef}
+          variant="pill"
+          value={mapQuery}
+          onChange={(v) => {
+            setMapQuery(v);
+            if (!v) setSearchContextQuery(null);
+            // Collapse drawer on first keystroke so keyboard + results are both visible.
+            // Done here (not onFocus) to avoid triggering Vaul's focus management during
+            // the drawer state change, which caused an infinite focus/blur loop.
+            if (v && drawerStateRef.current !== "peek") {
+              setDrawerState("peek");
+              drawerStateRef.current = "peek";
+            }
+          }}
+          onSearch={(q) => { void handleMapSearch(q, null); }}
+          onSuggestionSelect={(s: Suggestion) => {
+            setGoodWeatherOnly(false);
+            setFreeOnly(false);
+            freeOnlyRef.current = false;
+            addRecentSearch(s.name);
+            setRecentSearches(getRecentSearches());
+            setMapQuery(s.name);
+            if (s.kind === "campsite") {
+              // Seed immediately with minimal data so the pin appears without delay,
+              // then hydrate with the full record (amenities, blurb) once fetched.
+              setSearchResults([{ id: s.id, name: s.name, lat: s.lat, lng: s.lng, region: s.region ?? null, blurb: null, amenities: [], weather: null }]);
+              mapRef.current?.getMap().flyTo({ center: [s.lng, s.lat], zoom: 14, duration: 800 });
+              setDrawerState("peek");
+              drawerStateRef.current = "peek";
+              searchModeRef.current = true;
+              suppressGeoFlyRef.current = true;
+              setSearchContextQuery(s.name);
+              fetch(`/api/campsites/${s.id}`)
+                .then((r) => r.ok ? r.json() : null)
+                .then((full: { id: string; name: string; lat: number; lng: number; region: string | null; blurb: string | null; amenities: { key: string; label: string; icon: string; color: string }[] } | null) => {
+                  if (!full) return;
+                  const campsite = { ...full, weather: null };
+                  setSearchResults([campsite]);
+                  if (mapRef.current) loadWeatherForViewport(mapRef.current.getMap(), [campsite]);
+                })
+                .catch(() => { /* leave the minimal seed in place */ });
+            } else {
+              void fetchRegionCampsites(s.name);
+            }
+          }}
+          recentSearches={recentSearches}
+          onRecentSelect={(recent) => {
+            setMapQuery(recent);
+            setRecentSearches(getRecentSearches());
+            void handleMapSearch(recent, null);
+          }}
+          onClear={handleClearSearch}
+          loading={mapSearchLoading}
+          placeholder="Site name, area, or describe your trip…"
+          pillTrailing={
+            <>
+              <div className="h-4 w-px shrink-0 bg-[#e0dbd0]" />
+              <button
+                type="button"
+                onClick={() => setShowFilters(true)}
+                aria-label={`Filters${filterCount > 0 ? ` (${filterCount} active)` : ""}`}
+                className="shrink-0 text-xs font-bold text-[#e8674a]"
+              >
+                Filters{filterCount > 0 ? ` (${filterCount})` : ""}
+              </button>
+            </>
+          }
+        />
 
         {/* Search error */}
         {mapSearchError && (
@@ -1033,21 +1143,49 @@ export default function MapView() {
           {[...QUICK_CHIPS, ...AMENITY_CHIPS].map((chip) => {
             // filterKey is the discriminator: non-null = direct DB filter, null = AI search.
             const filterKey = chip.kind === "amenity" ? null : chip.filterKey;
+            // weatherFilter and freeFilter are client/server-side toggles, not AI search chips.
+            const isWeatherChip = chip.kind === "quick" && "weatherFilter" in chip && chip.weatherFilter;
+            const isFreeChip = chip.kind === "quick" && "freeFilter" in chip && chip.freeFilter;
             const isActive = chip.kind === "amenity"
               ? activeFilters.pois.includes(chip.poiType)
-              : filterKey !== null
-                ? activeFilters.activities.includes(filterKey)  // driven by filter state → syncs with FilterPanel and HomeScreen
-                : activeChip === chip.key;                       // AI chips (Pitchd, weather) use activeChip
+              : isWeatherChip
+                ? goodWeatherOnly
+                : isFreeChip
+                  ? freeOnly
+                  : filterKey !== null
+                    ? activeFilters.activities.includes(filterKey)  // driven by filter state → syncs with FilterPanel and HomeScreen
+                    : activeChip === chip.key;                       // AI chips (Pitchd, weather) use activeChip
             const handleClick = chip.kind === "amenity"
               ? () => handleAmenityChip(chip.poiType)
-              : filterKey !== null
-                ? () => handleDirectFilterChip(filterKey)        // direct toggle, no AI call
-                : isActive
-                  ? handleClearSearch
-                  : () => void handleMapSearch(chip.query, chip.key);
+              : isWeatherChip
+                ? () => {
+                    const hasWeatherData = campsites.some((c) => c.weather && c.weather.length > 0);
+                    if (!hasWeatherData) return;
+                    setSelectedIdx(null);
+                    selectedIdRef.current = null;
+                    setGoodWeatherOnly((prev) => !prev);
+                  }
+                : isFreeChip
+                  ? () => {
+                      const next = !freeOnly;
+                      setFreeOnly(next);
+                      freeOnlyRef.current = next;
+                      if (mapRef.current) {
+                        const map = mapRef.current.getMap();
+                        loadCampsites(map);
+                      }
+                    }
+                  : filterKey !== null
+                    ? () => handleDirectFilterChip(filterKey)        // direct toggle, no AI call
+                    : isActive
+                      ? handleClearSearch
+                      : () => void handleMapSearch(chip.query, chip.key);
             // AI chips have no filterKey and are kind="quick" — only they trigger mapSearchLoading.
-            const isAiChip = chip.kind === "quick" && filterKey === null;
-            const isDisabled = isAiChip && mapSearchLoading;
+            // weatherFilter and freeFilter are not AI chips.
+            const isAiChip = chip.kind === "quick" && filterKey === null && !isWeatherChip && !isFreeChip;
+            // Only disable the chip that triggered the current load, not all AI chips.
+            // Bar searches (no activeChip) never disable any chip.
+            const isDisabled = isAiChip && mapSearchLoading && activeChip === chip.key;
             return (
               <button
                 key={chip.key}
@@ -1139,7 +1277,7 @@ export default function MapView() {
             );
           }
           const { idx } = feature.properties as { id: string; idx: number };
-          const campsite = campsites[idx];
+          const campsite = displayedCampsites[idx];
           if (!campsite) return null;
           return (
             <Marker key={campsite.id} longitude={campsite.lng} latitude={campsite.lat} anchor="bottom" style={{ zIndex: selectedIdx === idx ? 10 : 1 }}>
@@ -1211,7 +1349,7 @@ export default function MapView() {
       {/* Bottom drawer — hidden during initial load to avoid double loading UI */}
       {!isInitialLoading && (
         <BottomDrawer
-          campsites={campsites}
+          campsites={displayedCampsites}
           hasMore={hasMore}
           amenityPois={amenityPois}
           poiMeta={POI_META}
@@ -1226,7 +1364,7 @@ export default function MapView() {
           isEmpty={emptySearchResult}
           searchLocation={searchParsedIntent?.location ?? null}
           onClearSearch={handleClearSearch}
-          onBroadenSearch={() => mapSearchInputRef.current?.focus()}
+          onBroadenSearch={() => searchInputRef.current?.focus()}
         />
       )}
     </div>

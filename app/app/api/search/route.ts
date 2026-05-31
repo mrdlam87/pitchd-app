@@ -194,6 +194,7 @@ export async function POST(req: Request): Promise<Response> {
             },
           },
         }),
+        ...(parsedIntent.isFree !== null && { isFree: parsedIntent.isFree }),
       },
       select: {
         id: true,

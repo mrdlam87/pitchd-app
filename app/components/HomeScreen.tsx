@@ -229,7 +229,7 @@ export default function HomeScreen() {
       {/* Search card */}
       <div className="relative z-10 -mt-2 px-4">
         <div className="mb-4 rounded-[20px] bg-white p-4 shadow-[0_4px_24px_rgba(45,74,45,0.15)]">
-          {/* Textarea */}
+          {/* Textarea search input */}
           <div
             className="relative mb-2.5 rounded-xl border bg-[#faf8f4] transition-colors duration-200"
             style={{ borderColor: focused ? "#2d4a2d" : "#e0dbd0" }}
@@ -250,7 +250,6 @@ export default function HomeScreen() {
               disabled={loading}
               className="block w-full resize-none bg-transparent pb-10 pl-3.5 pr-3.5 pt-3.5 text-sm leading-[1.55] text-[#1a2e1a] outline-none placeholder:text-[#8a9e8a] disabled:opacity-60"
             />
-
             {/* Bottom bar inside textarea */}
             <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between">
               <span className="text-[10px] text-[#8a9e8a]">Try: &quot;not raining this weekend&quot;</span>
@@ -273,7 +272,7 @@ export default function HomeScreen() {
 
           {/* Quick filter chips */}
           <div className="flex gap-1.5 overflow-x-auto py-0.5 [scrollbar-width:none]">
-            {QUICK_CHIPS.map((chip) => (
+            {QUICK_CHIPS.filter((chip) => !("weatherFilter" in chip) && !("freeFilter" in chip)).map((chip) => (
               <button
                 key={chip.key}
                 onClick={() => chip.filterKey ? handleDirectFilter(chip.filterKey, chip.key) : void handleSearch(chip.query, chip.key)}

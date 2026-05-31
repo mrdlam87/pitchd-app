@@ -254,6 +254,7 @@ function elementToRecord(el: OverpassElement): {
   syncStatus: SyncStatus;
   lastSyncedAt: Date;
   amenityKeys: string[];
+  isFree: boolean | null;
 } | null {
   let lat: number;
   let lng: number;
@@ -286,6 +287,7 @@ function elementToRecord(el: OverpassElement): {
     syncStatus: SyncStatus.active,
     lastSyncedAt: now,
     amenityKeys: extractAmenityKeys(tags),
+    isFree: tags.fee === "no" ? true : tags.fee === "yes" ? false : null,
   };
 }
 
@@ -419,7 +421,7 @@ async function main() {
       const batch = toInsert.slice(i, i + INSERT_BATCH);
       // createMany doesn't return IDs — look up the inserted records by sourceId afterwards
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      await prisma.campsite.createMany({ data: batch.map(({ amenityKeys: _amenityKeys, ...rest }) => rest), skipDuplicates: true });
+      await prisma.campsite.createMany({ data: batch.map(({ amenityKeys: _amenityKeys, ...rest }) => ({ ...rest })), skipDuplicates: true });
 
       // Sync amenities for newly inserted campsites
       const batchWithAmenities = batch.filter((r) => r.amenityKeys.length > 0);
@@ -468,6 +470,7 @@ async function main() {
               state: r.state,
               syncStatus: r.syncStatus,
               lastSyncedAt: r.lastSyncedAt,
+              isFree: r.isFree,
             },
           });
         })

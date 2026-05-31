@@ -83,6 +83,7 @@ export async function getCachedIntent(queryHash: string): Promise<ParsedIntent |
           ))
         : []
       : null,
+    isFree: raw.isFree === true ? true : raw.isFree === false ? false : null,
   };
 }
 

@@ -29,6 +29,7 @@ export async function GET(req: Request): Promise<Response> {
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
   // filter(Boolean) drops empty strings from ?amenities= (no value) to avoid matching nothing
   const amenities = searchParams.getAll("amenities").filter(Boolean);
+  const free = searchParams.get("free") === "true";
 
   if (isNaN(north) || isNaN(south) || isNaN(east) || isNaN(west)) {
     return Response.json(
@@ -79,6 +80,7 @@ export async function GET(req: Request): Promise<Response> {
             },
           },
         }),
+        ...(free && { isFree: true }),
       },
       select: {
         id: true,

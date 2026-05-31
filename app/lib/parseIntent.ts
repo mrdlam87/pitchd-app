@@ -35,6 +35,8 @@ export interface ParsedIntent {
   resultType: "campsites" | "amenities" | null;
   // POI type keys when resultType === "amenities" — filtered to ALLOWED_POI_TYPES
   poiTypes: string[] | null;
+  // true = user wants free campsites, false = paid, null = not mentioned
+  isFree: boolean | null;
 }
 
 // ISO date guard — rejects free-text and calendar-invalid dates (e.g. 2026-02-30)
@@ -69,7 +71,7 @@ export async function parseIntentWithClaude(query: string): Promise<ParsedIntent
 Today: ${today}
 
 Return ONLY this JSON shape:
-{"location":null,"siteName":null,"driveTimeHrs":3,"amenities":[],"amenityHints":[],"startDate":null,"endDate":null,"sortBy":null,"resultType":null,"poiTypes":null}
+{"location":null,"siteName":null,"driveTimeHrs":3,"amenities":[],"amenityHints":[],"startDate":null,"endDate":null,"sortBy":null,"resultType":null,"poiTypes":null,"isFree":null}
 
 Rules:
 - location: geographic area used to centre the search radius (city, region, state, e.g. "Blue Mountains", "Victoria") — or null if not mentioned. Do not infer from vague queries.
@@ -80,7 +82,8 @@ Rules:
 - startDate / endDate: ISO date strings (YYYY-MM-DD) if dates are mentioned, otherwise null. "this weekend" = upcoming Saturday and Sunday. "next weekend" = the weekend after that.
 - sortBy: "proximity" if user wants closest results, "relevance" if they want best match, null if not mentioned.
 - resultType: "amenities" if the query is clearly about finding a service or amenity POI (dump points, water fill stations, toilets, laundromats). "campsites" if the query is clearly about finding a campsite or campground. null if ambiguous or unclear.
-- poiTypes: array of POI type keys when resultType is "amenities", chosen from [dump_point, water_fill, toilets, laundromat]. null when resultType is not "amenities".`,
+- poiTypes: array of POI type keys when resultType is "amenities", chosen from [dump_point, water_fill, toilets, laundromat]. null when resultType is not "amenities".
+- isFree: true if the user explicitly wants free/no-cost campsites (e.g. "free camping", "no-fee sites"), false if they explicitly want paid sites, null if not mentioned.`,
         },
       ],
     },
@@ -140,5 +143,6 @@ Rules:
           ))
         : []
       : null,
+    isFree: parsed.isFree === true ? true : parsed.isFree === false ? false : null,
   };
 }
