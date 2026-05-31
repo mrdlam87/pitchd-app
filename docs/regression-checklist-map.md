@@ -124,7 +124,7 @@ Run this before merging any PR that touches Map.tsx, BottomDrawer.tsx, SearchInp
 ## 11b. Region search (via region suggestion)
 
 - [ ] Typing a known region name (e.g. "Blue Mountains", "Snowy Mountains") shows a region suggestion when region data is populated in DB
-- [ ] Clicking a region suggestion shows all campsites in that region sorted by proximity to user location
+- [ ] Clicking a region suggestion shows all campsites in that region sorted by proximity to the region centre
 - [ ] The drawer count shows "X campsites found" for the region
 
 ---
