@@ -55,6 +55,7 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
   const [showRecents, setShowRecents] = useState(false);
   const [highlightedIdx, setHighlightedIdx] = useState(-1);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const justSelectedRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useImperativeHandle(ref, () => ({
@@ -68,6 +69,10 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     debounceRef.current = setTimeout(async () => {
+      if (justSelectedRef.current) {
+        justSelectedRef.current = false;
+        return;
+      }
       if (value.trim().length < MIN_QUERY_LENGTH) {
         setSuggestions([]);
         setShowSuggestions(false);
@@ -144,6 +149,7 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
   }
 
   function handleChange(v: string) {
+    justSelectedRef.current = false;
     onChange(v);
     if (v.trim().length >= MIN_QUERY_LENGTH) {
       setShowRecents(false);
@@ -175,10 +181,7 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
       e.preventDefault();
       if (highlightedIdx >= 0) {
         if (isShowingRecents) {
-          const recent = activeList[highlightedIdx] as string;
-          setShowRecents(false);
-          setHighlightedIdx(-1);
-          onRecentSelect?.(recent);
+          selectRecent(activeList[highlightedIdx] as string);
         } else {
           selectSuggestion(suggestions[highlightedIdx]);
         }
@@ -192,7 +195,15 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
     setShowSuggestions(false);
     setShowRecents(false);
     setSuggestions([]);
+    justSelectedRef.current = true;
     onSuggestionSelect(s);
+  }
+
+  function selectRecent(recent: string) {
+    setShowRecents(false);
+    setHighlightedIdx(-1);
+    justSelectedRef.current = true;
+    onRecentSelect?.(recent);
   }
 
   function handleSubmit() {
@@ -313,7 +324,13 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
         <div className="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-2xl border bg-white shadow-[0_8px_24px_rgba(45,74,45,0.12)]" style={{ borderColor: BORDER }}>
           {suggestions.map((s, i) => (
             <button
-              key={s.kind === "campsite" ? s.id : `region-${s.name}`}
+              key={
+                s.kind === "campsite"
+                  ? s.id
+                  : s.kind === "region"
+                    ? `region-${s.name}`
+                    : `location-${s.name}-${s.lat}-${s.lng}`
+              }
               onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s); }}
               className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
                 i === highlightedIdx ? "bg-[#f0f5f0]" : "hover:bg-[#f7f5f0]"
@@ -327,7 +344,9 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
                 <span className="block truncate text-[11px]" style={{ color: SAGE }}>
                   {s.kind === "campsite"
                     ? [s.region, s.state].filter(Boolean).join(", ")
-                    : `Region · ${s.state} · ${s.count} campsite${s.count === 1 ? "" : "s"}`}
+                    : s.kind === "region"
+                      ? `Region · ${s.state} · ${s.count} campsite${s.count === 1 ? "" : "s"}`
+                      : "Show campsites nearby"}
                 </span>
               </span>
             </button>
@@ -343,8 +362,7 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
               key={recent}
               onMouseDown={(e) => {
                 e.preventDefault();
-                setShowRecents(false);
-                onRecentSelect?.(recent);
+                selectRecent(recent);
               }}
               className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
                 i === highlightedIdx ? "bg-[#f0f5f0]" : "hover:bg-[#f7f5f0]"

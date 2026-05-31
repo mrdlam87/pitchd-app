@@ -14,7 +14,7 @@ import BottomDrawer, {
 } from "./BottomDrawer";
 import type { AmenityPOI, Campsite } from "@/types/map";
 import { BORDER, CORAL, FOREST_GREEN, SAGE, SURFACE_OVERLAY } from "@/lib/tokens";
-import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayload, type AISearchPayload, type AmenitySearchPayload } from "@/lib/searchResults";
+import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayload, type AISearchPayload, type AmenitySearchPayload, type LocationPayload } from "@/lib/searchResults";
 import type { ParsedIntent } from "@/lib/parseIntent";
 import { getRecentSearches, addRecentSearch } from "@/lib/recentSearches";
 import { QUICK_CHIPS, AMENITY_CHIPS } from "@/lib/chips";
@@ -187,6 +187,10 @@ export default function MapView() {
   const [goodWeatherOnly, setGoodWeatherOnly] = useState(false);
   const [freeOnly, setFreeOnly] = useState(false);
   const freeOnlyRef = useRef(false);
+  // Stores the origin coords of the active location search so the Free chip can
+  // re-run fetchLocationCampsites instead of falling back to viewport browse.
+  // Cleared whenever the user exits location mode.
+  const locationCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
   // Suppresses the geolocation flyTo when search results are loaded so the camera
   // doesn't pan away from the result bounds.
   // Safe today: MapView unmounts on navigation so this is never permanently stuck.
@@ -621,6 +625,14 @@ export default function MapView() {
         return;
       }
 
+      // Location suggestion arrival — fetch campsites near the resolved coordinates.
+      if (searchPayload?.kind === "location") {
+        initialSearchRef.current = null;
+        suppressGeoFlyRef.current = true;
+        void fetchLocationCampsites(searchPayload.name, searchPayload.lat, searchPayload.lng);
+        return;
+      }
+
       // Search payload was present but returned no campsites — fall back to browse mode.
       // Reset both refs so handleMoveEnd fires normally and geolocation flyTo works.
       searchModeRef.current = false;
@@ -834,9 +846,79 @@ export default function MapView() {
     }
   }
 
+  // When a recent is selected, check suggestions first so location/region recents route
+  // correctly instead of falling through to NL search.
+  async function handleRecentSelect(recent: string) {
+    setMapQuery(recent);
+    setRecentSearches(getRecentSearches());
+    try {
+      const res = await fetch(`/api/search/suggestions?q=${encodeURIComponent(recent)}`);
+      if (res.ok) {
+        const { suggestions } = await res.json() as { suggestions: Suggestion[] };
+        const exactLoc = suggestions.find(
+          (s): s is Extract<Suggestion, { kind: "location" }> =>
+            s.kind === "location" && s.name.toLowerCase() === recent.toLowerCase()
+        );
+        if (exactLoc) { void fetchLocationCampsites(exactLoc.name, exactLoc.lat, exactLoc.lng); return; }
+        const exactRegion = suggestions.find(
+          (s) => s.kind === "region" && s.name.toLowerCase() === recent.toLowerCase()
+        );
+        if (exactRegion) { void fetchRegionCampsites(exactRegion.name); return; }
+      }
+    } catch { /* fall through to NL search */ }
+    void handleMapSearch(recent, null);
+  }
+
+  async function fetchLocationCampsites(name: string, lat: number, lng: number) {
+    setActiveChip(null);
+    activeChipRef.current = null;
+    setEmptySearchResult(false);
+    setMapSearchLoading(true);
+    setMapSearchError(null);
+    locationCoordsRef.current = { lat, lng };
+    try {
+      const params = new URLSearchParams({ lat: String(lat), lng: String(lng) });
+      if (freeOnlyRef.current) params.set("free", "true");
+      const res = await fetch(`/api/search/nearby?${params}`);
+      if (!res.ok) {
+        setMapSearchError("Could not load nearby campsites. Please try again.");
+        return;
+      }
+      const data = await res.json() as { campsites: Campsite[]; hasMore: boolean };
+      setSearchResults(data.campsites);
+      setHasMore(data.hasMore);
+      searchModeRef.current = true;
+      setSearchContextQuery(name);
+      if (data.campsites.length > 0 && mapRef.current) {
+        const map = mapRef.current.getMap();
+        fitToCampsites(map, data.campsites, getDrawerHeightPx("half"));
+        setDrawerState("half");
+        drawerStateRef.current = "half";
+        loadWeatherForViewport(map, data.campsites);
+      } else {
+        setEmptySearchResult(true);
+        setDrawerState("half");
+        drawerStateRef.current = "half";
+        // Fly to the city even when no results — keeps the map context consistent
+        // with the "near [City]" label shown in the drawer.
+        if (mapRef.current) {
+          mapRef.current.getMap().flyTo({ center: [lng, lat], zoom: 10, duration: 800 });
+        }
+      }
+    } catch (e) {
+      console.error("[fetchLocationCampsites]", e);
+      locationCoordsRef.current = null;
+      setMapSearchError("Could not load nearby campsites. Please try again.");
+    } finally {
+      setMapSearchLoading(false);
+      markInitialLoaded();
+    }
+  }
+
   // Inline NL search — stays on the map, replaces results without navigating home.
   async function handleMapSearch(q: string, chipKey: string | null = null) {
     if (!q.trim() || mapSearchLoading) return;
+    locationCoordsRef.current = null;
     // Sync the search bar to whatever query is being run — chip searches populate the bar
     // so the user always knows what was searched (mirrors HomeScreen → Map behaviour).
     setMapQuery(q);
@@ -886,7 +968,7 @@ export default function MapView() {
         setSearchResults([]);
         setActiveChip(chipKey);
         activeChipRef.current = chipKey;
-        setSearchContextQuery(q.trim());
+        setSearchContextQuery(null);
         setSearchParsedIntent(data.parsedIntent);
         setDrawerState("half");
         drawerStateRef.current = "half";
@@ -928,7 +1010,7 @@ export default function MapView() {
         };
         setActiveFilters(aiFilters);
         activeFiltersRef.current = aiFilters;
-        setSearchContextQuery(q.trim());
+        setSearchContextQuery(null);
         skipNextFetch.current = true;
         suppressGeoFlyRef.current = true;
         fitToCampsites(mapRef.current.getMap(), data.campsites, getDrawerHeightPx("half"));
@@ -945,7 +1027,7 @@ export default function MapView() {
         setActiveChip(null);
         activeChipRef.current = null;
         setSearchAmenities([]);
-        setSearchContextQuery(q.trim());
+        setSearchContextQuery(null);
         setSearchParsedIntent(data.parsedIntent);
         setEmptySearchResult(true);
         setDrawerState("half");
@@ -966,6 +1048,7 @@ export default function MapView() {
     searchModeRef.current = false;
     amenitySearchModeRef.current = false;
     suppressGeoFlyRef.current = false;
+    locationCoordsRef.current = null;
     setActiveChip(null);
     activeChipRef.current = null;
     setSearchContextQuery(null);
@@ -1103,15 +1186,17 @@ export default function MapView() {
                   if (mapRef.current) loadWeatherForViewport(mapRef.current.getMap(), [campsite]);
                 })
                 .catch(() => { /* leave the minimal seed in place */ });
-            } else {
+            } else if (s.kind === "region") {
               void fetchRegionCampsites(s.name);
+            } else if (s.kind === "location") {
+              // Location suggestion — fetch campsites nearby
+              suppressGeoFlyRef.current = true;
+              void fetchLocationCampsites(s.name, s.lat, s.lng);
             }
           }}
           recentSearches={recentSearches}
           onRecentSelect={(recent) => {
-            setMapQuery(recent);
-            setRecentSearches(getRecentSearches());
-            void handleMapSearch(recent, null);
+            void handleRecentSelect(recent);
           }}
           onClear={handleClearSearch}
           loading={mapSearchLoading}
@@ -1170,9 +1255,12 @@ export default function MapView() {
                       const next = !freeOnly;
                       setFreeOnly(next);
                       freeOnlyRef.current = next;
-                      if (mapRef.current) {
-                        const map = mapRef.current.getMap();
-                        loadCampsites(map);
+                      const locCoords = locationCoordsRef.current;
+                      if (locCoords) {
+                        suppressGeoFlyRef.current = true;
+                        void fetchLocationCampsites(searchContextQuery ?? "", locCoords.lat, locCoords.lng);
+                      } else if (mapRef.current) {
+                        loadCampsites(mapRef.current.getMap());
                       }
                     }
                   : filterKey !== null
@@ -1362,7 +1450,7 @@ export default function MapView() {
           onSelectPin={selectPin}
           isFetching={isFetching}
           isEmpty={emptySearchResult}
-          searchLocation={searchParsedIntent?.location ?? null}
+          searchLocation={searchParsedIntent?.location ?? searchContextQuery}
           onClearSearch={handleClearSearch}
           onBroadenSearch={() => searchInputRef.current?.focus()}
         />
