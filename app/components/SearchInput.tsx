@@ -67,13 +67,12 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
-    if (value.trim().length < MIN_QUERY_LENGTH) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-
     debounceRef.current = setTimeout(async () => {
+      if (value.trim().length < MIN_QUERY_LENGTH) {
+        setSuggestions([]);
+        setShowSuggestions(false);
+        return;
+      }
       try {
         const res = await fetch(
           `/api/search/suggestions?q=${encodeURIComponent(value.trim())}`
