@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/apiAuth";
 import { SyncStatus } from "@/lib/generated/prisma/enums";
 
-const RESULT_LIMIT = 500;
+const RESULT_LIMIT = 50;
 const DEFAULT_RADIUS_KM = 100;
 // Degrees per km at Australian latitudes (conservative overestimate for bounding box pre-filter).
 const DEG_PER_KM = 1 / 100;
@@ -66,13 +66,13 @@ export async function GET(req: Request): Promise<Response> {
       },
     });
 
-    const filtered = campsites
+    const withDist = campsites
       .map((c) => ({ c: { ...c, amenities: c.amenities.map((a) => a.amenityType) }, d: haversineKm(lat, lng, c.lat, c.lng) }))
       .filter(({ d }) => d <= DEFAULT_RADIUS_KM)
-      .sort((a, b) => a.d - b.d);
+      .sort((a, b) => a.d - b.d)
+      .slice(0, RESULT_LIMIT);
 
-    const hasMore = filtered.length > RESULT_LIMIT;
-    const withDist = filtered.slice(0, RESULT_LIMIT);
+    const hasMore = withDist.length === RESULT_LIMIT;
 
     return Response.json({ campsites: withDist.map(({ c }) => c), hasMore });
   } catch (e) {
