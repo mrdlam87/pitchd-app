@@ -846,8 +846,8 @@ export default function MapView() {
     }
   }
 
-  // When a recent is selected, check suggestions first so location/region recents route
-  // correctly instead of falling through to NL search.
+  // When a recent is selected, check suggestions first so the same action that originally
+  // produced the result is replicated. Priority: campsite (most specific) → region → location → NL.
   async function handleRecentSelect(recent: string) {
     setMapQuery(recent);
     setRecentSearches(getRecentSearches());
@@ -855,15 +855,44 @@ export default function MapView() {
       const res = await fetch(`/api/search/suggestions?q=${encodeURIComponent(recent)}`);
       if (res.ok) {
         const { suggestions } = await res.json() as { suggestions: Suggestion[] };
-        const exactLoc = suggestions.find(
-          (s): s is Extract<Suggestion, { kind: "location" }> =>
-            s.kind === "location" && s.name.toLowerCase() === recent.toLowerCase()
+        const lc = recent.toLowerCase();
+
+        // Campsite exact match — seed pin and fly to it, same as suggestion selection.
+        const exactCampsite = suggestions.find(
+          (s): s is Extract<Suggestion, { kind: "campsite" }> =>
+            s.kind === "campsite" && s.name.toLowerCase() === lc
         );
-        if (exactLoc) { void fetchLocationCampsites(exactLoc.name, exactLoc.lat, exactLoc.lng); return; }
+        if (exactCampsite) {
+          const s = exactCampsite;
+          setSearchResults([{ id: s.id, name: s.name, lat: s.lat, lng: s.lng, region: s.region ?? null, blurb: null, amenities: [], weather: null }]);
+          mapRef.current?.getMap().flyTo({ center: [s.lng, s.lat], zoom: 14, duration: 800 });
+          setDrawerState("peek");
+          drawerStateRef.current = "peek";
+          searchModeRef.current = true;
+          suppressGeoFlyRef.current = true;
+          setSearchContextQuery(s.name);
+          fetch(`/api/campsites/${s.id}`)
+            .then((r) => r.ok ? r.json() : null)
+            .then((full: { id: string; name: string; lat: number; lng: number; region: string | null; blurb: string | null; amenities: { key: string; label: string; icon: string; color: string }[] } | null) => {
+              if (!full) return;
+              const campsite = { ...full, weather: null };
+              setSearchResults([campsite]);
+              if (mapRef.current) loadWeatherForViewport(mapRef.current.getMap(), [campsite]);
+            })
+            .catch(() => { /* leave the minimal seed in place */ });
+          return;
+        }
+
         const exactRegion = suggestions.find(
-          (s) => s.kind === "region" && s.name.toLowerCase() === recent.toLowerCase()
+          (s) => s.kind === "region" && s.name.toLowerCase() === lc
         );
         if (exactRegion) { void fetchRegionCampsites(exactRegion.name); return; }
+
+        const exactLoc = suggestions.find(
+          (s): s is Extract<Suggestion, { kind: "location" }> =>
+            s.kind === "location" && s.name.toLowerCase() === lc
+        );
+        if (exactLoc) { void fetchLocationCampsites(exactLoc.name, exactLoc.lat, exactLoc.lng); return; }
       }
     } catch { /* fall through to NL search */ }
     void handleMapSearch(recent, null);
