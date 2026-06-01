@@ -849,6 +849,13 @@ export default function MapView() {
   function handleRecentSelect(entry: RecentEntry) {
     setMapQuery(entry.name);
     setRecentSearches(getRecentEntries());
+    setActiveChip(null);
+    activeChipRef.current = null;
+    setHasMore(false);
+    setEmptySearchResult(false);
+    setGoodWeatherOnly(false);
+    setFreeOnly(false);
+    freeOnlyRef.current = false;
     if (entry.kind === "campsite") {
       setSearchResults([{ id: entry.id, name: entry.name, lat: entry.lat, lng: entry.lng, region: entry.region, blurb: null, amenities: [], weather: null }]);
       mapRef.current?.getMap().flyTo({ center: [entry.lng, entry.lat], zoom: 14, duration: 800 });
@@ -859,7 +866,7 @@ export default function MapView() {
       setSearchContextQuery(entry.name);
       fetch(`/api/campsites/${entry.id}`)
         .then((r) => r.ok ? r.json() : null)
-        .then((full: { id: string; name: string; lat: number; lng: number; region: string | null; blurb: string | null; amenities: { key: string; label: string; icon: string; color: string }[] } | null) => {
+        .then((full: Campsite | null) => {
           if (!full) return;
           const campsite = { ...full, weather: null };
           setSearchResults([campsite]);
@@ -1191,7 +1198,7 @@ export default function MapView() {
               setSearchContextQuery(s.name);
               fetch(`/api/campsites/${s.id}`)
                 .then((r) => r.ok ? r.json() : null)
-                .then((full: { id: string; name: string; lat: number; lng: number; region: string | null; blurb: string | null; amenities: { key: string; label: string; icon: string; color: string }[] } | null) => {
+                .then((full: Campsite | null) => {
                   if (!full) return;
                   const campsite = { ...full, weather: null };
                   setSearchResults([campsite]);

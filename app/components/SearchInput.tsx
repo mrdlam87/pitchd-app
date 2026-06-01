@@ -360,7 +360,7 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
         <div className="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-2xl border bg-white shadow-[0_8px_24px_rgba(45,74,45,0.12)]" style={{ borderColor: BORDER }}>
           {recentSearches.map((entry, i) => (
             <button
-              key={entry.name}
+              key={entry.kind === "campsite" ? entry.id : entry.name}
               onMouseDown={(e) => {
                 e.preventDefault();
                 selectRecent(entry);

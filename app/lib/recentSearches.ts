@@ -14,7 +14,8 @@ function parseEntry(raw: unknown): RecentEntry | null {
   const o = raw as Record<string, unknown>;
   if (o.kind === "nl"       && typeof o.name === "string") return o as RecentEntry;
   if (o.kind === "campsite" && typeof o.name === "string" && typeof o.id === "string"
-      && typeof o.lat === "number" && typeof o.lng === "number") return o as RecentEntry;
+      && typeof o.lat === "number" && typeof o.lng === "number"
+      && (o.region === null || typeof o.region === "string")) return o as RecentEntry;
   if (o.kind === "location" && typeof o.name === "string"
       && typeof o.lat === "number" && typeof o.lng === "number") return o as RecentEntry;
   if (o.kind === "region"   && typeof o.name === "string") return o as RecentEntry;
