@@ -16,7 +16,7 @@ import type { AmenityPOI, Campsite } from "@/types/map";
 import { BORDER, CORAL, FOREST_GREEN, SAGE, SURFACE_OVERLAY } from "@/lib/tokens";
 import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayload, type AISearchPayload, type AmenitySearchPayload, type LocationPayload } from "@/lib/searchResults";
 import type { ParsedIntent } from "@/lib/parseIntent";
-import { getRecentSearches, addRecentSearch } from "@/lib/recentSearches";
+import { getRecentEntries, addRecentEntry, type RecentEntry } from "@/lib/recentSearches";
 import { QUICK_CHIPS, AMENITY_CHIPS } from "@/lib/chips";
 import { CampsitePin } from "./CampsitePin";
 import { AmenityPin, type AmenityPinMeta } from "./AmenityPin";
@@ -177,7 +177,7 @@ export default function MapView() {
       : ""
   );
   // Recent searches — loaded on mount and refreshed after each search for the SearchInput dropdown
-  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [recentSearches, setRecentSearches] = useState<RecentEntry[]>([]);
   // Ref to the SearchInput — used to restore focus after Vaul steals it
   const searchInputRef = useRef<SearchInputHandle>(null);
   // Blur timeout ref — used in cleanup to cancel any pending blur timer
@@ -472,7 +472,7 @@ export default function MapView() {
 
   // Load recent searches once on mount so SearchInput can show them immediately on focus.
   useEffect(() => {
-    setRecentSearches(getRecentSearches());
+    setRecentSearches(getRecentEntries());
   }, []);
 
   // Prevent Radix's FocusScope (inside Vaul's Drawer.Content) from stealing keyboard
@@ -846,56 +846,33 @@ export default function MapView() {
     }
   }
 
-  // When a recent is selected, check suggestions first so the same action that originally
-  // produced the result is replicated. Priority: campsite (most specific) → region → location → NL.
-  async function handleRecentSelect(recent: string) {
-    setMapQuery(recent);
-    setRecentSearches(getRecentSearches());
-    try {
-      const res = await fetch(`/api/search/suggestions?q=${encodeURIComponent(recent)}`);
-      if (res.ok) {
-        const { suggestions } = await res.json() as { suggestions: Suggestion[] };
-        const lc = recent.toLowerCase();
-
-        // Campsite exact match — seed pin and fly to it, same as suggestion selection.
-        const exactCampsite = suggestions.find(
-          (s): s is Extract<Suggestion, { kind: "campsite" }> =>
-            s.kind === "campsite" && s.name.toLowerCase() === lc
-        );
-        if (exactCampsite) {
-          const s = exactCampsite;
-          setSearchResults([{ id: s.id, name: s.name, lat: s.lat, lng: s.lng, region: s.region ?? null, blurb: null, amenities: [], weather: null }]);
-          mapRef.current?.getMap().flyTo({ center: [s.lng, s.lat], zoom: 14, duration: 800 });
-          setDrawerState("peek");
-          drawerStateRef.current = "peek";
-          searchModeRef.current = true;
-          suppressGeoFlyRef.current = true;
-          setSearchContextQuery(s.name);
-          fetch(`/api/campsites/${s.id}`)
-            .then((r) => r.ok ? r.json() : null)
-            .then((full: { id: string; name: string; lat: number; lng: number; region: string | null; blurb: string | null; amenities: { key: string; label: string; icon: string; color: string }[] } | null) => {
-              if (!full) return;
-              const campsite = { ...full, weather: null };
-              setSearchResults([campsite]);
-              if (mapRef.current) loadWeatherForViewport(mapRef.current.getMap(), [campsite]);
-            })
-            .catch(() => { /* leave the minimal seed in place */ });
-          return;
-        }
-
-        const exactRegion = suggestions.find(
-          (s) => s.kind === "region" && s.name.toLowerCase() === lc
-        );
-        if (exactRegion) { void fetchRegionCampsites(exactRegion.name); return; }
-
-        const exactLoc = suggestions.find(
-          (s): s is Extract<Suggestion, { kind: "location" }> =>
-            s.kind === "location" && s.name.toLowerCase() === lc
-        );
-        if (exactLoc) { void fetchLocationCampsites(exactLoc.name, exactLoc.lat, exactLoc.lng); return; }
-      }
-    } catch { /* fall through to NL search */ }
-    void handleMapSearch(recent, null);
+  function handleRecentSelect(entry: RecentEntry) {
+    setMapQuery(entry.name);
+    setRecentSearches(getRecentEntries());
+    if (entry.kind === "campsite") {
+      setSearchResults([{ id: entry.id, name: entry.name, lat: entry.lat, lng: entry.lng, region: entry.region, blurb: null, amenities: [], weather: null }]);
+      mapRef.current?.getMap().flyTo({ center: [entry.lng, entry.lat], zoom: 14, duration: 800 });
+      setDrawerState("peek");
+      drawerStateRef.current = "peek";
+      searchModeRef.current = true;
+      suppressGeoFlyRef.current = true;
+      setSearchContextQuery(entry.name);
+      fetch(`/api/campsites/${entry.id}`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((full: { id: string; name: string; lat: number; lng: number; region: string | null; blurb: string | null; amenities: { key: string; label: string; icon: string; color: string }[] } | null) => {
+          if (!full) return;
+          const campsite = { ...full, weather: null };
+          setSearchResults([campsite]);
+          if (mapRef.current) loadWeatherForViewport(mapRef.current.getMap(), [campsite]);
+        })
+        .catch(() => { /* leave the minimal seed in place */ });
+    } else if (entry.kind === "region") {
+      void fetchRegionCampsites(entry.name);
+    } else if (entry.kind === "location") {
+      void fetchLocationCampsites(entry.name, entry.lat, entry.lng);
+    } else {
+      void handleMapSearch(entry.name, null);
+    }
   }
 
   async function fetchLocationCampsites(name: string, lat: number, lng: number) {
@@ -989,7 +966,7 @@ export default function MapView() {
 
       // Amenity-only result — route returns amenityPois instead of campsites
       if ("amenityPois" in data) {
-        addRecentSearch(q.trim());
+        addRecentEntry({ kind: "nl", name: q.trim() });
         amenitySearchModeRef.current = data.amenityPois.length > 0;
         searchModeRef.current = false;
         setEmptySearchResult(data.amenityPois.length === 0);
@@ -1012,7 +989,7 @@ export default function MapView() {
           weatherCacheRef.current.set(c.id, c.weather);
         }
       }
-      addRecentSearch(q.trim());
+      addRecentEntry({ kind: "nl", name: q.trim() });
       setSearchResults(data.campsites);
       if (data.campsites.length > 0 && mapRef.current) {
         // Results — enter search mode and fit the map to the pins
@@ -1193,8 +1170,14 @@ export default function MapView() {
             setGoodWeatherOnly(false);
             setFreeOnly(false);
             freeOnlyRef.current = false;
-            addRecentSearch(s.name);
-            setRecentSearches(getRecentSearches());
+            if (s.kind === "campsite") {
+              addRecentEntry({ kind: "campsite", name: s.name, id: s.id, lat: s.lat, lng: s.lng, region: s.region ?? null });
+            } else if (s.kind === "region") {
+              addRecentEntry({ kind: "region", name: s.name });
+            } else {
+              addRecentEntry({ kind: "location", name: s.name, lat: s.lat, lng: s.lng });
+            }
+            setRecentSearches(getRecentEntries());
             setMapQuery(s.name);
             if (s.kind === "campsite") {
               // Seed immediately with minimal data so the pin appears without delay,
@@ -1224,9 +1207,7 @@ export default function MapView() {
             }
           }}
           recentSearches={recentSearches}
-          onRecentSelect={(recent) => {
-            void handleRecentSelect(recent);
-          }}
+          onRecentSelect={(entry) => { handleRecentSelect(entry); }}
           onClear={handleClearSearch}
           loading={mapSearchLoading}
           placeholder="Site name, area, or describe your trip…"
