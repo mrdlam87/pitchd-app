@@ -2,6 +2,7 @@
 
 import React, { useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { Suggestion } from "@/app/api/search/suggestions/route";
+import type { RecentEntry } from "@/lib/recentSearches";
 import { BORDER, CORAL, FOREST_GREEN, SAGE, TEXT, TEXT_MUTED } from "@/lib/tokens";
 
 export type { Suggestion };
@@ -11,8 +12,8 @@ interface SearchInputProps {
   onChange: (v: string) => void;
   onSearch: (query: string) => void;
   onSuggestionSelect: (suggestion: Suggestion) => void;
-  recentSearches?: string[];
-  onRecentSelect?: (query: string) => void;
+  recentSearches?: RecentEntry[];
+  onRecentSelect?: (entry: RecentEntry) => void;
   placeholder?: string;
   loading?: boolean;
   /** "pill" renders the original map search bar style (white rounded-full, circular icon button).
@@ -181,7 +182,7 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
       e.preventDefault();
       if (highlightedIdx >= 0) {
         if (isShowingRecents) {
-          selectRecent(activeList[highlightedIdx] as string);
+          selectRecent(activeList[highlightedIdx] as RecentEntry);
         } else {
           selectSuggestion(suggestions[highlightedIdx]);
         }
@@ -199,11 +200,11 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
     onSuggestionSelect(s);
   }
 
-  function selectRecent(recent: string) {
+  function selectRecent(entry: RecentEntry) {
     setShowRecents(false);
     setHighlightedIdx(-1);
     justSelectedRef.current = true;
-    onRecentSelect?.(recent);
+    onRecentSelect?.(entry);
   }
 
   function handleSubmit() {
@@ -357,12 +358,12 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
       {/* Recents dropdown (map bar only — shown when input is empty/short) */}
       {showRecents && !showSuggestions && recentSearches && recentSearches.length > 0 && (
         <div className="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-2xl border bg-white shadow-[0_8px_24px_rgba(45,74,45,0.12)]" style={{ borderColor: BORDER }}>
-          {recentSearches.map((recent, i) => (
+          {recentSearches.map((entry, i) => (
             <button
-              key={recent}
+              key={entry.kind === "campsite" ? entry.id : entry.name}
               onMouseDown={(e) => {
                 e.preventDefault();
-                selectRecent(recent);
+                selectRecent(entry);
               }}
               className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
                 i === highlightedIdx ? "bg-[#f0f5f0]" : "hover:bg-[#f7f5f0]"
@@ -372,7 +373,7 @@ const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>(functi
               style={{ color: TEXT }}
             >
               <span style={{ color: SAGE }}>🕐</span>
-              <span className="flex-1 truncate">{recent}</span>
+              <span className="flex-1 truncate">{entry.name}</span>
             </button>
           ))}
         </div>
