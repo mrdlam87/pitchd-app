@@ -37,8 +37,13 @@ export function getRecentEntries(): RecentEntry[] {
 export function addRecentEntry(entry: RecentEntry): void {
   if (entry.name.length > 200) return;
   try {
-    // Deduplicate by name so re-searching the same place replaces the old entry.
-    const current = getRecentEntries().filter((e) => e.name !== entry.name);
+    // Deduplicate by kind+id (campsite) or kind+name so different kinds with the same
+    // display name (e.g. campsite "Blue Lake" vs region "Blue Lake") don't collide.
+    const current = getRecentEntries().filter((e) => {
+      if (e.kind !== entry.kind) return true;
+      if (e.kind === "campsite" && entry.kind === "campsite") return e.id !== entry.id;
+      return e.name !== entry.name;
+    });
     localStorage.setItem(KEY, JSON.stringify([entry, ...current].slice(0, MAX)));
   } catch {
     // localStorage unavailable or full — fail silently

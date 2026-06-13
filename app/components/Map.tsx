@@ -857,6 +857,8 @@ export default function MapView() {
     setFreeOnly(false);
     freeOnlyRef.current = false;
     if (entry.kind === "campsite") {
+      locationCoordsRef.current = null;
+      setMapSearchError(null);
       setSearchResults([{ id: entry.id, name: entry.name, lat: entry.lat, lng: entry.lng, region: entry.region, blurb: null, amenities: [], weather: null }]);
       mapRef.current?.getMap().flyTo({ center: [entry.lng, entry.lat], zoom: 14, duration: 800 });
       setDrawerState("peek");
