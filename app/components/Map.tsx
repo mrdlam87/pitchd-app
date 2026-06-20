@@ -1490,6 +1490,7 @@ export default function MapView() {
           parsedIntent={searchParsedIntent}
           onDrawerStateChange={handleDrawerStateChange}
           onSelectPin={selectPin}
+          onSelectPoi={(poi) => selectPoi(poi, false)}
           isFetching={isFetching}
           isEmpty={emptySearchResult}
           searchLocation={searchParsedIntent?.location ?? searchContextQuery}

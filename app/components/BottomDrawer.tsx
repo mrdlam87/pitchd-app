@@ -363,11 +363,12 @@ function CampsiteCard({
 
 // ── POI detail card ────────────────────────────────────────────────────────────
 
-function POICard({ poi, meta }: { poi: AmenityPOI; meta: POIMeta }) {
+function POICard({ poi, meta, onClick }: { poi: AmenityPOI; meta: POIMeta; onClick?: () => void }) {
   return (
     <div
       className="relative rounded-xl p-3"
-      style={{ border: `1.5px solid ${meta.color}`, background: "#fff" }}
+      style={{ border: `1.5px solid ${meta.color}`, background: "#fff", cursor: onClick ? "pointer" : undefined }}
+      onClick={onClick}
     >
       <a
         href={`https://www.google.com/maps/dir/?api=1&destination=${poi.lat},${poi.lng}`}
@@ -462,6 +463,7 @@ function DrawerContentList({
   drawerMode,
   scrollRef,
   onSelectPin,
+  onSelectPoi,
   onOpenDetail,
 }: {
   campsites: Campsite[];
@@ -475,6 +477,7 @@ function DrawerContentList({
   drawerMode: DrawerMode;
   scrollRef: React.RefObject<HTMLDivElement | null>;
   onSelectPin: (i: number) => void;
+  onSelectPoi?: (poi: AmenityPOI) => void;
   onOpenDetail: (campsite: Campsite) => void;
 }) {
   // Amenity-only mode: show all POI cards, no campsite list
@@ -483,7 +486,7 @@ function DrawerContentList({
       <div ref={scrollRef} className="overflow-y-auto flex-1 px-4 pt-2 pb-4 space-y-2">
         {amenityPois.map((poi) => {
           const meta = poiMeta[poi.amenityType.key] ?? { emoji: "📍", label: poi.amenityType.key, color: FOREST_GREEN };
-          return <POICard key={poi.id} poi={poi} meta={meta} />;
+          return <POICard key={poi.id} poi={poi} meta={meta} onClick={onSelectPoi ? () => onSelectPoi(poi) : undefined} />;
         })}
       </div>
     );
@@ -685,6 +688,7 @@ type Props = {
   parsedIntent: ParsedIntent | null;
   onDrawerStateChange: (state: DrawerState) => void;
   onSelectPin: (i: number) => void;
+  onSelectPoi?: (poi: AmenityPOI) => void;
   isFetching?: boolean;
   isEmpty?: boolean;
   searchLocation?: string | null;
@@ -706,6 +710,7 @@ export default function BottomDrawer({
   parsedIntent,
   onDrawerStateChange,
   onSelectPin,
+  onSelectPoi,
   isFetching = false,
   isEmpty = false,
   searchLocation,
@@ -992,6 +997,7 @@ export default function BottomDrawer({
                 drawerMode={drawerMode}
                 scrollRef={scrollContainerRef}
                 onSelectPin={onSelectPin}
+                onSelectPoi={onSelectPoi}
                 onOpenDetail={openDetail}
               />
             )
