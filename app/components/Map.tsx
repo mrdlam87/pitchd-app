@@ -1490,7 +1490,17 @@ export default function MapView() {
           parsedIntent={searchParsedIntent}
           onDrawerStateChange={handleDrawerStateChange}
           onSelectPin={selectPin}
-          onSelectPoi={(poi) => selectPoi(poi, false)}
+          onSelectPoi={(poi) => {
+            setSelectedPoiId(poi.id);
+            setSelectedIdx(null);
+            selectedIdRef.current = null;
+            setDrawerState("half");
+            mapRef.current?.easeTo({
+              center: [poi.lng, poi.lat],
+              duration: 350,
+              padding: { top: 0, right: 0, bottom: getDrawerHeightPx("half"), left: 0 },
+            });
+          }}
           isFetching={isFetching}
           isEmpty={emptySearchResult}
           searchLocation={searchParsedIntent?.location ?? searchContextQuery}

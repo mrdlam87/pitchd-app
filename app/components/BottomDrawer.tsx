@@ -368,7 +368,7 @@ function POICard({ poi, meta, onClick }: { poi: AmenityPOI; meta: POIMeta; onCli
     <div
       className="relative rounded-xl p-3"
       style={{ border: `1.5px solid ${meta.color}`, background: "#fff", cursor: onClick ? "pointer" : undefined }}
-      onClick={onClick}
+      {...(onClick ? { role: "button", tabIndex: 0, onClick, onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } } : {})}
     >
       <a
         href={`https://www.google.com/maps/dir/?api=1&destination=${poi.lat},${poi.lng}`}
