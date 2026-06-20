@@ -150,6 +150,11 @@ export default function MapView() {
   // clearing the POI pins when no POI filter chip is active. Cleared when the user applies
   // filters, clears search, taps a direct-filter or amenity chip.
   const amenitySearchModeRef = useRef(initialSearch?.kind === "amenity-search");
+  // POI types active during amenity-search mode — used by handleMoveEnd to refetch
+  // the same amenity type as the map is panned, without touching activeFiltersRef.
+  const amenitySearchTypesRef = useRef<string[]>(
+    initialSearch?.kind === "amenity-search" ? (initialSearch.parsedIntent?.amenities ?? []) : []
+  );
   // Key of the currently active quick chip (null = browse mode).
   // AI arrivals: chipKey flows through AISearchPayload (defaults to "pitchd" for textarea NL queries).
   // Direct-filter arrivals: no chip is highlighted — the activity shows in the filter count badge.
@@ -607,6 +612,7 @@ export default function MapView() {
         initialSearchRef.current = null;
         searchModeRef.current = false;
         amenitySearchModeRef.current = true;
+        amenitySearchTypesRef.current = searchPayload.parsedIntent?.amenities ?? [];
         setSearchAmenities(searchPayload.amenityPois);
         setSearchParsedIntent(searchPayload.parsedIntent);
         setDrawerMode("amenity-only");
@@ -697,6 +703,16 @@ export default function MapView() {
       // fetch weather for any newly visible pins that haven't been cached yet.
       if (searchModeRef.current) {
         loadWeatherForViewport(e.target);
+        return;
+      }
+      if (amenitySearchModeRef.current) {
+        // Amenity-only mode: refetch the same POI types for the new viewport.
+        // Temporarily inject the NL search types into activeFiltersRef so loadAmenities
+        // fetches correctly without touching the user's filter chip state.
+        const savedPois = activeFiltersRef.current.pois;
+        activeFiltersRef.current = { ...activeFiltersRef.current, pois: amenitySearchTypesRef.current };
+        loadAmenities(e.target);
+        activeFiltersRef.current = { ...activeFiltersRef.current, pois: savedPois };
         return;
       }
       loadCampsites(e.target);
@@ -993,6 +1009,7 @@ export default function MapView() {
       if ("amenityPois" in data) {
         addRecentEntry({ kind: "nl", name: q.trim() });
         amenitySearchModeRef.current = data.amenityPois.length > 0;
+        amenitySearchTypesRef.current = data.parsedIntent?.amenities ?? [];
         searchModeRef.current = false;
         setEmptySearchResult(data.amenityPois.length === 0);
         setSearchAmenities(data.amenityPois);
