@@ -363,11 +363,15 @@ function CampsiteCard({
 
 // ── POI detail card ────────────────────────────────────────────────────────────
 
-function POICard({ poi, meta, onClick }: { poi: AmenityPOI; meta: POIMeta; onClick?: () => void }) {
+function POICard({ poi, meta, onClick, isSelected }: { poi: AmenityPOI; meta: POIMeta; onClick?: () => void; isSelected?: boolean }) {
   return (
     <div
       className="relative rounded-xl p-3"
-      style={{ border: `1.5px solid ${meta.color}`, background: "#fff", cursor: onClick ? "pointer" : undefined }}
+      style={{
+        border: isSelected ? `2px solid ${meta.color}` : `1.5px solid ${meta.color}`,
+        background: isSelected ? `${meta.color}18` : "#fff",
+        cursor: onClick ? "pointer" : undefined,
+      }}
       {...(onClick ? { role: "button", tabIndex: 0, onClick, onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } } : {})}
     >
       <a
@@ -486,7 +490,7 @@ function DrawerContentList({
       <div ref={scrollRef} className="overflow-y-auto flex-1 px-4 pt-2 pb-4 space-y-2">
         {amenityPois.map((poi) => {
           const meta = poiMeta[poi.amenityType.key] ?? { emoji: "📍", label: poi.amenityType.key, color: FOREST_GREEN };
-          return <POICard key={poi.id} poi={poi} meta={meta} onClick={onSelectPoi ? () => onSelectPoi(poi) : undefined} />;
+          return <POICard key={poi.id} poi={poi} meta={meta} isSelected={selectedPoi?.id === poi.id} onClick={onSelectPoi ? () => onSelectPoi(poi) : undefined} />;
         })}
       </div>
     );
