@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import FilterPanel, { type FilterState } from "./FilterPanel";
 import BottomDrawer, {
   type DrawerState,
+  type DrawerMode,
   PEEK_HEIGHT_PX,
   DRAWER_TRANSITION_MS,
   getDrawerHeightPx,
@@ -200,6 +201,13 @@ export default function MapView() {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
   const [drawerState, setDrawerState] = useState<DrawerState>("peek");
+  const [drawerMode, setDrawerMode] = useState<DrawerMode>(() => {
+    if (initialSearch?.kind === "ai") return "ai-search";
+    if (initialSearch?.kind === "amenity-search") return "amenity-only";
+    if (initialSearch?.kind === "region") return "region";
+    if (initialSearch?.kind === "location") return "location";
+    return "browse";
+  });
   const [showFilters, setShowFilters] = useState(false);
   // Lazy initialiser runs once on mount — avoids recomputing the conditional on every render.
   const [activeFilters, setActiveFilters] = useState<FilterState>(() =>
@@ -595,12 +603,13 @@ export default function MapView() {
       }
 
       // Amenity-only search arrival — display POI pins, don't lock the map.
-      // Drawer rendering for this kind is handled in #121; browse mode stays active for campsites.
       if (searchPayload?.kind === "amenity-search") {
         initialSearchRef.current = null;
         searchModeRef.current = false;
         amenitySearchModeRef.current = true;
         setSearchAmenities(searchPayload.amenityPois);
+        setSearchParsedIntent(searchPayload.parsedIntent);
+        setDrawerMode("amenity-only");
         // Fall through to browse mode so the camera and campsite fetch work normally.
       }
 
@@ -637,6 +646,7 @@ export default function MapView() {
       // Reset both refs so handleMoveEnd fires normally and geolocation flyTo works.
       searchModeRef.current = false;
       suppressGeoFlyRef.current = false;
+      setDrawerMode("browse");
 
       const loc = userLocationRef.current;
       if (loc) {
@@ -704,21 +714,23 @@ export default function MapView() {
       setSelectedIdx(null);
       selectedIdRef.current = null;
       if (animate && mapRef.current) {
-        skipNextFetch.current = true;
         const isIndividualPin = amenityClustersRef.current.some(
           (f) => !("cluster" in f.properties && f.properties.cluster) &&
                  (f.properties as { id: string }).id === poi.id
         );
         if (!isIndividualPin) {
+          // Only animate the map when the pin is inside a cluster — zoom in to uncluster.
+          // Individual visible pins highlight in place without panning the map.
+          skipNextFetch.current = true;
           isUnclusteringRef.current = true;
           setHideMarkers(true);
+          mapRef.current.easeTo({
+            center: [poi.lng, poi.lat],
+            zoom: CLUSTER_OPTIONS.maxZoom + 1,
+            duration: 450,
+            padding: { top: 0, right: 0, bottom: getDrawerHeightPx("half"), left: 0 },
+          });
         }
-        mapRef.current.easeTo({
-          center: [poi.lng, poi.lat],
-          ...(isIndividualPin ? {} : { zoom: CLUSTER_OPTIONS.maxZoom + 1 }),
-          duration: isIndividualPin ? 300 : 450,
-          padding: { top: 0, right: 0, bottom: getDrawerHeightPx("half"), left: 0 },
-        });
       }
     },
     []
@@ -781,6 +793,7 @@ export default function MapView() {
       searchModeRef.current = false;
       amenitySearchModeRef.current = false;
       suppressGeoFlyRef.current = false;
+      setDrawerMode("browse");
       setActiveChip(null);
       activeChipRef.current = null;
       setSearchContextQuery(null);
@@ -826,6 +839,7 @@ export default function MapView() {
       setHasMore(data.hasMore);
       searchModeRef.current = true;
       setSearchContextQuery(region);
+      setDrawerMode("region");
       if (data.campsites.length > 0 && mapRef.current) {
         const map = mapRef.current.getMap();
         fitToCampsites(map, data.campsites, getDrawerHeightPx("half"));
@@ -866,6 +880,7 @@ export default function MapView() {
       searchModeRef.current = true;
       suppressGeoFlyRef.current = true;
       setSearchContextQuery(entry.name);
+      setDrawerMode("browse");
       fetch(`/api/campsites/${entry.id}`)
         .then((r) => r.ok ? r.json() : null)
         .then((full: Campsite | null) => {
@@ -904,6 +919,7 @@ export default function MapView() {
       setHasMore(data.hasMore);
       searchModeRef.current = true;
       setSearchContextQuery(name);
+      setDrawerMode("location");
       if (data.campsites.length > 0 && mapRef.current) {
         const map = mapRef.current.getMap();
         fitToCampsites(map, data.campsites, getDrawerHeightPx("half"));
@@ -985,6 +1001,7 @@ export default function MapView() {
         activeChipRef.current = chipKey;
         setSearchContextQuery(null);
         setSearchParsedIntent(data.parsedIntent);
+        setDrawerMode("amenity-only");
         setDrawerState("half");
         drawerStateRef.current = "half";
         return;
@@ -1005,6 +1022,7 @@ export default function MapView() {
         setDrawerState("half");
         drawerStateRef.current = "half";
         searchModeRef.current = true;
+        setDrawerMode("ai-search");
         setActiveChip(chipKey);
         activeChipRef.current = chipKey;
         setSearchParsedIntent(data.parsedIntent);
@@ -1044,6 +1062,7 @@ export default function MapView() {
         setSearchAmenities([]);
         setSearchContextQuery(null);
         setSearchParsedIntent(data.parsedIntent);
+        setDrawerMode("browse");
         setEmptySearchResult(true);
         setDrawerState("half");
         drawerStateRef.current = "half";
@@ -1066,6 +1085,7 @@ export default function MapView() {
     locationCoordsRef.current = null;
     setActiveChip(null);
     activeChipRef.current = null;
+    setDrawerMode("browse");
     setSearchContextQuery(null);
     setSearchParsedIntent(null);
     setEmptySearchResult(false);
@@ -1114,6 +1134,7 @@ export default function MapView() {
       searchModeRef.current = false;
       amenitySearchModeRef.current = false;
       suppressGeoFlyRef.current = false;
+      setDrawerMode("browse");
       setSearchContextQuery(null);
       setSearchParsedIntent(null);
       setEmptySearchResult(false);
@@ -1465,6 +1486,8 @@ export default function MapView() {
           userLocation={userLocation}
           cardRefs={cardRefs}
           drawerState={drawerState}
+          drawerMode={drawerMode}
+          parsedIntent={searchParsedIntent}
           onDrawerStateChange={handleDrawerStateChange}
           onSelectPin={selectPin}
           isFetching={isFetching}
