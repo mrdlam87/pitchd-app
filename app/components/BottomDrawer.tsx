@@ -479,7 +479,7 @@ function DrawerContentList({
   cardRefs: React.MutableRefObject<(HTMLDivElement | null)[]>;
   compact: boolean;
   drawerMode: DrawerMode;
-  scrollRef: React.RefObject<HTMLDivElement>;
+  scrollRef: React.RefObject<HTMLDivElement | null>;
   onSelectPin: (i: number) => void;
   onSelectPoi?: (poi: AmenityPOI) => void;
   onOpenDetail: (campsite: Campsite) => void;
