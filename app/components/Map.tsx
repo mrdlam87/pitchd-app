@@ -653,11 +653,13 @@ export default function MapView() {
         return;
       }
 
-      // Search payload was present but returned no campsites — fall back to browse mode.
+      // Non-amenity search payload present but returned no campsites — fall back to browse mode.
       // Reset both refs so handleMoveEnd fires normally and geolocation flyTo works.
-      searchModeRef.current = false;
-      suppressGeoFlyRef.current = false;
-      setDrawerMode("browse");
+      if (!amenitySearchModeRef.current) {
+        searchModeRef.current = false;
+        suppressGeoFlyRef.current = false;
+        setDrawerMode("browse");
+      }
 
       const loc = userLocationRef.current;
       if (loc) {
@@ -711,7 +713,6 @@ export default function MapView() {
         return;
       }
       if (amenitySearchModeRef.current) {
-        // Amenity-only mode: refetch the same POI types for the new viewport.
         // Temporarily inject the NL search types into activeFiltersRef so loadAmenities
         // fetches correctly without touching the user's filter chip state.
         const savedPois = activeFiltersRef.current.pois;

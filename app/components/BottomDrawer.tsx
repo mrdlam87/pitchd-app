@@ -479,7 +479,7 @@ function DrawerContentList({
   cardRefs: React.MutableRefObject<(HTMLDivElement | null)[]>;
   compact: boolean;
   drawerMode: DrawerMode;
-  scrollRef: React.RefObject<HTMLDivElement | null>;
+  scrollRef: React.RefObject<HTMLDivElement>;
   onSelectPin: (i: number) => void;
   onSelectPoi?: (poi: AmenityPOI) => void;
   onOpenDetail: (campsite: Campsite) => void;
@@ -918,7 +918,7 @@ export default function BottomDrawer({
             bottom: drawerBottom,
             background: SURFACE,
             borderRadius: isFull ? 0 : "1rem 1rem 0 0",
-            borderTop: isFull ? "none" : "1.5px solid #e0dbd0",
+            borderTop: isFull ? "none" : `1.5px solid ${BORDER}`,
             boxShadow: "0 -4px 32px rgba(0,0,0,0.12)",
             overflow: "hidden",
             // Transition border-radius so it animates alongside Vaul's snap
@@ -957,7 +957,7 @@ export default function BottomDrawer({
               accidentally triggering a drawer drag. */}
           <div
             className="flex-shrink-0 select-none cursor-grab"
-            style={{ borderTop: isFull ? "1.5px solid #e0dbd0" : "none" }}
+            style={{ borderTop: isFull ? `1.5px solid ${BORDER}` : "none" }}
           >
             {/* Drag pill */}
             <div className="flex justify-center pt-3 pb-2">
