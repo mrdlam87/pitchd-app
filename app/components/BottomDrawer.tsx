@@ -369,7 +369,7 @@ function POICard({ poi, meta, onClick, isSelected }: { poi: AmenityPOI; meta: PO
       className="relative rounded-xl p-3"
       style={{
         border: isSelected ? `2px solid ${meta.color}` : `1.5px solid ${meta.color}`,
-        background: isSelected ? `${meta.color}18` : "#fff",
+        background: isSelected ? `${meta.color}18` : SURFACE,
         cursor: onClick ? "pointer" : undefined,
       }}
       {...(onClick ? { role: "button", tabIndex: 0, onClick, onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } } : {})}

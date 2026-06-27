@@ -721,9 +721,7 @@ export default function MapView() {
         return;
       }
       loadCampsites(e.target);
-      if (!amenitySearchModeRef.current) {
-        loadAmenities(e.target);
-      }
+      loadAmenities(e.target);
     },
     [loadCampsites, loadAmenities, loadWeatherForViewport]
   );
