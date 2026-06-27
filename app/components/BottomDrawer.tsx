@@ -484,7 +484,6 @@ function DrawerContentList({
   onSelectPoi?: (poi: AmenityPOI) => void;
   onOpenDetail: (campsite: Campsite) => void;
 }) {
-  // Amenity-only mode: show all POI cards, no campsite list
   if (drawerMode === "amenity-only") {
     return (
       <div ref={scrollRef} className="overflow-y-auto flex-1 px-4 pt-2 pb-4 space-y-2">
@@ -555,6 +554,7 @@ function CampsiteDetailSheet({
         transform: open ? "translateY(0)" : "translateY(100%)",
         transition: `transform 350ms cubic-bezier(0.32,0.72,0,1)`,
         zIndex: 10,
+        pointerEvents: open ? undefined : "none",
       }}
     >
       {/* Drag handle + back arrow — intercepts pointer to detect swipe-down */}
@@ -562,9 +562,11 @@ function CampsiteDetailSheet({
         className="flex-shrink-0 select-none"
         style={{ cursor: "grab" }}
         onPointerDown={(e) => {
+          e.stopPropagation();
           pointerStartY.current = e.clientY;
         }}
         onPointerMove={(e) => {
+          e.stopPropagation();
           if (pointerStartY.current !== null && e.clientY - pointerStartY.current > 60) {
             pointerStartY.current = null;
             onDismiss();
@@ -578,7 +580,7 @@ function CampsiteDetailSheet({
         }}
       >
         <div className="flex justify-center pt-3 pb-2">
-          <div className="w-10 h-1 rounded-full bg-[#e0dbd0]" />
+          <div className="w-10 h-1 rounded-full" style={{ background: BORDER }} />
         </div>
         <div className="px-4 pb-3">
           <button
@@ -598,7 +600,7 @@ function CampsiteDetailSheet({
 
       {campsite && (
         <>
-          <ScenicPhoto seed={0} />
+          <ScenicPhoto seed={campsite.name.charCodeAt(0)} />
           <div className="overflow-y-auto flex-1 px-4 pt-3 pb-4">
             <div className="flex items-start gap-2 mb-1">
               <div className="min-w-0 flex-1">
@@ -630,7 +632,7 @@ function CampsiteDetailSheet({
           {/* Sticky directions button */}
           <div
             className="flex-shrink-0 px-4 pb-6 pt-3"
-            style={{ borderTop: `1.5px solid #e0dbd0`, background: SURFACE }}
+            style={{ borderTop: `1.5px solid ${BORDER}`, background: SURFACE }}
           >
             <a
               href={`https://www.google.com/maps/dir/?api=1&destination=${campsite.lat},${campsite.lng}`}
@@ -764,7 +766,11 @@ export default function BottomDrawer({
   }, []);
 
   // Detail sheet state — local to the drawer.
+  // detailCampsite holds the content to display (persists through close animation).
+  // isDetailOpen drives the CSS transform so the sheet can animate out with content visible.
   const [detailCampsite, setDetailCampsite] = useState<Campsite | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const closeAnimTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedScrollRef = useRef(0);
 
   const isFull = drawerState === "full";
@@ -793,7 +799,6 @@ export default function BottomDrawer({
         uniqueKeys.length === 1
           ? (poiMeta[uniqueKeys[0]]?.label ?? "amenity")
           : "amenities";
-      // Crude pluralisation: append "s" unless already ends in "s" (handles "Toilets").
       const plural = rawLabel.endsWith("s") ? rawLabel : `${rawLabel}s`;
       return `${count} ${plural} nearby`;
     }
@@ -849,12 +854,17 @@ export default function BottomDrawer({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   function openDetail(campsite: Campsite) {
+    if (closeAnimTimerRef.current !== null) {
+      clearTimeout(closeAnimTimerRef.current);
+      closeAnimTimerRef.current = null;
+    }
     savedScrollRef.current = scrollContainerRef.current?.scrollTop ?? 0;
     setDetailCampsite(campsite);
+    setIsDetailOpen(true);
   }
 
   function closeDetail() {
-    setDetailCampsite(null);
+    setIsDetailOpen(false);
     // Restore scroll position after React re-renders the list.
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -863,7 +873,18 @@ export default function BottomDrawer({
         }
       });
     });
+    // Clear content after the slide-down animation completes so it stays visible during the transition.
+    closeAnimTimerRef.current = setTimeout(() => {
+      closeAnimTimerRef.current = null;
+      setDetailCampsite(null);
+    }, 350);
   }
+
+  useEffect(() => {
+    return () => {
+      if (closeAnimTimerRef.current !== null) clearTimeout(closeAnimTimerRef.current);
+    };
+  }, []);
 
   // Empty state title for amenity-only mode
   const emptyTitle =
@@ -914,7 +935,7 @@ export default function BottomDrawer({
           <CampsiteDetailSheet
             campsite={detailCampsite}
             userLocation={userLocation}
-            open={detailCampsite !== null}
+            open={isDetailOpen}
             onDismiss={closeDetail}
           />
 
@@ -941,7 +962,7 @@ export default function BottomDrawer({
           >
             {/* Drag pill */}
             <div className="flex justify-center pt-3 pb-2">
-              <div className="w-10 h-1 rounded-full bg-[#e0dbd0]" />
+              <div className="w-10 h-1 rounded-full" style={{ background: BORDER }} />
             </div>
 
             {/* Summary row */}

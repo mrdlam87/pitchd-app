@@ -616,6 +616,11 @@ export default function MapView() {
         setSearchAmenities(searchPayload.amenityPois);
         setSearchParsedIntent(searchPayload.parsedIntent);
         setDrawerMode("amenity-only");
+        if (searchPayload.amenityPois.length === 0) {
+          setEmptySearchResult(true);
+          setDrawerState("half");
+          drawerStateRef.current = "half";
+        }
         // Fall through to browse mode so the camera and campsite fetch work normally.
       }
 
@@ -1070,7 +1075,7 @@ export default function MapView() {
         // next pan (handleMoveEnd) will fill in any newly revealed pins.
         loadWeatherForViewport(mapRef.current.getMap(), data.campsites);
       } else {
-        // No results — stay in browse mode but show empty state in drawer
+        // No results — stay in ai-search mode so the label reads "0 results · ranked by weather"
         searchModeRef.current = false;
         amenitySearchModeRef.current = false;
         suppressGeoFlyRef.current = false;
@@ -1079,7 +1084,7 @@ export default function MapView() {
         setSearchAmenities([]);
         setSearchContextQuery(null);
         setSearchParsedIntent(data.parsedIntent);
-        setDrawerMode("browse");
+        setDrawerMode("ai-search");
         setEmptySearchResult(true);
         setDrawerState("half");
         drawerStateRef.current = "half";
@@ -1512,6 +1517,7 @@ export default function MapView() {
             setSelectedIdx(null);
             selectedIdRef.current = null;
             setDrawerState("half");
+            skipNextFetch.current = true;
             mapRef.current?.easeTo({
               center: [poi.lng, poi.lat],
               duration: 350,
