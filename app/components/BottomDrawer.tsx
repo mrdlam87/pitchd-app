@@ -516,7 +516,6 @@ function DrawerContentList({
           userLocation={userLocation}
           cardRef={(el) => { cardRefs.current[i] = el; }}
           onSelect={() => {
-            onSelectPin(i);
             onOpenDetail(campsite);
           }}
         />
@@ -600,7 +599,7 @@ function CampsiteDetailSheet({
 
       {campsite && (
         <>
-          <ScenicPhoto seed={campsite.name.charCodeAt(0)} />
+          <ScenicPhoto seed={1000 + campsite.name.charCodeAt(0)} />
           <div className="overflow-y-auto flex-1 px-4 pt-3 pb-4">
             <div className="flex items-start gap-2 mb-1">
               <div className="min-w-0 flex-1">
@@ -807,7 +806,7 @@ export default function BottomDrawer({
       const count = campsites.length;
       const base = `${count} result${count === 1 ? "" : "s"} · ranked by weather`;
       if (parsedIntent?.location) {
-        return `${base} · ${parsedIntent.driveTimeHrs}hr from ${parsedIntent.location}`;
+        return `${base} · near ${parsedIntent.location}`;
       }
       return base;
     }
