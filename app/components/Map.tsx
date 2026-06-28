@@ -1512,6 +1512,10 @@ export default function MapView() {
           parsedIntent={searchParsedIntent}
           onDrawerStateChange={handleDrawerStateChange}
           onSelectPin={selectPin}
+          onHighlightPin={(i) => {
+            setSelectedIdx(i);
+            selectedIdRef.current = displayedCampsitesRef.current[i]?.id ?? null;
+          }}
           onSelectPoi={(poi) => {
             setSelectedPoiId(poi.id);
             setSelectedIdx(null);

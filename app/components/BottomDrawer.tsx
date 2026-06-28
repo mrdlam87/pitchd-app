@@ -467,6 +467,7 @@ function DrawerContentList({
   drawerMode,
   scrollRef,
   onSelectPoi,
+  onHighlightPin,
   onOpenDetail,
 }: {
   campsites: Campsite[];
@@ -480,6 +481,7 @@ function DrawerContentList({
   drawerMode: DrawerMode;
   scrollRef: React.RefObject<HTMLDivElement | null>;
   onSelectPoi?: (poi: AmenityPOI) => void;
+  onHighlightPin?: (i: number) => void;
   onOpenDetail: (campsite: Campsite) => void;
 }) {
   if (drawerMode === "amenity-only") {
@@ -514,6 +516,7 @@ function DrawerContentList({
           userLocation={userLocation}
           cardRef={(el) => { cardRefs.current[i] = el; }}
           onSelect={() => {
+            onHighlightPin?.(i);
             onOpenDetail(campsite);
           }}
         />
@@ -694,6 +697,7 @@ type Props = {
   onDrawerStateChange: (state: DrawerState) => void;
   onSelectPin: (i: number) => void;
   onSelectPoi?: (poi: AmenityPOI) => void;
+  onHighlightPin?: (i: number) => void;
   isFetching?: boolean;
   isEmpty?: boolean;
   searchLocation?: string | null;
@@ -716,6 +720,7 @@ export default function BottomDrawer({
   onDrawerStateChange,
   onSelectPin,
   onSelectPoi,
+  onHighlightPin,
   isFetching = false,
   isEmpty = false,
   searchLocation,
@@ -1027,6 +1032,7 @@ export default function BottomDrawer({
                   drawerMode={drawerMode}
                   scrollRef={scrollContainerRef}
                   onSelectPoi={onSelectPoi}
+                  onHighlightPin={onHighlightPin}
                   onOpenDetail={openDetail}
                 />
               )
