@@ -546,6 +546,7 @@ function CampsiteDetailSheet({
     <div
       className="absolute inset-0 flex flex-col overflow-hidden"
       aria-hidden={!open}
+      inert={!open || undefined}
       style={{
         background: SURFACE,
         transform: open ? "translateY(0)" : "translateY(100%)",
@@ -580,9 +581,6 @@ function CampsiteDetailSheet({
           pointerStartY.current = null;
         }}
       >
-        <div className="flex justify-center pt-3 pb-2">
-          <div className="w-10 h-1 rounded-full" style={{ background: BORDER }} />
-        </div>
         <div className="px-4 pb-3">
           <button
             type="button"
@@ -933,14 +931,6 @@ export default function BottomDrawer({
               which requires either aria-label or a Drawer.Title to be present. */}
           <Drawer.Title className="sr-only">Search results</Drawer.Title>
 
-          {/* Campsite detail sheet — absolute overlay, slides up when a card is tapped */}
-          <CampsiteDetailSheet
-            campsite={detailCampsite}
-            userLocation={userLocation}
-            open={isDetailOpen}
-            onDismiss={closeDetail}
-          />
-
           {/* Spacer — pushes content below the floating search bar + chips (z-[60])
               in full state. Animating the height (rather than mount/unmount) prevents
               the handle from jumping when entering or leaving full state. */}
@@ -1000,60 +990,74 @@ export default function BottomDrawer({
             </div>
           </div>
 
-          {/* Scrollable card list (or empty state) — visible in half and full states */}
-          {drawerState !== "peek" && (
-            showEmptyState ? (
-              <div className="overflow-y-auto flex-1 px-4 pt-2 pb-4">
-                <EmptySearchState
-                  title={emptyTitle}
-                  location={searchLocation}
-                  onClearSearch={onClearSearch}
-                  onBroadenSearch={onBroadenSearch}
-                />
-              </div>
-            ) : (
-              <DrawerContentList
-                campsites={campsites}
-                amenityPois={amenityPois}
-                selectedPoi={selectedPoi}
-                poiMeta={poiMeta}
-                selectedIdx={selectedIdx}
-                userLocation={userLocation}
-                cardRefs={cardRefs}
-                compact={drawerState !== "full"}
-                drawerMode={drawerMode}
-                scrollRef={scrollContainerRef}
-                onSelectPoi={onSelectPoi}
-                onOpenDetail={openDetail}
-              />
-            )
-          )}
+          {/* Content wrapper — CampsiteDetailSheet is absolute inset-0 relative to this
+              div, so it clips to the card-list area below the handle strip rather than
+              covering the full Drawer.Content (which would hide the handle strip and
+              overlap the floating search bar). */}
+          <div className="relative flex-1 overflow-hidden">
+            {/* Campsite detail sheet — absolute overlay, slides up when a card is tapped */}
+            <CampsiteDetailSheet
+              campsite={detailCampsite}
+              userLocation={userLocation}
+              open={isDetailOpen}
+              onDismiss={closeDetail}
+            />
 
-          {/* Peek state — show selected card (or first card, or empty state) without scrolling */}
-          {drawerState === "peek" && (
-            <div className="px-4 pt-2 pb-4 overflow-hidden">
-              {showEmptyState ? (
-                <EmptySearchState
-                  title={emptyTitle}
-                  location={searchLocation}
-                  onClearSearch={onClearSearch}
-                  onBroadenSearch={onBroadenSearch}
-                />
-              ) : selectedPoi && peekPoiMeta ? (
-                <POICard poi={selectedPoi} meta={peekPoiMeta} />
-              ) : peekCampsite ? (
-                <CampsiteCard
-                  campsite={peekCampsite}
-                  index={peekIdx}
-                  isSelected={selectedIdx === peekIdx}
-                  compact={true}
+            {/* Scrollable card list (or empty state) — visible in half and full states */}
+            {drawerState !== "peek" && (
+              showEmptyState ? (
+                <div className="overflow-y-auto flex-1 px-4 pt-2 pb-4">
+                  <EmptySearchState
+                    title={emptyTitle}
+                    location={searchLocation}
+                    onClearSearch={onClearSearch}
+                    onBroadenSearch={onBroadenSearch}
+                  />
+                </div>
+              ) : (
+                <DrawerContentList
+                  campsites={campsites}
+                  amenityPois={amenityPois}
+                  selectedPoi={selectedPoi}
+                  poiMeta={poiMeta}
+                  selectedIdx={selectedIdx}
                   userLocation={userLocation}
-                  cardRef={() => { /* peek card — ref not used for scrollIntoView */ }}
-                  onSelect={() => onSelectPin(peekIdx)}
+                  cardRefs={cardRefs}
+                  compact={drawerState !== "full"}
+                  drawerMode={drawerMode}
+                  scrollRef={scrollContainerRef}
+                  onSelectPoi={onSelectPoi}
+                  onOpenDetail={openDetail}
                 />
-              ) : null}
-            </div>
-          )}
+              )
+            )}
+
+            {/* Peek state — show selected card (or first card, or empty state) without scrolling */}
+            {drawerState === "peek" && (
+              <div className="px-4 pt-2 pb-4 overflow-hidden">
+                {showEmptyState ? (
+                  <EmptySearchState
+                    title={emptyTitle}
+                    location={searchLocation}
+                    onClearSearch={onClearSearch}
+                    onBroadenSearch={onBroadenSearch}
+                  />
+                ) : selectedPoi && peekPoiMeta ? (
+                  <POICard poi={selectedPoi} meta={peekPoiMeta} />
+                ) : peekCampsite ? (
+                  <CampsiteCard
+                    campsite={peekCampsite}
+                    index={peekIdx}
+                    isSelected={selectedIdx === peekIdx}
+                    compact={true}
+                    userLocation={userLocation}
+                    cardRef={() => { /* peek card — ref not used for scrollIntoView */ }}
+                    onSelect={() => onSelectPin(peekIdx)}
+                  />
+                ) : null}
+              </div>
+            )}
+          </div>
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>
