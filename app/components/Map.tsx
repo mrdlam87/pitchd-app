@@ -1012,7 +1012,7 @@ export default function MapView() {
       // Amenity-only result — route returns amenityPois instead of campsites
       if ("amenityPois" in data) {
         addRecentEntry({ kind: "nl", name: q.trim() });
-        amenitySearchModeRef.current = data.amenityPois.length > 0;
+        amenitySearchModeRef.current = true;
         amenitySearchTypesRef.current = data.parsedIntent?.amenities ?? [];
         searchModeRef.current = false;
         setEmptySearchResult(data.amenityPois.length === 0);

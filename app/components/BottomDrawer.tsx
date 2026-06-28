@@ -466,7 +466,6 @@ function DrawerContentList({
   compact,
   drawerMode,
   scrollRef,
-  onSelectPin,
   onSelectPoi,
   onOpenDetail,
 }: {
@@ -480,7 +479,6 @@ function DrawerContentList({
   compact: boolean;
   drawerMode: DrawerMode;
   scrollRef: React.RefObject<HTMLDivElement | null>;
-  onSelectPin: (i: number) => void;
   onSelectPoi?: (poi: AmenityPOI) => void;
   onOpenDetail: (campsite: Campsite) => void;
 }) {
@@ -577,6 +575,9 @@ function CampsiteDetailSheet({
         onPointerLeave={() => {
           pointerStartY.current = null;
         }}
+        onPointerCancel={() => {
+          pointerStartY.current = null;
+        }}
       >
         <div className="flex justify-center pt-3 pb-2">
           <div className="w-10 h-1 rounded-full" style={{ background: BORDER }} />
@@ -599,7 +600,7 @@ function CampsiteDetailSheet({
 
       {campsite && (
         <>
-          <ScenicPhoto seed={1000 + campsite.name.charCodeAt(0)} />
+          <ScenicPhoto seed={1000 + (campsite.name.charCodeAt(0) || 0)} />
           <div className="overflow-y-auto flex-1 px-4 pt-3 pb-4">
             <div className="flex items-start gap-2 mb-1">
               <div className="min-w-0 flex-1">
@@ -788,19 +789,20 @@ export default function BottomDrawer({
 
   // Context-aware result label — switches on drawerMode.
   const resultLabel = (() => {
-    if (isFetching) return "Finding…";
-
     if (drawerMode === "amenity-only") {
       const count = amenityPois.length;
+      if (isFetching && count === 0) return "Finding…";
       if (count === 0) return "0 amenities found";
       const uniqueKeys = [...new Set(amenityPois.map((p) => p.amenityType.key))];
       const rawLabel =
         uniqueKeys.length === 1
           ? (poiMeta[uniqueKeys[0]]?.label ?? "amenity")
           : "amenities";
-      const plural = rawLabel.endsWith("s") ? rawLabel : `${rawLabel}s`;
-      return `${count} ${plural} nearby`;
+      const label = count === 1 ? rawLabel : (rawLabel.endsWith("s") ? rawLabel : `${rawLabel}s`);
+      return `${count} ${label} nearby`;
     }
+
+    if (isFetching) return "Finding…";
 
     if (drawerMode === "ai-search") {
       const count = campsites.length;
@@ -1020,7 +1022,6 @@ export default function BottomDrawer({
                 compact={drawerState !== "full"}
                 drawerMode={drawerMode}
                 scrollRef={scrollContainerRef}
-                onSelectPin={onSelectPin}
                 onSelectPoi={onSelectPoi}
                 onOpenDetail={openDetail}
               />
