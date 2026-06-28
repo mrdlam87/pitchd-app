@@ -564,8 +564,10 @@ function CampsiteDetailSheet({
         style={{ cursor: "grab" }}
         onPointerDown={(e) => {
           e.stopPropagation();
-          e.currentTarget.setPointerCapture(e.pointerId);
-          pointerStartY.current = e.clientY;
+          if (!(e.target as Element).closest("button")) {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            pointerStartY.current = e.clientY;
+          }
         }}
         onPointerMove={(e) => {
           e.stopPropagation();
@@ -890,6 +892,15 @@ export default function BottomDrawer({
       if (closeAnimTimerRef.current !== null) clearTimeout(closeAnimTimerRef.current);
     };
   }, []);
+
+  // When a map pin is tapped while the detail sheet is already open, update the
+  // displayed campsite so the sheet reflects the newly selected pin.
+  useEffect(() => {
+    if (isDetailOpen && selectedIdx !== null) {
+      const campsite = campsites[selectedIdx];
+      if (campsite) setDetailCampsite(campsite);
+    }
+  }, [selectedIdx, isDetailOpen, campsites]);
 
   // Empty state title for amenity-only mode
   const emptyTitle =
