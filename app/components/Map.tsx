@@ -14,7 +14,7 @@ import BottomDrawer, {
   getDrawerHeightPx,
 } from "./BottomDrawer";
 import type { AmenityPOI, Campsite } from "@/types/map";
-import { BORDER, CORAL, FOREST_GREEN, SAGE, SURFACE_OVERLAY } from "@/lib/tokens";
+import { BORDER, CORAL, FOREST_GREEN, SAGE, SURFACE, SURFACE_OVERLAY, TEXT } from "@/lib/tokens";
 import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayload, type AISearchPayload, type AmenitySearchPayload, type LocationPayload } from "@/lib/searchResults";
 import type { ParsedIntent } from "@/lib/parseIntent";
 import { getRecentEntries, addRecentEntry, type RecentEntry } from "@/lib/recentSearches";
@@ -616,10 +616,10 @@ export default function MapView() {
         setSearchAmenities(searchPayload.amenityPois);
         setSearchParsedIntent(searchPayload.parsedIntent);
         setDrawerMode("amenity-only");
+        setDrawerState("half");
+        drawerStateRef.current = "half";
         if (searchPayload.amenityPois.length === 0) {
           setEmptySearchResult(true);
-          setDrawerState("half");
-          drawerStateRef.current = "half";
         }
         // Fall through to browse mode so the camera and campsite fetch work normally.
       }
@@ -1239,6 +1239,8 @@ export default function MapView() {
               drawerStateRef.current = "peek";
               searchModeRef.current = true;
               suppressGeoFlyRef.current = true;
+              setDrawerMode("browse");
+              setSearchParsedIntent(null);
               setSearchContextQuery(s.name);
               fetch(`/api/campsites/${s.id}`)
                 .then((r) => r.ok ? r.json() : null)
@@ -1279,7 +1281,7 @@ export default function MapView() {
 
         {/* Search error */}
         {mapSearchError && (
-          <div className="rounded-xl border border-[#fdd] bg-white px-3 py-2 text-xs text-[#e8674a] shadow-sm">
+          <div className="rounded-xl border border-red-200 bg-white px-3 py-2 text-xs shadow-sm" style={{ color: CORAL }}>
             {mapSearchError}
           </div>
         )}
@@ -1342,20 +1344,19 @@ export default function MapView() {
                 onClick={handleClick}
                 disabled={isDisabled}
                 aria-label={chip.icon === "logo" ? chip.label : undefined}
-                className={`flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold font-[family-name:var(--font-dm-sans)] shadow-sm transition-all duration-150 disabled:opacity-50 ${
-                  isActive
-                    ? chip.kind === "quick" && chip.primary
-                      ? "bg-[#e8674a] border-[#e8674a] text-white"
-                      : "bg-[#2d4a2d] border-[#2d4a2d] text-white"
-                    : chip.kind === "quick" && chip.primary
-                      ? "bg-white border-[#e0dbd0] text-[#e8674a]"
-                      : "bg-white border-[#e0dbd0] text-[#1a2e1a]"
-                }`}
+                className="flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold font-[family-name:var(--font-dm-sans)] shadow-sm transition-all duration-150 disabled:opacity-50"
+                style={isActive
+                  ? chip.kind === "quick" && chip.primary
+                    ? { background: CORAL, borderColor: CORAL, color: "white" }
+                    : { background: FOREST_GREEN, borderColor: FOREST_GREEN, color: "white" }
+                  : chip.kind === "quick" && chip.primary
+                    ? { background: SURFACE, borderColor: BORDER, color: CORAL }
+                    : { background: SURFACE, borderColor: BORDER, color: TEXT }}
               >
                 {chip.icon === "logo" ? (
                   <span className="flex items-baseline">
-                    <span className={`font-[family-name:var(--font-lora)] text-[11px] font-bold ${isActive ? "text-white" : "text-[#2d4a2d]"}`}>Pitch</span>
-                    <span className={`font-[family-name:var(--font-lora)] text-[11px] font-bold ${isActive ? "text-white/75" : "text-[#e8674a]"}`}>d</span>
+                    <span className="font-[family-name:var(--font-lora)] text-[11px] font-bold" style={{ color: isActive ? "white" : FOREST_GREEN }}>Pitch</span>
+                    <span className="font-[family-name:var(--font-lora)] text-[11px] font-bold" style={{ color: isActive ? "rgba(255,255,255,0.75)" : CORAL }}>d</span>
                   </span>
                 ) : (
                   <>

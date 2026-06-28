@@ -210,7 +210,7 @@ const NavigateButton = ({ lat, lng, name }: { lat: number; lng: number; name: st
     rel="noopener noreferrer"
     onClick={(e) => e.stopPropagation()}
     className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full transition-opacity hover:opacity-70 active:opacity-50"
-    style={{ background: "rgba(232,103,74,0.12)" }}
+    style={{ background: CORAL_LIGHT }}
     aria-label={`Navigate to ${name} in Google Maps`}
   >
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
@@ -432,8 +432,8 @@ function EmptySearchState({
           <button
             type="button"
             onClick={onBroadenSearch}
-            className="rounded-full border border-[#e0dbd0] bg-white px-4 py-2 text-xs font-semibold font-[family-name:var(--font-dm-sans)] transition-colors hover:border-[#2d4a2d]"
-            style={{ color: FOREST_GREEN }}
+            className="rounded-full border px-4 py-2 text-xs font-semibold font-[family-name:var(--font-dm-sans)] transition-colors"
+            style={{ color: FOREST_GREEN, background: SURFACE, borderColor: BORDER }}
           >
             Edit search
           </button>
@@ -560,6 +560,7 @@ function CampsiteDetailSheet({
         style={{ cursor: "grab" }}
         onPointerDown={(e) => {
           e.stopPropagation();
+          e.currentTarget.setPointerCapture(e.pointerId);
           pointerStartY.current = e.clientY;
         }}
         onPointerMove={(e) => {
