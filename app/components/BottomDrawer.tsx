@@ -902,6 +902,19 @@ export default function BottomDrawer({
     }
   }, [selectedIdx, isDetailOpen, campsites]);
 
+  // Close the detail sheet whenever the drawer snaps to peek (e.g. user drags
+  // it down). Leaving it open in peek state hides the peek card behind the sheet.
+  useEffect(() => {
+    if (drawerState !== "peek") return;
+    if (!isDetailOpen) return;
+    setIsDetailOpen(false);
+    if (closeAnimTimerRef.current !== null) clearTimeout(closeAnimTimerRef.current);
+    closeAnimTimerRef.current = setTimeout(() => {
+      closeAnimTimerRef.current = null;
+      setDetailCampsite(null);
+    }, 350);
+  }, [drawerState]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Empty state title for amenity-only mode
   const emptyTitle =
     drawerMode === "amenity-only" ? "No amenities found" : undefined;
@@ -1010,7 +1023,7 @@ export default function BottomDrawer({
               div, so it clips to the card-list area below the handle strip rather than
               covering the full Drawer.Content (which would hide the handle strip and
               overlap the floating search bar). */}
-          <div className="relative flex-1 overflow-hidden">
+          <div className="relative flex-1 overflow-hidden flex flex-col">
             {/* Campsite detail sheet — absolute overlay, slides up when a card is tapped */}
             <CampsiteDetailSheet
               campsite={detailCampsite}
