@@ -787,13 +787,18 @@ export default function MapView() {
       }
       if (animate) {
         requestAnimationFrame(() => {
-          cardRefs.current[i]?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          // block: "start" — Vaul keeps Drawer.Content at full height and uses CSS
+          // transforms for snap positions, so the scroll container's CSS height is
+          // the full drawer height even though only the snap fraction is visible.
+          // "nearest" would land the card near the invisible bottom of the container;
+          // "start" scrolls it to the top where it's always in the visible window.
+          cardRefs.current[i]?.scrollIntoView({ behavior: "smooth", block: "start" });
         });
       } else {
         if (scrollTimeoutRef.current !== null) clearTimeout(scrollTimeoutRef.current);
         scrollTimeoutRef.current = setTimeout(() => {
           scrollTimeoutRef.current = null;
-          cardRefs.current[i]?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          cardRefs.current[i]?.scrollIntoView({ behavior: "smooth", block: "start" });
         }, DRAWER_TRANSITION_MS);
       }
     },
