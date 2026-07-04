@@ -893,6 +893,21 @@ export default function BottomDrawer({
     };
   }, []);
 
+  // Vaul's Drawer.Content has overflow:hidden but Chrome's scrollIntoView (and
+  // other browser scroll mechanisms) can still set scrollTop on it via JS, which
+  // shifts all drawer content up and clips the handle strip. Guard against this
+  // by listening for any scroll on the dialog and immediately resetting to 0.
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const dialog = container.closest('[role="dialog"]') as HTMLElement | null;
+    if (!dialog) return;
+    const reset = () => { if (dialog.scrollTop !== 0) dialog.scrollTop = 0; };
+    dialog.addEventListener("scroll", reset, { passive: true });
+    reset(); // clear any scrollTop left over from a previous render cycle
+    return () => dialog.removeEventListener("scroll", reset);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // When a map pin is tapped while the detail sheet is already open, update the
   // displayed campsite so the sheet reflects the newly selected pin.
   useEffect(() => {
