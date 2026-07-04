@@ -486,7 +486,7 @@ function DrawerContentList({
 }) {
   if (drawerMode === "amenity-only") {
     return (
-      <div ref={scrollRef} className="overflow-y-auto flex-1 min-h-0 px-4 pt-2 pb-4 space-y-2">
+      <div ref={scrollRef} className="overflow-y-auto flex-1 min-h-0 px-4 pt-2 pb-4 space-y-2 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
         {amenityPois.map((poi) => {
           const meta = poiMeta[poi.amenityType.key] ?? { emoji: "📍", label: poi.amenityType.key, color: FOREST_GREEN };
           return <POICard key={poi.id} poi={poi} meta={meta} isSelected={selectedPoi?.id === poi.id} onClick={onSelectPoi ? () => onSelectPoi(poi) : undefined} />;
@@ -500,7 +500,7 @@ function DrawerContentList({
     : null;
 
   return (
-    <div ref={scrollRef} className="overflow-y-auto flex-1 min-h-0 px-4 pt-2 pb-4 space-y-2">
+    <div ref={scrollRef} className="overflow-y-auto flex-1 min-h-0 px-4 pt-2 pb-4 space-y-2 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
       {/* POI detail card — shown when an amenity pin is selected in campsite list modes */}
       {selectedPoi && selectedPoiMeta && (
         <POICard key={selectedPoi.id} poi={selectedPoi} meta={selectedPoiMeta} />
