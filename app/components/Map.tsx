@@ -792,6 +792,30 @@ export default function MapView() {
     []
   );
 
+  // Like selectPin but without changing drawer state — used when a card is tapped
+  // from the drawer list to open the detail sheet. The map flies to the campsite
+  // and unclust ers the pin (if needed) so the coral ring is visible, while the
+  // drawer stays in whichever state the user had it (half or full).
+  const flyToPin = useCallback((i: number) => {
+    const campsite = displayedCampsitesRef.current[i];
+    if (!campsite || !mapRef.current) return;
+    skipNextFetch.current = true;
+    const isIndividualPin = campsiteClustersRef.current.some(
+      (f) => !("cluster" in f.properties && f.properties.cluster) &&
+             (f.properties as { idx: number }).idx === i
+    );
+    if (!isIndividualPin) {
+      isUnclusteringRef.current = true;
+      setHideMarkers(true);
+    }
+    mapRef.current.easeTo({
+      center: [campsite.lng, campsite.lat],
+      ...(isIndividualPin ? {} : { zoom: CLUSTER_OPTIONS.maxZoom + 1 }),
+      duration: isIndividualPin ? 300 : 450,
+      padding: { top: 0, right: 0, bottom: getDrawerHeightPx(drawerStateRef.current), left: 0 },
+    });
+  }, []);
+
   const handleApplyFilters = useCallback(
     (filters: FilterState) => {
       setActiveFilters(filters);
@@ -1507,6 +1531,7 @@ export default function MapView() {
           onHighlightPin={(i) => {
             setSelectedIdx(i);
             selectedIdRef.current = displayedCampsitesRef.current[i]?.id ?? null;
+            flyToPin(i);
           }}
           onSelectPoi={(poi) => {
             setSelectedPoiId(poi.id);
