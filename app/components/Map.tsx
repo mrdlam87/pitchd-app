@@ -8,13 +8,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import FilterPanel, { type FilterState } from "./FilterPanel";
 import BottomDrawer, {
   type DrawerState,
+  type DrawerMode,
   PEEK_HEIGHT_PX,
-  DRAWER_TRANSITION_MS,
   getDrawerHeightPx,
 } from "./BottomDrawer";
 import type { AmenityPOI, Campsite } from "@/types/map";
-import { BORDER, CORAL, FOREST_GREEN, SAGE, SURFACE_OVERLAY } from "@/lib/tokens";
-import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayload, type AISearchPayload, type AmenitySearchPayload, type LocationPayload } from "@/lib/searchResults";
+import { BORDER, CORAL, FOREST_GREEN, SAGE, SURFACE, SURFACE_OVERLAY, TEXT } from "@/lib/tokens";
+import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayload, type AISearchPayload, type AmenitySearchPayload } from "@/lib/searchResults";
 import type { ParsedIntent } from "@/lib/parseIntent";
 import { getRecentEntries, addRecentEntry, type RecentEntry } from "@/lib/recentSearches";
 import { QUICK_CHIPS, AMENITY_CHIPS } from "@/lib/chips";
@@ -114,21 +114,6 @@ function ClusterBubble({ count, color, ariaLabel, onExpand }: ClusterBubbleProps
   );
 }
 
-// Builds a human-readable summary from a parsed search intent.
-// "Near Blue Mountains · 3hr · Dog friendly · Sat 21 Jun"
-function buildContextLabel(pi: ParsedIntent): string {
-  const parts: string[] = [];
-  if (pi.location) parts.push(`Near ${pi.location}`);
-  if (pi.driveTimeHrs) parts.push(`${pi.driveTimeHrs}hr`);
-  if (pi.amenities.length > 0) parts.push(pi.amenities.map((a) => a.replace(/_/g, " ")).join(", "));
-  if (pi.startDate) {
-    try {
-      const d = new Date(`${pi.startDate}T00:00:00`);
-      parts.push(d.toLocaleDateString("en-AU", { weekday: "short", month: "short", day: "numeric" }));
-    } catch { /* ignore invalid date */ }
-  }
-  return parts.join(" · ");
-}
 
 export default function MapView() {
   // useState lazy initialiser runs synchronously on the first render — before any effects
@@ -149,6 +134,11 @@ export default function MapView() {
   // clearing the POI pins when no POI filter chip is active. Cleared when the user applies
   // filters, clears search, taps a direct-filter or amenity chip.
   const amenitySearchModeRef = useRef(initialSearch?.kind === "amenity-search");
+  // POI types active during amenity-search mode — used by handleMoveEnd to refetch
+  // the same amenity type as the map is panned, without touching activeFiltersRef.
+  const amenitySearchTypesRef = useRef<string[]>(
+    initialSearch?.kind === "amenity-search" ? (initialSearch.parsedIntent?.amenities ?? []) : []
+  );
   // Key of the currently active quick chip (null = browse mode).
   // AI arrivals: chipKey flows through AISearchPayload (defaults to "pitchd" for textarea NL queries).
   // Direct-filter arrivals: no chip is highlighted — the activity shows in the filter count badge.
@@ -200,6 +190,13 @@ export default function MapView() {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
   const [drawerState, setDrawerState] = useState<DrawerState>("peek");
+  const [drawerMode, setDrawerMode] = useState<DrawerMode>(() => {
+    if (initialSearch?.kind === "ai") return "ai-search";
+    if (initialSearch?.kind === "amenity-search") return "amenity-only";
+    if (initialSearch?.kind === "region") return "region";
+    if (initialSearch?.kind === "location") return "location";
+    return "browse";
+  });
   const [showFilters, setShowFilters] = useState(false);
   // Lazy initialiser runs once on mount — avoids recomputing the conditional on every render.
   const [activeFilters, setActiveFilters] = useState<FilterState>(() =>
@@ -595,12 +592,19 @@ export default function MapView() {
       }
 
       // Amenity-only search arrival — display POI pins, don't lock the map.
-      // Drawer rendering for this kind is handled in #121; browse mode stays active for campsites.
       if (searchPayload?.kind === "amenity-search") {
         initialSearchRef.current = null;
         searchModeRef.current = false;
         amenitySearchModeRef.current = true;
+        amenitySearchTypesRef.current = searchPayload.parsedIntent?.amenities ?? [];
         setSearchAmenities(searchPayload.amenityPois);
+        setSearchParsedIntent(searchPayload.parsedIntent);
+        setDrawerMode("amenity-only");
+        setDrawerState("half");
+        drawerStateRef.current = "half";
+        if (searchPayload.amenityPois.length === 0) {
+          setEmptySearchResult(true);
+        }
         // Fall through to browse mode so the camera and campsite fetch work normally.
       }
 
@@ -633,10 +637,13 @@ export default function MapView() {
         return;
       }
 
-      // Search payload was present but returned no campsites — fall back to browse mode.
+      // Non-amenity search payload present but returned no campsites — fall back to browse mode.
       // Reset both refs so handleMoveEnd fires normally and geolocation flyTo works.
-      searchModeRef.current = false;
-      suppressGeoFlyRef.current = false;
+      if (!amenitySearchModeRef.current) {
+        searchModeRef.current = false;
+        suppressGeoFlyRef.current = false;
+        setDrawerMode("browse");
+      }
 
       const loc = userLocationRef.current;
       if (loc) {
@@ -659,6 +666,10 @@ export default function MapView() {
         }
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchRegionCampsites and
+    // fetchLocationCampsites are plain async functions recreated every render; adding them
+    // would make handleLoad change every render, which is risky for an onLoad handler that
+    // fires only once. The closure is fresh at mount so stale-closure risk is zero.
     [loadCampsites, loadAmenities, loadWeatherForViewport, setSearchResults, setSearchAmenities, markInitialLoaded]
   );
 
@@ -689,10 +700,17 @@ export default function MapView() {
         loadWeatherForViewport(e.target);
         return;
       }
-      loadCampsites(e.target);
-      if (!amenitySearchModeRef.current) {
+      if (amenitySearchModeRef.current) {
+        // Temporarily inject the NL search types into activeFiltersRef so loadAmenities
+        // fetches correctly without touching the user's filter chip state.
+        const savedPois = activeFiltersRef.current.pois;
+        activeFiltersRef.current = { ...activeFiltersRef.current, pois: amenitySearchTypesRef.current };
         loadAmenities(e.target);
+        activeFiltersRef.current = { ...activeFiltersRef.current, pois: savedPois };
+        return;
       }
+      loadCampsites(e.target);
+      loadAmenities(e.target);
     },
     [loadCampsites, loadAmenities, loadWeatherForViewport]
   );
@@ -704,21 +722,23 @@ export default function MapView() {
       setSelectedIdx(null);
       selectedIdRef.current = null;
       if (animate && mapRef.current) {
-        skipNextFetch.current = true;
         const isIndividualPin = amenityClustersRef.current.some(
           (f) => !("cluster" in f.properties && f.properties.cluster) &&
                  (f.properties as { id: string }).id === poi.id
         );
         if (!isIndividualPin) {
+          // Only animate the map when the pin is inside a cluster — zoom in to uncluster.
+          // Individual visible pins highlight in place without panning the map.
+          skipNextFetch.current = true;
           isUnclusteringRef.current = true;
           setHideMarkers(true);
+          mapRef.current.easeTo({
+            center: [poi.lng, poi.lat],
+            zoom: CLUSTER_OPTIONS.maxZoom + 1,
+            duration: 450,
+            padding: { top: 0, right: 0, bottom: getDrawerHeightPx("half"), left: 0 },
+          });
         }
-        mapRef.current.easeTo({
-          center: [poi.lng, poi.lat],
-          ...(isIndividualPin ? {} : { zoom: CLUSTER_OPTIONS.maxZoom + 1 }),
-          duration: isIndividualPin ? 300 : 450,
-          padding: { top: 0, right: 0, bottom: getDrawerHeightPx("half"), left: 0 },
-        });
       }
     },
     []
@@ -753,20 +773,37 @@ export default function MapView() {
           padding: { top: 0, right: 0, bottom: getDrawerHeightPx("half"), left: 0 },
         });
       }
-      if (animate) {
-        requestAnimationFrame(() => {
-          cardRefs.current[i]?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        });
-      } else {
-        if (scrollTimeoutRef.current !== null) clearTimeout(scrollTimeoutRef.current);
-        scrollTimeoutRef.current = setTimeout(() => {
-          scrollTimeoutRef.current = null;
-          cardRefs.current[i]?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        }, DRAWER_TRANSITION_MS);
-      }
+      // Scroll is handled inside BottomDrawer via a selectedIdx useEffect that
+      // sets scrollTop directly on the scroll container. scrollIntoView is avoided
+      // because Chrome also scrolls ancestor overflow:hidden elements (including
+      // Vaul's Drawer.Content), clipping the handle strip off the top of the drawer.
     },
     []
   );
+
+  // Like selectPin but without changing drawer state — used when a card is tapped
+  // from the drawer list to open the detail sheet. The map flies to the campsite
+  // and unclust ers the pin (if needed) so the coral ring is visible, while the
+  // drawer stays in whichever state the user had it (half or full).
+  const flyToPin = useCallback((i: number) => {
+    const campsite = displayedCampsitesRef.current[i];
+    if (!campsite || !mapRef.current) return;
+    skipNextFetch.current = true;
+    const isIndividualPin = campsiteClustersRef.current.some(
+      (f) => !("cluster" in f.properties && f.properties.cluster) &&
+             (f.properties as { idx: number }).idx === i
+    );
+    if (!isIndividualPin) {
+      isUnclusteringRef.current = true;
+      setHideMarkers(true);
+    }
+    mapRef.current.easeTo({
+      center: [campsite.lng, campsite.lat],
+      ...(isIndividualPin ? {} : { zoom: CLUSTER_OPTIONS.maxZoom + 1 }),
+      duration: isIndividualPin ? 300 : 450,
+      padding: { top: 0, right: 0, bottom: getDrawerHeightPx(drawerStateRef.current), left: 0 },
+    });
+  }, []);
 
   const handleApplyFilters = useCallback(
     (filters: FilterState) => {
@@ -781,6 +818,7 @@ export default function MapView() {
       searchModeRef.current = false;
       amenitySearchModeRef.current = false;
       suppressGeoFlyRef.current = false;
+      setDrawerMode("browse");
       setActiveChip(null);
       activeChipRef.current = null;
       setSearchContextQuery(null);
@@ -826,6 +864,7 @@ export default function MapView() {
       setHasMore(data.hasMore);
       searchModeRef.current = true;
       setSearchContextQuery(region);
+      setDrawerMode("region");
       if (data.campsites.length > 0 && mapRef.current) {
         const map = mapRef.current.getMap();
         fitToCampsites(map, data.campsites, getDrawerHeightPx("half"));
@@ -866,6 +905,7 @@ export default function MapView() {
       searchModeRef.current = true;
       suppressGeoFlyRef.current = true;
       setSearchContextQuery(entry.name);
+      setDrawerMode("browse");
       fetch(`/api/campsites/${entry.id}`)
         .then((r) => r.ok ? r.json() : null)
         .then((full: Campsite | null) => {
@@ -904,6 +944,7 @@ export default function MapView() {
       setHasMore(data.hasMore);
       searchModeRef.current = true;
       setSearchContextQuery(name);
+      setDrawerMode("location");
       if (data.campsites.length > 0 && mapRef.current) {
         const map = mapRef.current.getMap();
         fitToCampsites(map, data.campsites, getDrawerHeightPx("half"));
@@ -976,7 +1017,8 @@ export default function MapView() {
       // Amenity-only result — route returns amenityPois instead of campsites
       if ("amenityPois" in data) {
         addRecentEntry({ kind: "nl", name: q.trim() });
-        amenitySearchModeRef.current = data.amenityPois.length > 0;
+        amenitySearchModeRef.current = true;
+        amenitySearchTypesRef.current = data.parsedIntent?.amenities ?? [];
         searchModeRef.current = false;
         setEmptySearchResult(data.amenityPois.length === 0);
         setSearchAmenities(data.amenityPois);
@@ -985,6 +1027,7 @@ export default function MapView() {
         activeChipRef.current = chipKey;
         setSearchContextQuery(null);
         setSearchParsedIntent(data.parsedIntent);
+        setDrawerMode("amenity-only");
         setDrawerState("half");
         drawerStateRef.current = "half";
         return;
@@ -1005,6 +1048,7 @@ export default function MapView() {
         setDrawerState("half");
         drawerStateRef.current = "half";
         searchModeRef.current = true;
+        setDrawerMode("ai-search");
         setActiveChip(chipKey);
         activeChipRef.current = chipKey;
         setSearchParsedIntent(data.parsedIntent);
@@ -1035,7 +1079,7 @@ export default function MapView() {
         // next pan (handleMoveEnd) will fill in any newly revealed pins.
         loadWeatherForViewport(mapRef.current.getMap(), data.campsites);
       } else {
-        // No results — stay in browse mode but show empty state in drawer
+        // No results — stay in ai-search mode so the label reads "0 results · ranked by weather"
         searchModeRef.current = false;
         amenitySearchModeRef.current = false;
         suppressGeoFlyRef.current = false;
@@ -1044,6 +1088,7 @@ export default function MapView() {
         setSearchAmenities([]);
         setSearchContextQuery(null);
         setSearchParsedIntent(data.parsedIntent);
+        setDrawerMode("ai-search");
         setEmptySearchResult(true);
         setDrawerState("half");
         drawerStateRef.current = "half";
@@ -1066,6 +1111,7 @@ export default function MapView() {
     locationCoordsRef.current = null;
     setActiveChip(null);
     activeChipRef.current = null;
+    setDrawerMode("browse");
     setSearchContextQuery(null);
     setSearchParsedIntent(null);
     setEmptySearchResult(false);
@@ -1114,6 +1160,7 @@ export default function MapView() {
       searchModeRef.current = false;
       amenitySearchModeRef.current = false;
       suppressGeoFlyRef.current = false;
+      setDrawerMode("browse");
       setSearchContextQuery(null);
       setSearchParsedIntent(null);
       setEmptySearchResult(false);
@@ -1197,6 +1244,8 @@ export default function MapView() {
               drawerStateRef.current = "peek";
               searchModeRef.current = true;
               suppressGeoFlyRef.current = true;
+              setDrawerMode("browse");
+              setSearchParsedIntent(null);
               setSearchContextQuery(s.name);
               fetch(`/api/campsites/${s.id}`)
                 .then((r) => r.ok ? r.json() : null)
@@ -1237,7 +1286,7 @@ export default function MapView() {
 
         {/* Search error */}
         {mapSearchError && (
-          <div className="rounded-xl border border-[#fdd] bg-white px-3 py-2 text-xs text-[#e8674a] shadow-sm">
+          <div className="rounded-xl border border-red-200 bg-white px-3 py-2 text-xs shadow-sm" style={{ color: CORAL }}>
             {mapSearchError}
           </div>
         )}
@@ -1300,20 +1349,19 @@ export default function MapView() {
                 onClick={handleClick}
                 disabled={isDisabled}
                 aria-label={chip.icon === "logo" ? chip.label : undefined}
-                className={`flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold font-[family-name:var(--font-dm-sans)] shadow-sm transition-all duration-150 disabled:opacity-50 ${
-                  isActive
-                    ? chip.kind === "quick" && chip.primary
-                      ? "bg-[#e8674a] border-[#e8674a] text-white"
-                      : "bg-[#2d4a2d] border-[#2d4a2d] text-white"
-                    : chip.kind === "quick" && chip.primary
-                      ? "bg-white border-[#e0dbd0] text-[#e8674a]"
-                      : "bg-white border-[#e0dbd0] text-[#1a2e1a]"
-                }`}
+                className="flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold font-[family-name:var(--font-dm-sans)] shadow-sm transition-all duration-150 disabled:opacity-50"
+                style={isActive
+                  ? chip.kind === "quick" && chip.primary
+                    ? { background: CORAL, borderColor: CORAL, color: "white" }
+                    : { background: FOREST_GREEN, borderColor: FOREST_GREEN, color: "white" }
+                  : chip.kind === "quick" && chip.primary
+                    ? { background: SURFACE, borderColor: BORDER, color: CORAL }
+                    : { background: SURFACE, borderColor: BORDER, color: TEXT }}
               >
                 {chip.icon === "logo" ? (
                   <span className="flex items-baseline">
-                    <span className={`font-[family-name:var(--font-lora)] text-[11px] font-bold ${isActive ? "text-white" : "text-[#2d4a2d]"}`}>Pitch</span>
-                    <span className={`font-[family-name:var(--font-lora)] text-[11px] font-bold ${isActive ? "text-white/75" : "text-[#e8674a]"}`}>d</span>
+                    <span className="font-[family-name:var(--font-lora)] text-[11px] font-bold" style={{ color: isActive ? "white" : FOREST_GREEN }}>Pitch</span>
+                    <span className="font-[family-name:var(--font-lora)] text-[11px] font-bold" style={{ color: isActive ? "rgba(255,255,255,0.75)" : CORAL }}>d</span>
                   </span>
                 ) : (
                   <>
@@ -1465,8 +1513,27 @@ export default function MapView() {
           userLocation={userLocation}
           cardRefs={cardRefs}
           drawerState={drawerState}
+          drawerMode={drawerMode}
+          parsedIntent={searchParsedIntent}
           onDrawerStateChange={handleDrawerStateChange}
           onSelectPin={selectPin}
+          onHighlightPin={(i) => {
+            setSelectedIdx(i);
+            selectedIdRef.current = displayedCampsitesRef.current[i]?.id ?? null;
+            flyToPin(i);
+          }}
+          onSelectPoi={(poi) => {
+            setSelectedPoiId(poi.id);
+            setSelectedIdx(null);
+            selectedIdRef.current = null;
+            setDrawerState("half");
+            skipNextFetch.current = true;
+            mapRef.current?.easeTo({
+              center: [poi.lng, poi.lat],
+              duration: 350,
+              padding: { top: 0, right: 0, bottom: getDrawerHeightPx("half"), left: 0 },
+            });
+          }}
           isFetching={isFetching}
           isEmpty={emptySearchResult}
           searchLocation={searchParsedIntent?.location ?? searchContextQuery}

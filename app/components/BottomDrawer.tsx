@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Drawer } from "vaul";
 import { BORDER, CORAL, CORAL_LIGHT, FOREST_GREEN, SAGE, SURFACE } from "@/lib/tokens";
 import { wmoCodeToEmoji, condColorForCode } from "@/lib/weatherScore";
 import type { AmenityPOI, Campsite, POIMeta, WeatherDay } from "@/types/map";
 import { haversineKm } from "@/lib/distance";
+import type { ParsedIntent } from "@/lib/parseIntent";
 
 export type DrawerState = "peek" | "half" | "full";
+export type DrawerMode = "browse" | "ai-search" | "region" | "location" | "amenity-only";
 
 // ── Heights ────────────────────────────────────────────────────────────────────
 
@@ -208,7 +210,7 @@ const NavigateButton = ({ lat, lng, name }: { lat: number; lng: number; name: st
     rel="noopener noreferrer"
     onClick={(e) => e.stopPropagation()}
     className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full transition-opacity hover:opacity-70 active:opacity-50"
-    style={{ background: "rgba(232,103,74,0.12)" }}
+    style={{ background: CORAL_LIGHT }}
     aria-label={`Navigate to ${name} in Google Maps`}
   >
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
@@ -361,11 +363,16 @@ function CampsiteCard({
 
 // ── POI detail card ────────────────────────────────────────────────────────────
 
-function POICard({ poi, meta }: { poi: AmenityPOI; meta: POIMeta }) {
+function POICard({ poi, meta, onClick, isSelected }: { poi: AmenityPOI; meta: POIMeta; onClick?: () => void; isSelected?: boolean }) {
   return (
     <div
       className="relative rounded-xl p-3"
-      style={{ border: `1.5px solid ${meta.color}`, background: "#fff" }}
+      style={{
+        border: isSelected ? `2px solid ${meta.color}` : `1.5px solid ${meta.color}`,
+        background: isSelected ? `${meta.color}18` : SURFACE,
+        cursor: onClick ? "pointer" : undefined,
+      }}
+      {...(onClick ? { role: "button", tabIndex: 0, onClick, onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } } : {})}
     >
       <a
         href={`https://www.google.com/maps/dir/?api=1&destination=${poi.lat},${poi.lng}`}
@@ -398,21 +405,24 @@ function POICard({ poi, meta }: { poi: AmenityPOI; meta: POIMeta }) {
 // ── Empty search state ─────────────────────────────────────────────────────────
 
 function EmptySearchState({
+  title,
   location,
   onClearSearch,
   onBroadenSearch,
 }: {
+  title?: string;
   location?: string | null;
   onClearSearch?: () => void;
   onBroadenSearch?: () => void;
 }) {
+  const heading = title ?? `No campsites found${location ? ` near ${location}` : ""}`;
   return (
     <div
       className="rounded-2xl p-4 text-center"
       style={{ background: SURFACE, border: `1.5px solid ${BORDER}`, boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}
     >
       <div className="text-sm font-semibold mb-1 font-[family-name:var(--font-dm-sans)]" style={{ color: FOREST_GREEN }}>
-        No campsites found{location ? ` near ${location}` : ""}
+        {heading}
       </div>
       <div className="text-xs mb-3 font-[family-name:var(--font-dm-sans)]" style={{ color: SAGE }}>
         Try broadening your search or clearing filters.
@@ -422,8 +432,8 @@ function EmptySearchState({
           <button
             type="button"
             onClick={onBroadenSearch}
-            className="rounded-full border border-[#e0dbd0] bg-white px-4 py-2 text-xs font-semibold font-[family-name:var(--font-dm-sans)] transition-colors hover:border-[#2d4a2d]"
-            style={{ color: FOREST_GREEN }}
+            className="rounded-full border px-4 py-2 text-xs font-semibold font-[family-name:var(--font-dm-sans)] transition-colors"
+            style={{ color: FOREST_GREEN, background: SURFACE, borderColor: BORDER }}
           >
             Edit search
           </button>
@@ -447,30 +457,51 @@ function EmptySearchState({
 
 function DrawerContentList({
   campsites,
+  amenityPois,
   selectedPoi,
   poiMeta,
   selectedIdx,
   userLocation,
   cardRefs,
   compact,
-  onSelectPin,
+  drawerMode,
+  scrollRef,
+  onSelectPoi,
+  onHighlightPin,
+  onOpenDetail,
 }: {
   campsites: Campsite[];
+  amenityPois: AmenityPOI[];
   selectedPoi: AmenityPOI | null;
   poiMeta: Record<string, POIMeta>;
   selectedIdx: number | null;
   userLocation: { lat: number; lng: number } | null;
   cardRefs: React.MutableRefObject<(HTMLDivElement | null)[]>;
   compact: boolean;
-  onSelectPin: (i: number) => void;
+  drawerMode: DrawerMode;
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+  onSelectPoi?: (poi: AmenityPOI) => void;
+  onHighlightPin?: (i: number) => void;
+  onOpenDetail: (campsite: Campsite) => void;
 }) {
+  if (drawerMode === "amenity-only") {
+    return (
+      <div ref={scrollRef} className="overflow-y-auto flex-1 min-h-0 px-4 pt-2 pb-4 space-y-2 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
+        {amenityPois.map((poi) => {
+          const meta = poiMeta[poi.amenityType.key] ?? { emoji: "📍", label: poi.amenityType.key, color: FOREST_GREEN };
+          return <POICard key={poi.id} poi={poi} meta={meta} isSelected={selectedPoi?.id === poi.id} onClick={onSelectPoi ? () => onSelectPoi(poi) : undefined} />;
+        })}
+      </div>
+    );
+  }
+
   const selectedPoiMeta = selectedPoi
     ? (poiMeta[selectedPoi.amenityType.key] ?? { emoji: "📍", label: selectedPoi.amenityType.key, color: FOREST_GREEN })
     : null;
 
   return (
-    <div className="overflow-y-auto flex-1 px-4 pt-2 pb-4 space-y-2">
-      {/* POI detail card — shown when an amenity pin is selected */}
+    <div ref={scrollRef} className="overflow-y-auto flex-1 min-h-0 px-4 pt-2 pb-4 space-y-2 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
+      {/* POI detail card — shown when an amenity pin is selected in campsite list modes */}
       {selectedPoi && selectedPoiMeta && (
         <POICard key={selectedPoi.id} poi={selectedPoi} meta={selectedPoiMeta} />
       )}
@@ -484,9 +515,144 @@ function DrawerContentList({
           showIndex={false}
           userLocation={userLocation}
           cardRef={(el) => { cardRefs.current[i] = el; }}
-          onSelect={() => onSelectPin(i)}
+          onSelect={() => {
+            onHighlightPin?.(i);
+            onOpenDetail(campsite);
+          }}
         />
       ))}
+    </div>
+  );
+}
+
+// ── Campsite detail sheet ──────────────────────────────────────────────────────
+
+function CampsiteDetailSheet({
+  campsite,
+  userLocation,
+  onDismiss,
+  open,
+}: {
+  campsite: Campsite | null;
+  userLocation: { lat: number; lng: number } | null;
+  onDismiss: () => void;
+  open: boolean;
+}) {
+  const pointerStartY = useRef<number | null>(null);
+
+  const driveTime =
+    campsite && userLocation
+      ? driveLabel(haversineKm(userLocation.lat, userLocation.lng, campsite.lat, campsite.lng))
+      : null;
+
+  return (
+    <div
+      className="absolute inset-0 flex flex-col overflow-hidden"
+      aria-hidden={!open}
+      inert={!open || undefined}
+      style={{
+        background: SURFACE,
+        transform: open ? "translateY(0)" : "translateY(100%)",
+        transition: `transform 350ms cubic-bezier(0.32,0.72,0,1)`,
+        zIndex: 10,
+        pointerEvents: open ? undefined : "none",
+      }}
+    >
+      {/* Drag handle + back arrow — intercepts pointer to detect swipe-down */}
+      <div
+        className="flex-shrink-0 select-none"
+        style={{ cursor: "grab" }}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          if (!(e.target as Element).closest("button")) {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            pointerStartY.current = e.clientY;
+          }
+        }}
+        onPointerMove={(e) => {
+          e.stopPropagation();
+          if (pointerStartY.current !== null && e.clientY - pointerStartY.current > 60) {
+            pointerStartY.current = null;
+            onDismiss();
+          }
+        }}
+        onPointerUp={() => {
+          pointerStartY.current = null;
+        }}
+        onPointerLeave={() => {
+          pointerStartY.current = null;
+        }}
+        onPointerCancel={() => {
+          pointerStartY.current = null;
+        }}
+      >
+        <div className="px-4 pb-3">
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="flex items-center gap-1.5 text-xs font-semibold font-[family-name:var(--font-dm-sans)] transition-opacity hover:opacity-70"
+            style={{ color: SAGE }}
+            aria-label="Back to results"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M19 12H5M12 5l-7 7 7 7" stroke={SAGE} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Results
+          </button>
+        </div>
+      </div>
+
+      {campsite && (
+        <>
+          <ScenicPhoto seed={1000 + (campsite.name.charCodeAt(0) || 0)} />
+          <div className="overflow-y-auto flex-1 px-4 pt-3 pb-4">
+            <div className="flex items-start gap-2 mb-1">
+              <div className="min-w-0 flex-1">
+                <div
+                  className="text-[18px] font-semibold leading-snug font-[family-name:var(--font-dm-sans)]"
+                  style={{ color: FOREST_GREEN }}
+                >
+                  {campsite.name}
+                </div>
+                {(driveTime || campsite.region || campsite.blurb) && (
+                  <div className="text-[12px] mt-0.5 leading-relaxed" style={{ color: SAGE }}>
+                    {driveTime && <span>🚗 {driveTime}</span>}
+                    {driveTime && (campsite.region ?? campsite.blurb) && <span> · </span>}
+                    {campsite.region && <span>{campsite.region}</span>}
+                    {campsite.region && campsite.blurb && <span> · </span>}
+                    {campsite.blurb && <span>{campsite.blurb}</span>}
+                  </div>
+                )}
+              </div>
+            </div>
+            {campsite.weather && campsite.weather.length > 0 && (
+              <div className="mt-3">
+                <WeatherStrip weather={campsite.weather} />
+                <DayWeatherCells weather={campsite.weather} />
+              </div>
+            )}
+            <AmenityTags amenities={campsite.amenities} />
+          </div>
+          {/* Sticky directions button */}
+          <div
+            className="flex-shrink-0 px-4 pb-6 pt-3"
+            style={{ borderTop: `1.5px solid ${BORDER}`, background: SURFACE }}
+          >
+            <a
+              href={`https://www.google.com/maps/dir/?api=1&destination=${campsite.lat},${campsite.lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full rounded-full py-3 text-sm font-semibold text-white font-[family-name:var(--font-dm-sans)] transition-opacity hover:opacity-80 active:opacity-70"
+              style={{ background: CORAL }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill="#fff" />
+              </svg>
+              Get directions
+            </a>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -528,8 +694,12 @@ type Props = {
   userLocation: { lat: number; lng: number } | null;
   cardRefs: React.MutableRefObject<(HTMLDivElement | null)[]>;
   drawerState: DrawerState;
+  drawerMode: DrawerMode;
+  parsedIntent: ParsedIntent | null;
   onDrawerStateChange: (state: DrawerState) => void;
   onSelectPin: (i: number) => void;
+  onSelectPoi?: (poi: AmenityPOI) => void;
+  onHighlightPin?: (i: number) => void;
   isFetching?: boolean;
   isEmpty?: boolean;
   searchLocation?: string | null;
@@ -547,8 +717,12 @@ export default function BottomDrawer({
   userLocation,
   cardRefs,
   drawerState,
+  drawerMode,
+  parsedIntent,
   onDrawerStateChange,
   onSelectPin,
+  onSelectPoi,
+  onHighlightPin,
   isFetching = false,
   isEmpty = false,
   searchLocation,
@@ -575,6 +749,8 @@ export default function BottomDrawer({
     () => (typeof window !== "undefined" ? (window.visualViewport?.height ?? window.innerHeight) : 812)
   );
   const [drawerBottom, setDrawerBottom] = useState<number>(0);
+  const handleStripRef = useRef<HTMLDivElement>(null);
+  const [handleStripHeight, setHandleStripHeight] = useState(52);
 
   useEffect(() => {
     function update() {
@@ -597,26 +773,106 @@ export default function BottomDrawer({
     };
   }, []);
 
+  useEffect(() => {
+    const el = handleStripRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setHandleStripHeight(entry.contentRect.height));
+    ro.observe(el);
+    setHandleStripHeight(el.offsetHeight);
+    return () => ro.disconnect();
+  }, []);
+
+  // Detail sheet state — local to the drawer.
+  // detailCampsite holds the content to display (persists through close animation).
+  // isDetailOpen drives the CSS transform so the sheet can animate out with content visible.
+  const [detailCampsite, setDetailCampsite] = useState<Campsite | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const closeAnimTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedScrollRef = useRef(0);
+
   const isFull = drawerState === "full";
+
+  // Vaul sizes Drawer.Content to drawerHeight (full viewport) and uses translateY to
+  // show only the snap-point fraction. From the browser's perspective the scroll
+  // container fills the entire drawer height, so its clientHeight >> visible area and
+  // the browser thinks no scrolling is needed. Constrain the content wrapper to the
+  // *visible* snap height so the scroll container is properly bounded.
+  const snapPx =
+    drawerState === "full"
+      ? drawerHeight
+      : drawerState === "half"
+        ? Math.round(drawerHeight * HALF_VH)
+        : 64; // peek = SNAP_POINTS[0] = "64px"
+  const spacerPx = isFull ? FULL_STATE_SPACER_PX : 0;
+  const contentAreaHeight = Math.max(0, snapPx - spacerPx - handleStripHeight);
 
   const selectedPoi = selectedPoiId
     ? amenityPois.find((p) => p.id === selectedPoiId) ?? null
     : null;
 
   // Show empty state when the last search returned 0 results and we're not fetching
-  const showEmptyState = isEmpty && !isFetching && campsites.length === 0 && amenityPois.length === 0 && selectedPoi === null;
+  const showEmptyState =
+    isEmpty &&
+    !isFetching &&
+    campsites.length === 0 &&
+    amenityPois.length === 0 &&
+    selectedPoi === null;
 
+  // Context-aware result label — switches on drawerMode.
+  const resultLabel = (() => {
+    if (drawerMode === "amenity-only") {
+      const count = amenityPois.length;
+      if (isFetching && count === 0) return "Finding…";
+      if (count === 0) return "0 amenities found";
+      const uniqueKeys = [...new Set(amenityPois.map((p) => p.amenityType.key))];
+      const rawLabel =
+        uniqueKeys.length === 1
+          ? (poiMeta[uniqueKeys[0]]?.label ?? "amenity")
+          : "amenities";
+      const label = count === 1 ? rawLabel : (rawLabel.endsWith("s") ? rawLabel : `${rawLabel}s`);
+      return `${count} ${label} nearby`;
+    }
 
-  const resultLabel =
-    campsites.length > 0
-      ? hasMore
-        ? `${campsites.length}+ campsites found`
-        : `${campsites.length} campsite${campsites.length === 1 ? "" : "s"} found`
-      : selectedPoi
-      ? (poiMeta[selectedPoi.amenityType.key] ?? { label: "POI" }).label
-      : isFetching
-      ? "Finding campsites…"
-      : "0 campsites found";
+    if (isFetching) return "Finding…";
+
+    if (drawerMode === "ai-search") {
+      const count = campsites.length;
+      const base = `${count} result${count === 1 ? "" : "s"} · ranked by weather`;
+      if (parsedIntent?.location) {
+        return `${base} · near ${parsedIntent.location}`;
+      }
+      return base;
+    }
+
+    if (drawerMode === "region" && searchLocation) {
+      const count = campsites.length;
+      const suffix = hasMore ? "+" : "";
+      return `${count}${suffix} campsite${count === 1 ? "" : "s"} in ${searchLocation}`;
+    }
+
+    if (drawerMode === "location" && searchLocation) {
+      const count = campsites.length;
+      const suffix = hasMore ? "+" : "";
+      return `${count}${suffix} campsite${count === 1 ? "" : "s"} near ${searchLocation}`;
+    }
+
+    // browse (and fallback when searchLocation is missing for region/location)
+    const count = campsites.length;
+    if (count === 0) {
+      if (selectedPoi) return (poiMeta[selectedPoi.amenityType.key] ?? { label: "POI" }).label;
+      return "0 campsites found";
+    }
+    const suffix = hasMore ? "+" : "";
+    return `${count}${suffix} campsite${count === 1 ? "" : "s"} nearby`;
+  })();
+
+  // hasContent drives drawer expansion; amenity-only mode uses POI count.
+  const hasContent =
+    campsites.length > 0 ||
+    selectedPoi !== null ||
+    (drawerMode === "amenity-only" && amenityPois.length > 0);
+  // Allow expansion when there's content OR when showing empty state (so the card is fully visible)
+  const allowExpand = hasContent || showEmptyState;
 
   // Peek state: show selected card (or first card) without scrolling
   const peekIdx = selectedIdx ?? 0;
@@ -625,9 +881,109 @@ export default function BottomDrawer({
     ? (poiMeta[selectedPoi.amenityType.key] ?? { emoji: "📍", label: selectedPoi.amenityType.key, color: FOREST_GREEN })
     : null;
 
-  const hasContent = campsites.length > 0 || selectedPoi !== null;
-  // Allow expansion when there's content OR when showing empty state (so the card is fully visible)
-  const allowExpand = hasContent || showEmptyState;
+  // Ref for the scrollable list container — used to save/restore scroll position
+  // when the detail sheet opens and closes.
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  function openDetail(campsite: Campsite) {
+    if (closeAnimTimerRef.current !== null) {
+      clearTimeout(closeAnimTimerRef.current);
+      closeAnimTimerRef.current = null;
+    }
+    savedScrollRef.current = scrollContainerRef.current?.scrollTop ?? 0;
+    setDetailCampsite(campsite);
+    setIsDetailOpen(true);
+  }
+
+  function closeDetail() {
+    setIsDetailOpen(false);
+    // Restore scroll position after React re-renders the list.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = savedScrollRef.current;
+        }
+      });
+    });
+    // Clear content after the slide-down animation completes so it stays visible during the transition.
+    closeAnimTimerRef.current = setTimeout(() => {
+      closeAnimTimerRef.current = null;
+      setDetailCampsite(null);
+    }, 350);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (closeAnimTimerRef.current !== null) clearTimeout(closeAnimTimerRef.current);
+    };
+  }, []);
+
+  // Vaul's Drawer.Content has overflow:hidden but Chrome's scrollIntoView (and
+  // other browser scroll mechanisms) can still set scrollTop on it via JS, which
+  // shifts all drawer content up and clips the handle strip. Guard against this
+  // by listening for any scroll on the dialog and immediately resetting to 0.
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const dialog = container.closest('[role="dialog"]') as HTMLElement | null;
+    if (!dialog) return;
+    const reset = () => { if (dialog.scrollTop !== 0) dialog.scrollTop = 0; };
+    dialog.addEventListener("scroll", reset, { passive: true });
+    reset(); // clear any scrollTop left over from a previous render cycle
+    return () => dialog.removeEventListener("scroll", reset);
+  }, []);
+
+  // When a map pin is tapped while the detail sheet is already open, update the
+  // displayed campsite so the sheet reflects the newly selected pin.
+  useEffect(() => {
+    if (isDetailOpen && selectedIdx !== null) {
+      const campsite = campsites[selectedIdx];
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (campsite) setDetailCampsite(campsite);
+    }
+  }, [selectedIdx, isDetailOpen, campsites]);
+
+  // Close the detail sheet whenever the drawer snaps to peek (e.g. user drags
+  // it down). Leaving it open in peek state hides the peek card behind the sheet.
+  useEffect(() => {
+    if (drawerState !== "peek") return;
+    if (!isDetailOpen) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsDetailOpen(false);
+    if (closeAnimTimerRef.current !== null) clearTimeout(closeAnimTimerRef.current);
+    closeAnimTimerRef.current = setTimeout(() => {
+      closeAnimTimerRef.current = null;
+      setDetailCampsite(null);
+    }, 350);
+  }, [drawerState]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Scroll the selected card into view when selectedIdx changes.
+  // We avoid scrollIntoView because Chrome also scrolls ancestor overflow:hidden
+  // elements (including Vaul's Drawer.Content), which shifts the drawer content
+  // upward and clips the handle strip. Instead we set scrollTop directly on the
+  // scroll container so only the inner list scrolls.
+  // Guard: if isDetailOpen is true at render time, this change came from a card
+  // tap (onHighlightPin + openDetail fire in the same event, React batches them),
+  // so the card is already visible — skip the scroll.
+  useEffect(() => {
+    if (selectedIdx === null || isDetailOpen) return;
+    const i = selectedIdx;
+    const timer = setTimeout(() => {
+      const card = cardRefs.current[i];
+      const container = scrollContainerRef.current;
+      if (!card || !container) return;
+      const cardTop =
+        card.getBoundingClientRect().top -
+        container.getBoundingClientRect().top +
+        container.scrollTop;
+      container.scrollTop = Math.max(0, cardTop - 8);
+    }, DRAWER_TRANSITION_MS);
+    return () => clearTimeout(timer);
+  }, [selectedIdx]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Empty state title for amenity-only mode
+  const emptyTitle =
+    drawerMode === "amenity-only" ? "No amenities found" : undefined;
 
   return (
     <Drawer.Root
@@ -658,7 +1014,7 @@ export default function BottomDrawer({
             bottom: drawerBottom,
             background: SURFACE,
             borderRadius: isFull ? 0 : "1rem 1rem 0 0",
-            borderTop: isFull ? "none" : "1.5px solid #e0dbd0",
+            borderTop: isFull ? "none" : `1.5px solid ${BORDER}`,
             boxShadow: "0 -4px 32px rgba(0,0,0,0.12)",
             overflow: "hidden",
             // Transition border-radius so it animates alongside Vaul's snap
@@ -688,12 +1044,13 @@ export default function BottomDrawer({
               Vaul's internal scroll detection prevents card-list scrolling from
               accidentally triggering a drawer drag. */}
           <div
+            ref={handleStripRef}
             className="flex-shrink-0 select-none cursor-grab"
-            style={{ borderTop: isFull ? "1.5px solid #e0dbd0" : "none" }}
+            style={{ borderTop: isFull ? `1.5px solid ${BORDER}` : "none" }}
           >
             {/* Drag pill */}
             <div className="flex justify-center pt-3 pb-2">
-              <div className="w-10 h-1 rounded-full bg-[#e0dbd0]" />
+              <div className="w-10 h-1 rounded-full" style={{ background: BORDER }} />
             </div>
 
             {/* Summary row */}
@@ -704,11 +1061,6 @@ export default function BottomDrawer({
                   style={{ color: FOREST_GREEN }}
                 >
                   {resultLabel}
-                  {campsites.length > 0 && (
-                    <span className="ml-1.5 font-normal text-xs" style={{ color: SAGE }}>
-                      · nearby
-                    </span>
-                  )}
                 </span>
                 {isFetching && (
                   <div
@@ -734,54 +1086,81 @@ export default function BottomDrawer({
             </div>
           </div>
 
-          {/* Scrollable card list (or empty state) — visible in half and full states */}
-          {drawerState !== "peek" && (
-            showEmptyState ? (
-              <div className="overflow-y-auto flex-1 px-4 pt-2 pb-4">
-                <EmptySearchState
-                  location={searchLocation}
-                  onClearSearch={onClearSearch}
-                  onBroadenSearch={onBroadenSearch}
-                />
-              </div>
-            ) : (
-              <DrawerContentList
-                campsites={campsites}
-                selectedPoi={selectedPoi}
-                poiMeta={poiMeta}
-                selectedIdx={selectedIdx}
-                userLocation={userLocation}
-                cardRefs={cardRefs}
-                compact={drawerState !== "full"}
-                onSelectPin={onSelectPin}
-              />
-            )
-          )}
+          {/* Content wrapper — CampsiteDetailSheet is absolute inset-0 relative to this
+              div, so it clips to the card-list area below the handle strip rather than
+              covering the full Drawer.Content (which would hide the handle strip and
+              overlap the floating search bar). */}
+          <div
+            className="relative flex-shrink-0 overflow-hidden flex flex-col"
+            style={{
+              height: contentAreaHeight,
+              transition: `height ${DRAWER_TRANSITION_MS}ms cubic-bezier(0.32,0.72,0,1)`,
+            }}
+          >
+            {/* Campsite detail sheet — absolute overlay, slides up when a card is tapped */}
+            <CampsiteDetailSheet
+              campsite={detailCampsite}
+              userLocation={userLocation}
+              open={isDetailOpen}
+              onDismiss={closeDetail}
+            />
 
-          {/* Peek state — show selected card (or first card, or empty state) without scrolling */}
-          {drawerState === "peek" && (
-            <div className="px-4 pt-2 pb-4 overflow-hidden">
-              {showEmptyState ? (
-                <EmptySearchState
-                  location={searchLocation}
-                  onClearSearch={onClearSearch}
-                  onBroadenSearch={onBroadenSearch}
-                />
-              ) : selectedPoi && peekPoiMeta ? (
-                <POICard poi={selectedPoi} meta={peekPoiMeta} />
-              ) : peekCampsite ? (
-                <CampsiteCard
-                  campsite={peekCampsite}
-                  index={peekIdx}
-                  isSelected={selectedIdx === peekIdx}
-                  compact={true}
+            {/* Scrollable card list (or empty state) — visible in half and full states */}
+            {drawerState !== "peek" && (
+              showEmptyState ? (
+                <div className="overflow-y-auto flex-1 px-4 pt-2 pb-4">
+                  <EmptySearchState
+                    title={emptyTitle}
+                    location={searchLocation}
+                    onClearSearch={onClearSearch}
+                    onBroadenSearch={onBroadenSearch}
+                  />
+                </div>
+              ) : (
+                <DrawerContentList
+                  campsites={campsites}
+                  amenityPois={amenityPois}
+                  selectedPoi={selectedPoi}
+                  poiMeta={poiMeta}
+                  selectedIdx={selectedIdx}
                   userLocation={userLocation}
-                  cardRef={() => { /* peek card — ref not used for scrollIntoView */ }}
-                  onSelect={() => onSelectPin(peekIdx)}
+                  cardRefs={cardRefs}
+                  compact={drawerState !== "full"}
+                  drawerMode={drawerMode}
+                  scrollRef={scrollContainerRef}
+                  onSelectPoi={onSelectPoi}
+                  onHighlightPin={onHighlightPin}
+                  onOpenDetail={openDetail}
                 />
-              ) : null}
-            </div>
-          )}
+              )
+            )}
+
+            {/* Peek state — show selected card (or first card, or empty state) without scrolling */}
+            {drawerState === "peek" && (
+              <div className="px-4 pt-2 pb-4 overflow-hidden">
+                {showEmptyState ? (
+                  <EmptySearchState
+                    title={emptyTitle}
+                    location={searchLocation}
+                    onClearSearch={onClearSearch}
+                    onBroadenSearch={onBroadenSearch}
+                  />
+                ) : selectedPoi && peekPoiMeta ? (
+                  <POICard poi={selectedPoi} meta={peekPoiMeta} />
+                ) : peekCampsite ? (
+                  <CampsiteCard
+                    campsite={peekCampsite}
+                    index={peekIdx}
+                    isSelected={selectedIdx === peekIdx}
+                    compact={true}
+                    userLocation={userLocation}
+                    cardRef={() => { /* peek card — ref not used for scrollIntoView */ }}
+                    onSelect={() => onSelectPin(peekIdx)}
+                  />
+                ) : null}
+              </div>
+            )}
+          </div>
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>
