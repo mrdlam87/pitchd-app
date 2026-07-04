@@ -915,6 +915,30 @@ export default function BottomDrawer({
     }, 350);
   }, [drawerState]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Scroll the selected card into view when selectedIdx changes.
+  // We avoid scrollIntoView because Chrome also scrolls ancestor overflow:hidden
+  // elements (including Vaul's Drawer.Content), which shifts the drawer content
+  // upward and clips the handle strip. Instead we set scrollTop directly on the
+  // scroll container so only the inner list scrolls.
+  // Guard: if isDetailOpen is true at render time, this change came from a card
+  // tap (onHighlightPin + openDetail fire in the same event, React batches them),
+  // so the card is already visible — skip the scroll.
+  useEffect(() => {
+    if (selectedIdx === null || isDetailOpen) return;
+    const i = selectedIdx;
+    const timer = setTimeout(() => {
+      const card = cardRefs.current[i];
+      const container = scrollContainerRef.current;
+      if (!card || !container) return;
+      const cardTop =
+        card.getBoundingClientRect().top -
+        container.getBoundingClientRect().top +
+        container.scrollTop;
+      container.scrollTop = Math.max(0, cardTop - 8);
+    }, DRAWER_TRANSITION_MS);
+    return () => clearTimeout(timer);
+  }, [selectedIdx]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Empty state title for amenity-only mode
   const emptyTitle =
     drawerMode === "amenity-only" ? "No amenities found" : undefined;
