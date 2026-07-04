@@ -749,6 +749,8 @@ export default function BottomDrawer({
     () => (typeof window !== "undefined" ? (window.visualViewport?.height ?? window.innerHeight) : 812)
   );
   const [drawerBottom, setDrawerBottom] = useState<number>(0);
+  const handleStripRef = useRef<HTMLDivElement>(null);
+  const [handleStripHeight, setHandleStripHeight] = useState(52);
 
   useEffect(() => {
     function update() {
@@ -771,6 +773,15 @@ export default function BottomDrawer({
     };
   }, []);
 
+  useEffect(() => {
+    const el = handleStripRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setHandleStripHeight(entry.contentRect.height));
+    ro.observe(el);
+    setHandleStripHeight(el.offsetHeight);
+    return () => ro.disconnect();
+  }, []);
+
   // Detail sheet state — local to the drawer.
   // detailCampsite holds the content to display (persists through close animation).
   // isDetailOpen drives the CSS transform so the sheet can animate out with content visible.
@@ -780,6 +791,20 @@ export default function BottomDrawer({
   const savedScrollRef = useRef(0);
 
   const isFull = drawerState === "full";
+
+  // Vaul sizes Drawer.Content to drawerHeight (full viewport) and uses translateY to
+  // show only the snap-point fraction. From the browser's perspective the scroll
+  // container fills the entire drawer height, so its clientHeight >> visible area and
+  // the browser thinks no scrolling is needed. Constrain the content wrapper to the
+  // *visible* snap height so the scroll container is properly bounded.
+  const snapPx =
+    drawerState === "full"
+      ? drawerHeight
+      : drawerState === "half"
+        ? Math.round(drawerHeight * HALF_VH)
+        : 64; // peek = SNAP_POINTS[0] = "64px"
+  const spacerPx = isFull ? FULL_STATE_SPACER_PX : 0;
+  const contentAreaHeight = Math.max(0, snapPx - spacerPx - handleStripHeight);
 
   const selectedPoi = selectedPoiId
     ? amenityPois.find((p) => p.id === selectedPoiId) ?? null
@@ -1019,6 +1044,7 @@ export default function BottomDrawer({
               Vaul's internal scroll detection prevents card-list scrolling from
               accidentally triggering a drawer drag. */}
           <div
+            ref={handleStripRef}
             className="flex-shrink-0 select-none cursor-grab"
             style={{ borderTop: isFull ? `1.5px solid ${BORDER}` : "none" }}
           >
@@ -1064,7 +1090,13 @@ export default function BottomDrawer({
               div, so it clips to the card-list area below the handle strip rather than
               covering the full Drawer.Content (which would hide the handle strip and
               overlap the floating search bar). */}
-          <div className="relative flex-1 overflow-hidden flex flex-col">
+          <div
+            className="relative flex-shrink-0 overflow-hidden flex flex-col"
+            style={{
+              height: contentAreaHeight,
+              transition: `height ${DRAWER_TRANSITION_MS}ms cubic-bezier(0.32,0.72,0,1)`,
+            }}
+          >
             {/* Campsite detail sheet — absolute overlay, slides up when a card is tapped */}
             <CampsiteDetailSheet
               campsite={detailCampsite}
