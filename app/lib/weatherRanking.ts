@@ -131,11 +131,15 @@ export function combinedScore(
   forecast: unknown,
   startDate: string | null,
   endDate: string | null,
+  isUnnamed = false,
 ): number {
   const prox = proximityScore(distanceKm, radiusKm);
   const days = extractForecastDays(forecast, startDate, endDate);
   const weather = days.length > 0 ? weatherScore(days) : NEUTRAL_WEATHER_SCORE;
-  return PROXIMITY_WEIGHT * prox + WEATHER_WEIGHT * weather;
+  const score = PROXIMITY_WEIGHT * prox + WEATHER_WEIGHT * weather;
+  // Named campsites generally have more reliable data (amenities, blurb, verified coords) —
+  // nudge unnamed sites down without eliminating them.
+  return isUnnamed ? score * 0.9 : score;
 }
 
 // ─── Batch weather fetch ─────────────────────────────────────────────────────
