@@ -14,7 +14,7 @@ import BottomDrawer, {
 } from "./BottomDrawer";
 import type { AmenityPOI, Campsite } from "@/types/map";
 import { BORDER, CORAL, FOREST_GREEN, SAGE, SURFACE, SURFACE_OVERLAY, TEXT } from "@/lib/tokens";
-import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayload, type AISearchPayload, type AmenitySearchPayload, type LocationPayload } from "@/lib/searchResults";
+import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayload, type AISearchPayload, type AmenitySearchPayload } from "@/lib/searchResults";
 import type { ParsedIntent } from "@/lib/parseIntent";
 import { getRecentEntries, addRecentEntry, type RecentEntry } from "@/lib/recentSearches";
 import { QUICK_CHIPS, AMENITY_CHIPS } from "@/lib/chips";
@@ -114,21 +114,6 @@ function ClusterBubble({ count, color, ariaLabel, onExpand }: ClusterBubbleProps
   );
 }
 
-// Builds a human-readable summary from a parsed search intent.
-// "Near Blue Mountains · 3hr · Dog friendly · Sat 21 Jun"
-function buildContextLabel(pi: ParsedIntent): string {
-  const parts: string[] = [];
-  if (pi.location) parts.push(`Near ${pi.location}`);
-  if (pi.driveTimeHrs) parts.push(`${pi.driveTimeHrs}hr`);
-  if (pi.amenities.length > 0) parts.push(pi.amenities.map((a) => a.replace(/_/g, " ")).join(", "));
-  if (pi.startDate) {
-    try {
-      const d = new Date(`${pi.startDate}T00:00:00`);
-      parts.push(d.toLocaleDateString("en-AU", { weekday: "short", month: "short", day: "numeric" }));
-    } catch { /* ignore invalid date */ }
-  }
-  return parts.join(" · ");
-}
 
 export default function MapView() {
   // useState lazy initialiser runs synchronously on the first render — before any effects
@@ -681,6 +666,10 @@ export default function MapView() {
         }
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchRegionCampsites and
+    // fetchLocationCampsites are plain async functions recreated every render; adding them
+    // would make handleLoad change every render, which is risky for an onLoad handler that
+    // fires only once. The closure is fresh at mount so stale-closure risk is zero.
     [loadCampsites, loadAmenities, loadWeatherForViewport, setSearchResults, setSearchAmenities, markInitialLoaded]
   );
 
