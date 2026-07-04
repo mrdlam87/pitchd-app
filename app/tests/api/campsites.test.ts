@@ -173,10 +173,9 @@ describe("GET /api/campsites", () => {
       name: expect.any(String),
       lat: expect.any(Number),
       lng: expect.any(Number),
+      state: expect.any(String),
       amenities: expect.any(Array),
     });
-    // state should not be present in response
-    expect(campsite.state).toBeUndefined();
   });
 
   it("excludes campsites with syncStatus removed", async () => {

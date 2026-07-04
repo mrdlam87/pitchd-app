@@ -47,6 +47,7 @@ export async function GET(req: Request): Promise<Response> {
         lat: true,
         lng: true,
         region: true,
+        state: true,
         blurb: true,
         amenities: {
           select: {

@@ -640,7 +640,7 @@ export default function MapView() {
       if (searchPayload?.kind === "campsite-direct") {
         initialSearchRef.current = null;
         const c = searchPayload.campsite;
-        setSearchResults([{ id: c.id, name: c.name, lat: c.lat, lng: c.lng, region: null, blurb: null, amenities: [], weather: null }]);
+        setSearchResults([{ id: c.id, name: c.name, lat: c.lat, lng: c.lng, region: null, state: "", blurb: null, amenities: [], weather: null }]);
         searchModeRef.current = true;
         suppressGeoFlyRef.current = true;
         e.target.flyTo({ center: [c.lng, c.lat], zoom: 14, duration: 800 });
@@ -926,7 +926,7 @@ export default function MapView() {
     if (entry.kind === "campsite") {
       locationCoordsRef.current = null;
       setMapSearchError(null);
-      setSearchResults([{ id: entry.id, name: entry.name, lat: entry.lat, lng: entry.lng, region: entry.region, blurb: null, amenities: [], weather: null }]);
+      setSearchResults([{ id: entry.id, name: entry.name, lat: entry.lat, lng: entry.lng, region: entry.region, state: "", blurb: null, amenities: [], weather: null }]);
       mapRef.current?.getMap().flyTo({ center: [entry.lng, entry.lat], zoom: 14, duration: 800 });
       setDrawerState("peek");
       drawerStateRef.current = "peek";
@@ -1266,7 +1266,7 @@ export default function MapView() {
             if (s.kind === "campsite") {
               // Seed immediately with minimal data so the pin appears without delay,
               // then hydrate with the full record (amenities, blurb) once fetched.
-              setSearchResults([{ id: s.id, name: s.name, lat: s.lat, lng: s.lng, region: s.region ?? null, blurb: null, amenities: [], weather: null }]);
+              setSearchResults([{ id: s.id, name: s.name, lat: s.lat, lng: s.lng, region: s.region ?? null, state: "", blurb: null, amenities: [], weather: null }]);
               mapRef.current?.getMap().flyTo({ center: [s.lng, s.lat], zoom: 14, duration: 800 });
               setDrawerState("peek");
               drawerStateRef.current = "peek";
