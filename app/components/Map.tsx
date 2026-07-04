@@ -10,7 +10,6 @@ import BottomDrawer, {
   type DrawerState,
   type DrawerMode,
   PEEK_HEIGHT_PX,
-  DRAWER_TRANSITION_MS,
   getDrawerHeightPx,
 } from "./BottomDrawer";
 import type { AmenityPOI, Campsite } from "@/types/map";

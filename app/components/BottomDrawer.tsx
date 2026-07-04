@@ -906,13 +906,14 @@ export default function BottomDrawer({
     dialog.addEventListener("scroll", reset, { passive: true });
     reset(); // clear any scrollTop left over from a previous render cycle
     return () => dialog.removeEventListener("scroll", reset);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // When a map pin is tapped while the detail sheet is already open, update the
   // displayed campsite so the sheet reflects the newly selected pin.
   useEffect(() => {
     if (isDetailOpen && selectedIdx !== null) {
       const campsite = campsites[selectedIdx];
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (campsite) setDetailCampsite(campsite);
     }
   }, [selectedIdx, isDetailOpen, campsites]);
@@ -922,6 +923,7 @@ export default function BottomDrawer({
   useEffect(() => {
     if (drawerState !== "peek") return;
     if (!isDetailOpen) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsDetailOpen(false);
     if (closeAnimTimerRef.current !== null) clearTimeout(closeAnimTimerRef.current);
     closeAnimTimerRef.current = setTimeout(() => {
