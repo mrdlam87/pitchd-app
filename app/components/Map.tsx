@@ -107,6 +107,7 @@ function ClusterBubble({ count, color, ariaLabel, onExpand }: ClusterBubbleProps
         height: size,
         background: color,
         fontSize: size >= 48 ? 14 : 12,
+        WebkitTextStroke: "0.6px rgba(0,0,0,0.35)",
       }}
     >
       {count}
