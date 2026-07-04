@@ -554,6 +554,53 @@ describe("POST /api/search", () => {
     expect(nearIdx).toBeLessThan(farIdx);
   });
 
+  it("ranks a named campsite above an unnamed one at equal distance/weather", async () => {
+    const query = "unnamed campsite ranking penalty test";
+    createdHashes.push(hashQuery(query));
+    await prisma.searchCache.deleteMany({ where: { queryHash: hashQuery(query) } });
+
+    // Broken Hill — remote, no real OSM campsites to contaminate ranking.
+    const BASE_LAT = -31.95;
+    const BASE_LNG = 141.47;
+
+    const named = await seedCampsite({ lat: -32.0, lng: BASE_LNG });
+    const unnamed = await prisma.campsite.create({
+      data: {
+        name: "Unnamed campsite",
+        slug: `test-search-unnamed-${Date.now()}-${Math.random()}`,
+        lat: -32.0,
+        lng: BASE_LNG,
+        state: "NSW",
+        source: TEST_SOURCE,
+        sourceId: `test-search-unnamed-${Date.now()}-${Math.random()}`,
+      },
+    });
+
+    // Default mockFetchWeather already returns null for all candidates —
+    // both campsites get the same neutral weather score, isolating the
+    // test to the name-based ranking penalty.
+    mockCreate.mockResolvedValueOnce({
+      content: [{ type: "text", text: JSON.stringify({
+        location: null, driveTimeHrs: 1, amenities: [],
+        startDate: null, endDate: null, sortBy: null,
+      }) }],
+    });
+
+    const res = await POST(makeRequest({ query, lat: BASE_LAT, lng: BASE_LNG }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    const ids = body.campsites.map((c: { id: string }) => c.id);
+    const namedIdx = ids.indexOf(named.id);
+    const unnamedIdx = ids.indexOf(unnamed.id);
+
+    expect(namedIdx).not.toBe(-1);
+    expect(unnamedIdx).not.toBe(-1);
+    // Same distance and weather — named campsite should still rank higher
+    // due to the unnamed-campsite penalty in combinedScore.
+    expect(namedIdx).toBeLessThan(unnamedIdx);
+  });
+
   // --- Vague query handling ---
 
   it("handles vague queries — returns 200 with a valid parsedIntent shape", async () => {
