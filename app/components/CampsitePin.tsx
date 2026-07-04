@@ -1,4 +1,5 @@
-import { FOREST_GREEN } from "@/lib/tokens";
+import { CORAL, FOREST_GREEN, TEXT_MUTED } from "@/lib/tokens";
+import { getWeatherBadge, weatherScore } from "@/lib/weatherScore";
 import type { Campsite } from "@/types/map";
 
 export type CampsitePinProps = {
@@ -15,6 +16,10 @@ export function CampsitePin({ campsite, idx, isSelected, onSelect }: CampsitePin
     .split(" – ")[0];
   const pinW = isSelected ? 34 : 26;
   const pinH = isSelected ? 37 : 28;
+  // No weather data yet (browse mode, not fetched for this viewport) → neutral colour.
+  const pinColor = campsite.weather && campsite.weather.length > 0
+    ? getWeatherBadge(weatherScore(campsite.weather)).color
+    : TEXT_MUTED;
   return (
     <div
       role="button" tabIndex={0}
@@ -27,10 +32,15 @@ export function CampsitePin({ campsite, idx, isSelected, onSelect }: CampsitePin
         style={{ width: pinW, height: pinH, filter: `drop-shadow(0 2px 6px rgba(0,0,0,${isSelected ? 0.45 : 0.28}))`, transition: "width 150ms, height 150ms" }}
         viewBox="0 0 26 28" fill="none"
       >
+        {isSelected && (
+          <path d="M13 1.5C7.2 1.5 2.5 6.2 2.5 12C2.5 18.5 9 24 13 26C17 24 23.5 18.5 23.5 12C23.5 6.2 18.8 1.5 13 1.5Z"
+            fill="none" stroke="#fff" strokeWidth="4.5" />
+        )}
         <path d="M13 1.5C7.2 1.5 2.5 6.2 2.5 12C2.5 18.5 9 24 13 26C17 24 23.5 18.5 23.5 12C23.5 6.2 18.8 1.5 13 1.5Z"
-          fill={isSelected ? FOREST_GREEN : "#fff"} stroke={FOREST_GREEN} strokeWidth="1.5" />
+          fill={pinColor} stroke={isSelected ? CORAL : pinColor} strokeWidth={isSelected ? "2.5" : "1.5"} />
         <text x="13" y="12.5" textAnchor="middle" dominantBaseline="central"
-          fill={isSelected ? "#fff" : FOREST_GREEN} fontSize={isSelected ? 11 : 9} fontWeight="800" fontFamily="DM Sans, sans-serif">
+          fill="#fff" stroke="rgba(0,0,0,0.35)" strokeWidth={0.6} paintOrder="stroke"
+          fontSize={isSelected ? 11 : 9} fontWeight="800" fontFamily="DM Sans, sans-serif">
           {idx + 1}
         </text>
       </svg>

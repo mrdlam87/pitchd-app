@@ -13,7 +13,7 @@ import BottomDrawer, {
   getDrawerHeightPx,
 } from "./BottomDrawer";
 import type { AmenityPOI, Campsite } from "@/types/map";
-import { BORDER, CORAL, FOREST_GREEN, SAGE, SURFACE, SURFACE_OVERLAY, TEXT } from "@/lib/tokens";
+import { BORDER, CORAL, FOREST_GREEN, SAGE, SURFACE, SURFACE_OVERLAY, TEXT, TEXT_MUTED } from "@/lib/tokens";
 import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayload, type AISearchPayload, type AmenitySearchPayload } from "@/lib/searchResults";
 import type { ParsedIntent } from "@/lib/parseIntent";
 import { getRecentEntries, addRecentEntry, type RecentEntry } from "@/lib/recentSearches";
@@ -22,7 +22,7 @@ import { CampsitePin } from "./CampsitePin";
 import { AmenityPin, type AmenityPinMeta } from "./AmenityPin";
 import { useMapData } from "@/hooks/useMapData";
 import SearchInput, { type SearchInputHandle, type Suggestion } from "@/components/SearchInput";
-import { weatherScore } from "@/lib/weatherScore";
+import { getWeatherBadge, weatherScore } from "@/lib/weatherScore";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -107,6 +107,7 @@ function ClusterBubble({ count, color, ariaLabel, onExpand }: ClusterBubbleProps
         height: size,
         background: color,
         fontSize: size >= 48 ? 14 : 12,
+        WebkitTextStroke: "0.6px rgba(0,0,0,0.35)",
       }}
     >
       {count}
@@ -363,6 +364,33 @@ export default function MapView() {
     }
     return map;
   }, [amenityClusters, amenityClusterInstance]);
+
+  // Pre-compute campsite cluster bubble colors keyed by cluster ID — best (highest)
+  // weather score among all leaves in the cluster, or neutral grey if none have
+  // weather data yet. Unlike amenityClusterColorMap (which samples one leaf), this
+  // scans every leaf via the cluster's exact point_count so a single great-weather
+  // site inside a large cluster is never missed.
+  const campsiteClusterColorMap = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const f of campsiteClusters) {
+      if ("cluster" in f.properties && f.properties.cluster) {
+        const clusterId = f.id as number;
+        const pointCount = (f.properties as { point_count: number }).point_count;
+        const leaves = campsiteClusterInstance.getLeaves(clusterId, pointCount);
+        let bestScore: number | null = null;
+        for (const leaf of leaves) {
+          const leafIdx = (leaf.properties as { idx: number }).idx;
+          const c = displayedCampsites[leafIdx];
+          if (c?.weather && c.weather.length > 0) {
+            const score = weatherScore(c.weather);
+            if (bestScore === null || score > bestScore) bestScore = score;
+          }
+        }
+        map.set(clusterId, bestScore === null ? TEXT_MUTED : getWeatherBadge(bestScore).color);
+      }
+    }
+    return map;
+  }, [campsiteClusters, campsiteClusterInstance, displayedCampsites]);
 
   // O(1) lookup for individual amenity POI features in the render loop.
   const amenityPoiById = useMemo(
@@ -1414,7 +1442,7 @@ export default function MapView() {
               <Marker key={`cs-cluster-${clusterId}`} longitude={fLng} latitude={fLat} anchor="center" style={{ zIndex: 2 }}>
                 <ClusterBubble
                   count={count}
-                  color={FOREST_GREEN}
+                  color={campsiteClusterColorMap.get(clusterId) ?? TEXT_MUTED}
                   ariaLabel={`${count} campsites — tap to expand`}
                   onExpand={() => {
                     try {
