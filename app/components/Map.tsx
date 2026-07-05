@@ -18,6 +18,7 @@ import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayloa
 import type { ParsedIntent } from "@/lib/parseIntent";
 import { getRecentEntries, addRecentEntry, type RecentEntry } from "@/lib/recentSearches";
 import { QUICK_CHIPS, AMENITY_CHIPS } from "@/lib/chips";
+import { hexToRgba } from "@/lib/mapPin";
 import { CampsitePin } from "./CampsitePin";
 import { AmenityPin, type AmenityPinMeta } from "./AmenityPin";
 import { useMapData } from "@/hooks/useMapData";
@@ -39,11 +40,16 @@ const DEFAULT_VIEWPORT = {
 
 // Local metadata for each POI type — matches FilterPanel POI_OPTIONS and AmenityType seed data.
 // Colors and icons must stay in sync with the AmenityType seed data in prisma/seed.ts.
+// dump_point and toilets were previously #c8870a and #4a9e6a — both collided with
+// weather-score pin colours (Good #c8a040 and Great #4a9e6a respectively, see
+// lib/weatherScore.ts), which made an amenity pin's colour ambiguous with the
+// weather signal at a glance. Moved to hues clear of every other pin/badge colour
+// in use (weather, activity badges, other POIs).
 const POI_META: Record<string, AmenityPinMeta> = {
-  dump_point: { emoji: "🚐", label: "Dump point", color: "#c8870a" },
+  dump_point: { emoji: "🚐", label: "Dump point", color: "#944294" },
   water_fill: { emoji: "💧", label: "Water fill", color: "#2a8ab0" },
   laundromat: { emoji: "🧺", label: "Laundromat", color: "#7a6ab0" },
-  toilets:    { emoji: "🚻", label: "Toilets",    color: "#4a9e6a" },
+  toilets:    { emoji: "🚻", label: "Toilets",    color: "#1e3a5f" },
 };
 
 const EMPTY_FILTERS: FilterState = { activities: [], pois: [], startDate: null, endDate: null };
@@ -57,6 +63,30 @@ const WORLD_BBOX: [number, number, number, number] = [-180, -90, 180, 90];
 // two pins overlap when centers are <26px apart. 40px adds a tap-target
 // buffer — tighten toward 28 for stricter overlap-only clustering.
 const CLUSTER_OPTIONS = { radius: 45, maxZoom: 14 } as const;
+
+// Shared active-state logic for quick/amenity chips — used both to compute the
+// active chip key (for auto-scroll) and to style each chip in the render loop.
+// Keeping this in one place avoids the two call sites drifting out of sync.
+function isChipActive(
+  chip: (typeof QUICK_CHIPS)[number] | (typeof AMENITY_CHIPS)[number],
+  activeFilters: FilterState,
+  goodWeatherOnly: boolean,
+  freeOnly: boolean,
+  activeChip: string | null
+): boolean {
+  const filterKey = chip.kind === "amenity" ? null : chip.filterKey;
+  const isWeatherChip = chip.kind === "quick" && "weatherFilter" in chip && chip.weatherFilter;
+  const isFreeChip = chip.kind === "quick" && "freeFilter" in chip && chip.freeFilter;
+  return chip.kind === "amenity"
+    ? activeFilters.pois.includes(chip.poiType)
+    : isWeatherChip
+      ? goodWeatherOnly
+      : isFreeChip
+        ? freeOnly
+        : filterKey !== null
+          ? activeFilters.activities.includes(filterKey)
+          : activeChip === chip.key;
+}
 
 // Fit the map to the bounding box of a set of campsites.
 // Uses reduce instead of spread to avoid V8 stack overflow on large arrays.
@@ -101,13 +131,17 @@ function ClusterBubble({ count, color, ariaLabel, onExpand }: ClusterBubbleProps
       aria-label={ariaLabel}
       onClick={onExpand}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onExpand(); } }}
-      className="flex items-center justify-center rounded-full cursor-pointer font-black border-[2.5px] border-white shadow-[0_2px_8px_rgba(0,0,0,0.28)] text-white font-[family-name:var(--font-dm-sans)]"
+      className="flex items-center justify-center rounded-full cursor-pointer font-black border-[2.5px] border-white text-white font-[family-name:var(--font-dm-sans)]"
       style={{
         width: size,
         height: size,
         background: color,
         fontSize: size >= 48 ? 14 : 12,
         WebkitTextStroke: "0.6px rgba(0,0,0,0.35)",
+        // Outer tinted halo ring (in addition to the white border) makes cluster
+        // bubbles unambiguous at a glance vs individual teardrop pins, which have
+        // no ring at all — see issue #142 (cluster vs individual pin distinction).
+        boxShadow: `0 0 0 4px ${hexToRgba(color, 0.28)}, 0 2px 8px rgba(0,0,0,0.28)`,
       }}
     >
       {count}
@@ -227,6 +261,13 @@ export default function MapView() {
   const mapLoadedRef = useRef(false);
   const mapRef = useRef<MapRef>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+  // Keyed by chip.key — used to scroll the currently active chip into view
+  // whenever it changes (e.g. arriving from the home screen with a chip pre-active).
+  const chipButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  // Key of whichever chip the user most recently tapped directly — takes priority over
+  // array order in activeChipKey below so auto-scroll follows the user's last action
+  // rather than an arbitrary earlier chip that also happens to be active (issue #142 review).
+  const lastTappedChipKeyRef = useRef<string | null>(null);
   // skipNextFetch suppresses the moveend handler for one event — used when code
   // calls easeTo/setPadding programmatically to avoid triggering a redundant fetch.
   const skipNextFetch = useRef(false);
@@ -397,6 +438,34 @@ export default function MapView() {
     () => new Map(amenityPois.map((p) => [p.id, p])),
     [amenityPois]
   );
+
+  // Key of whichever quick/amenity chip is currently "active" — mirrors the same
+  // isActive logic used to style each chip below. Used to auto-scroll the chip
+  // row so the active chip is never left clipped off-screen (issue #142).
+  const activeChipKey = useMemo(() => {
+    const allChips = [...QUICK_CHIPS, ...AMENITY_CHIPS];
+    // Independent toggles (weather/free/amenities) can all be active at once — prefer
+    // whichever chip the user just tapped over fixed array order, as long as it's
+    // still active. Falls through to array order for chips that became active without
+    // a direct tap (e.g. arriving from the home screen with a chip pre-active).
+    const lastTapped = lastTappedChipKeyRef.current;
+    if (lastTapped) {
+      const chip = allChips.find((c) => c.key === lastTapped);
+      if (chip && isChipActive(chip, activeFilters, goodWeatherOnly, freeOnly, activeChip)) return lastTapped;
+    }
+    for (const chip of allChips) {
+      if (isChipActive(chip, activeFilters, goodWeatherOnly, freeOnly, activeChip)) return chip.key;
+    }
+    return null;
+  }, [activeFilters, goodWeatherOnly, freeOnly, activeChip]);
+
+  // Scroll the active chip fully into view whenever it changes — covers both
+  // arriving from the home screen with a chip pre-active and direct taps.
+  useEffect(() => {
+    if (!activeChipKey) return;
+    const btn = chipButtonRefs.current.get(activeChipKey);
+    btn?.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
+  }, [activeChipKey]);
 
   // Deselect when the selected campsite transitions from a visible individual pin into
   // a cluster (i.e. the user zoomed out). Only triggers on that visible→clustered
@@ -1320,23 +1389,15 @@ export default function MapView() {
         )}
 
         {/* Quick chips */}
-        <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
+        <div className="flex gap-1.5 overflow-x-auto pl-1 [scrollbar-width:none]">
           {[...QUICK_CHIPS, ...AMENITY_CHIPS].map((chip) => {
             // filterKey is the discriminator: non-null = direct DB filter, null = AI search.
             const filterKey = chip.kind === "amenity" ? null : chip.filterKey;
             // weatherFilter and freeFilter are client/server-side toggles, not AI search chips.
             const isWeatherChip = chip.kind === "quick" && "weatherFilter" in chip && chip.weatherFilter;
             const isFreeChip = chip.kind === "quick" && "freeFilter" in chip && chip.freeFilter;
-            const isActive = chip.kind === "amenity"
-              ? activeFilters.pois.includes(chip.poiType)
-              : isWeatherChip
-                ? goodWeatherOnly
-                : isFreeChip
-                  ? freeOnly
-                  : filterKey !== null
-                    ? activeFilters.activities.includes(filterKey)  // driven by filter state → syncs with FilterPanel and HomeScreen
-                    : activeChip === chip.key;                       // AI chips (Pitchd, weather) use activeChip
-            const handleClick = chip.kind === "amenity"
+            const isActive = isChipActive(chip, activeFilters, goodWeatherOnly, freeOnly, activeChip);
+            const innerHandleClick = chip.kind === "amenity"
               ? () => handleAmenityChip(chip.poiType)
               : isWeatherChip
                 ? () => {
@@ -1364,6 +1425,12 @@ export default function MapView() {
                     : isActive
                       ? handleClearSearch
                       : () => void handleMapSearch(chip.query, chip.key);
+            // Record the tapped chip so activeChipKey can prefer it over fixed array
+            // order when multiple independent toggles are active at once (see above).
+            const handleClick = () => {
+              lastTappedChipKeyRef.current = chip.key;
+              innerHandleClick();
+            };
             // AI chips have no filterKey and are kind="quick" — only they trigger mapSearchLoading.
             // weatherFilter and freeFilter are not AI chips.
             const isAiChip = chip.kind === "quick" && filterKey === null && !isWeatherChip && !isFreeChip;
@@ -1373,6 +1440,10 @@ export default function MapView() {
             return (
               <button
                 key={chip.key}
+                ref={(el) => {
+                  if (el) chipButtonRefs.current.set(chip.key, el);
+                  else chipButtonRefs.current.delete(chip.key);
+                }}
                 type="button"
                 onClick={handleClick}
                 disabled={isDisabled}

@@ -45,7 +45,9 @@ const amenityTypes = [
     key: "dump_point",
     label: "Dump point",
     icon: "🚐",
-    color: "#c8870a",
+    // Was #c8870a — collided with the "Good" weather-score pin colour (#c8a040 in
+    // lib/weatherScore.ts). Keep in sync with POI_META in components/Map.tsx.
+    color: "#944294",
     category: "poi",
   },
   {
@@ -66,7 +68,9 @@ const amenityTypes = [
     key: "toilets",
     label: "Toilets",
     icon: "🚻",
-    color: "#4a9e6a",
+    // Was #4a9e6a — identical to the "Great" weather-score pin colour. Keep in
+    // sync with POI_META in components/Map.tsx.
+    color: "#1e3a5f",
     category: "poi",
   },
 ];
