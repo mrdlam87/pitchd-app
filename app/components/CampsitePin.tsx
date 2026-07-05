@@ -47,10 +47,12 @@ export function CampsitePin({ campsite, idx, isSelected, onSelect }: CampsitePin
           <path d={PIN_PATH_D} fill="none" stroke="#fff" strokeWidth="4" />
         )}
         <path d={PIN_PATH_D} fill={pinColor} stroke={pinColor} strokeWidth={isSelected ? "2" : "1.5"} />
-        <text x="13" y="12.5" textAnchor="middle" dominantBaseline="central"
-          fill="#fff" stroke="rgba(0,0,0,0.35)" strokeWidth={0.6} paintOrder="stroke"
-          fontSize={isSelected ? 11 : 9} fontWeight="800" fontFamily="DM Sans, sans-serif">
-          {idx + 1}
+        {/* A tent icon, not the result index — a numbered pin next to a cluster
+            bubble's count (also just a number in a circle) read as the same
+            signal at a glance even though they mean different things. */}
+        <text x="13" y="12.5" textAnchor="middle" dominantBaseline="central" fill="#000"
+          fontSize={isSelected ? 12 : 10} style={{ filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.35))" }}>
+          ⛺
         </text>
       </svg>
       <div
