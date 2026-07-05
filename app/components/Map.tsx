@@ -49,7 +49,7 @@ const POI_META: Record<string, AmenityPinMeta> = {
   dump_point: { emoji: "🚐", label: "Dump point", color: "#944294" },
   water_fill: { emoji: "💧", label: "Water fill", color: "#2a8ab0" },
   laundromat: { emoji: "🧺", label: "Laundromat", color: "#7a6ab0" },
-  toilets:    { emoji: "🚻", label: "Toilets",    color: "#8a6d4a" },
+  toilets:    { emoji: "🚻", label: "Toilets",    color: "#1e3a5f" },
 };
 
 const EMPTY_FILTERS: FilterState = { activities: [], pois: [], startDate: null, endDate: null };
