@@ -20,6 +20,7 @@ function makeCampsites(count: number): Campsite[] {
     lat: -30 + i * 0.001,
     lng: 150,
     region: "NSW",
+    state: "NSW",
     blurb: null,
     amenities: [],
   }));
