@@ -70,7 +70,7 @@ const amenityTypes = [
     icon: "🚻",
     // Was #4a9e6a — identical to the "Great" weather-score pin colour. Keep in
     // sync with POI_META in components/Map.tsx.
-    color: "#536ba2",
+    color: "#8a6d4a",
     category: "poi",
   },
 ];

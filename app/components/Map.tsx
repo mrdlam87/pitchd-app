@@ -49,7 +49,7 @@ const POI_META: Record<string, AmenityPinMeta> = {
   dump_point: { emoji: "🚐", label: "Dump point", color: "#944294" },
   water_fill: { emoji: "💧", label: "Water fill", color: "#2a8ab0" },
   laundromat: { emoji: "🧺", label: "Laundromat", color: "#7a6ab0" },
-  toilets:    { emoji: "🚻", label: "Toilets",    color: "#536ba2" },
+  toilets:    { emoji: "🚻", label: "Toilets",    color: "#8a6d4a" },
 };
 
 const EMPTY_FILTERS: FilterState = { activities: [], pois: [], startDate: null, endDate: null };
@@ -63,6 +63,30 @@ const WORLD_BBOX: [number, number, number, number] = [-180, -90, 180, 90];
 // two pins overlap when centers are <26px apart. 40px adds a tap-target
 // buffer — tighten toward 28 for stricter overlap-only clustering.
 const CLUSTER_OPTIONS = { radius: 45, maxZoom: 14 } as const;
+
+// Shared active-state logic for quick/amenity chips — used both to compute the
+// active chip key (for auto-scroll) and to style each chip in the render loop.
+// Keeping this in one place avoids the two call sites drifting out of sync.
+function isChipActive(
+  chip: (typeof QUICK_CHIPS)[number] | (typeof AMENITY_CHIPS)[number],
+  activeFilters: FilterState,
+  goodWeatherOnly: boolean,
+  freeOnly: boolean,
+  activeChip: string | null
+): boolean {
+  const filterKey = chip.kind === "amenity" ? null : chip.filterKey;
+  const isWeatherChip = chip.kind === "quick" && "weatherFilter" in chip && chip.weatherFilter;
+  const isFreeChip = chip.kind === "quick" && "freeFilter" in chip && chip.freeFilter;
+  return chip.kind === "amenity"
+    ? activeFilters.pois.includes(chip.poiType)
+    : isWeatherChip
+      ? goodWeatherOnly
+      : isFreeChip
+        ? freeOnly
+        : filterKey !== null
+          ? activeFilters.activities.includes(filterKey)
+          : activeChip === chip.key;
+}
 
 // Fit the map to the bounding box of a set of campsites.
 // Uses reduce instead of spread to avoid V8 stack overflow on large arrays.
@@ -419,20 +443,6 @@ export default function MapView() {
   // isActive logic used to style each chip below. Used to auto-scroll the chip
   // row so the active chip is never left clipped off-screen (issue #142).
   const activeChipKey = useMemo(() => {
-    const isChipActive = (chip: (typeof QUICK_CHIPS)[number] | (typeof AMENITY_CHIPS)[number]) => {
-      const filterKey = chip.kind === "amenity" ? null : chip.filterKey;
-      const isWeatherChip = chip.kind === "quick" && "weatherFilter" in chip && chip.weatherFilter;
-      const isFreeChip = chip.kind === "quick" && "freeFilter" in chip && chip.freeFilter;
-      return chip.kind === "amenity"
-        ? activeFilters.pois.includes(chip.poiType)
-        : isWeatherChip
-          ? goodWeatherOnly
-          : isFreeChip
-            ? freeOnly
-            : filterKey !== null
-              ? activeFilters.activities.includes(filterKey)
-              : activeChip === chip.key;
-    };
     const allChips = [...QUICK_CHIPS, ...AMENITY_CHIPS];
     // Independent toggles (weather/free/amenities) can all be active at once — prefer
     // whichever chip the user just tapped over fixed array order, as long as it's
@@ -441,10 +451,10 @@ export default function MapView() {
     const lastTapped = lastTappedChipKeyRef.current;
     if (lastTapped) {
       const chip = allChips.find((c) => c.key === lastTapped);
-      if (chip && isChipActive(chip)) return lastTapped;
+      if (chip && isChipActive(chip, activeFilters, goodWeatherOnly, freeOnly, activeChip)) return lastTapped;
     }
     for (const chip of allChips) {
-      if (isChipActive(chip)) return chip.key;
+      if (isChipActive(chip, activeFilters, goodWeatherOnly, freeOnly, activeChip)) return chip.key;
     }
     return null;
   }, [activeFilters, goodWeatherOnly, freeOnly, activeChip]);
@@ -1386,15 +1396,7 @@ export default function MapView() {
             // weatherFilter and freeFilter are client/server-side toggles, not AI search chips.
             const isWeatherChip = chip.kind === "quick" && "weatherFilter" in chip && chip.weatherFilter;
             const isFreeChip = chip.kind === "quick" && "freeFilter" in chip && chip.freeFilter;
-            const isActive = chip.kind === "amenity"
-              ? activeFilters.pois.includes(chip.poiType)
-              : isWeatherChip
-                ? goodWeatherOnly
-                : isFreeChip
-                  ? freeOnly
-                  : filterKey !== null
-                    ? activeFilters.activities.includes(filterKey)  // driven by filter state → syncs with FilterPanel and HomeScreen
-                    : activeChip === chip.key;                       // AI chips (Pitchd, weather) use activeChip
+            const isActive = isChipActive(chip, activeFilters, goodWeatherOnly, freeOnly, activeChip);
             const innerHandleClick = chip.kind === "amenity"
               ? () => handleAmenityChip(chip.poiType)
               : isWeatherChip
