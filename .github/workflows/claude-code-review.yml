@@ -31,27 +31,57 @@ jobs:
           settings: '{"permissions":{"allow":["Bash","Read","Glob","Grep"]}}'
           claude_args: "--allowedTools \"mcp__github_inline_comment__create_inline_comment,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr review:*),Read,Glob,Grep\""
           prompt: |
-            Please review this pull request. Focus on:
-            - Correctness and bugs introduced by this PR
-            - Adherence to project conventions (TypeScript, Tailwind, Prisma, Next.js App Router — see CLAUDE.md)
-            - Security issues introduced by this PR
-            - Anything that looks out of place or incomplete
+            ## Step 1 — Understand intent
+            Run `gh pr view ${{ github.event.pull_request.number }}` to read the PR title, description,
+            and linked issue number. Read CLAUDE.md for project conventions. Then run
+            `gh pr diff ${{ github.event.pull_request.number }}` to get the full diff.
 
-            ## Posting feedback
+            ## Step 2 — Review the diff
+            Check only for issues introduced by this PR:
 
-            Use `mcp__github_inline_comment__create_inline_comment` (with `confirmed: true`) for every
-            issue — whether in a changed file or a file broken by this PR's changes (e.g. a type change
-            that breaks an untouched test fixture). Inline threads must be resolved before merge, so this
-            is the primary blocking mechanism.
+            **Correctness**
+            - Logic bugs, off-by-one errors, wrong conditions
+            - Unhandled null/undefined (especially after optional chaining or DB queries)
+            - Unhandled promise rejections, missing await
+            - Unbounded loops or queries (missing take/limit)
 
-            Use `gh pr review ${{ github.event.pull_request.number }} --comment --body "..."` only for a
-            brief overall summary (scope, what looks good, anything non-line-specific). Never use
-            --request-changes or --approve.
+            **Type safety**
+            - If TypeScript types changed, run `cd app && npx tsc --noEmit` to confirm no breakage
+              in files outside the diff. Flag any errors as blocking.
 
-            ## What counts as this PR's issue
+            **Test coverage**
+            - If the PR adds or changes logic, check whether tests cover it. Flag missing tests as blocking
+              if the logic is non-trivial and untested.
 
-            Only flag issues introduced by this PR. Pre-existing problems in unrelated code are worth a
-            note in the summary body but must NOT become inline comments (they can't be resolved by the
-            PR author).
+            **Security**
+            - User input flowing into queries, prompts, or templates without sanitisation
+            - Auth/permission checks missing on new routes
 
-            Be concise. Do not repeat points already made in earlier reviews on this PR.
+            **Conventions (see CLAUDE.md)**
+            - Server vs client component misuse
+            - Raw SQL instead of Prisma
+            - Hardcoded hex values instead of design tokens
+            - Missing error handling on external API/DB calls
+
+            ## Step 3 — Verify before posting
+            Before posting any finding, confirm it is real — check the surrounding code, run tsc if
+            relevant, and use Read/Glob/Grep to inspect files outside the diff that may be affected.
+            Do not flag speculative issues.
+
+            ## Step 4 — Post feedback
+
+            **Inline comments** — use `mcp__github_inline_comment__create_inline_comment` (with
+            `confirmed: true`) for every line-specific finding. Prefix each comment body with either:
+            - `**[blocking]**` — must be resolved before merge (correctness bug, type error, security issue,
+              missing test on non-trivial logic, knock-on breakage in untouched files)
+            - `**[suggestion]**` — worth considering but does not block merge
+
+            **Overall summary** — use `gh pr review ${{ github.event.pull_request.number }} --comment --body "..."`
+            for a brief summary: what the PR does, what looks good, and any non-line-specific notes.
+            Never use --request-changes or --approve.
+
+            ## Rules
+            - Only flag issues this PR introduced. Note pre-existing problems in the summary only —
+              never as inline comments (the author cannot resolve what they didn't write).
+            - Do not repeat points already made in earlier reviews on this PR.
+            - Be concise. One clear sentence per finding is enough.
