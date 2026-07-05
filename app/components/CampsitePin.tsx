@@ -1,4 +1,5 @@
-import { CORAL, FOREST_GREEN, TEXT_MUTED } from "@/lib/tokens";
+import { FOREST_GREEN, TEXT_MUTED } from "@/lib/tokens";
+import { hexToRgba, PIN_PATH_D } from "@/lib/mapPin";
 import { getWeatherBadge, weatherScore } from "@/lib/weatherScore";
 import type { Campsite } from "@/types/map";
 
@@ -15,7 +16,11 @@ export function CampsitePin({ campsite, idx, isSelected, onSelect }: CampsitePin
     .replace(" Conservation Park", " CP")
     .split(" – ")[0];
   const pinW = isSelected ? 34 : 26;
-  const pinH = isSelected ? 37 : 28;
+  // Selected height (and the -2/30 viewBox below) leave headroom above the pin shape
+  // for the glow + halo rings so they aren't clipped by the SVG viewport — see issue
+  // #142 follow-up. The bottom edge stays at y=28 in both cases so the marker's
+  // anchor="bottom" point (the pin tip) never shifts relative to its map coordinate.
+  const pinH = isSelected ? 40 : 28;
   // No weather data yet (browse mode, not fetched for this viewport) → neutral colour.
   const pinColor = campsite.weather && campsite.weather.length > 0
     ? getWeatherBadge(weatherScore(campsite.weather)).color
@@ -30,14 +35,18 @@ export function CampsitePin({ campsite, idx, isSelected, onSelect }: CampsitePin
     >
       <svg
         style={{ width: pinW, height: pinH, filter: `drop-shadow(0 2px 6px rgba(0,0,0,${isSelected ? 0.45 : 0.28}))`, transition: "width 150ms, height 150ms" }}
-        viewBox="0 0 26 28" fill="none"
+        viewBox={isSelected ? "0 -2 26 30" : "0 0 26 28"} fill="none"
       >
         {isSelected && (
-          <path d="M13 1.5C7.2 1.5 2.5 6.2 2.5 12C2.5 18.5 9 24 13 26C17 24 23.5 18.5 23.5 12C23.5 6.2 18.8 1.5 13 1.5Z"
-            fill="none" stroke="#fff" strokeWidth="4.5" />
+          // Tonal glow in the pin's own colour, not a fixed accent — so it reads
+          // consistently on weather-coloured campsite pins and differently-coloured
+          // amenity pins alike (issue #142 follow-up).
+          <path d={PIN_PATH_D} fill="none" stroke={hexToRgba(pinColor, 0.3)} strokeWidth="5" />
         )}
-        <path d="M13 1.5C7.2 1.5 2.5 6.2 2.5 12C2.5 18.5 9 24 13 26C17 24 23.5 18.5 23.5 12C23.5 6.2 18.8 1.5 13 1.5Z"
-          fill={pinColor} stroke={isSelected ? CORAL : pinColor} strokeWidth={isSelected ? "2.5" : "1.5"} />
+        {isSelected && (
+          <path d={PIN_PATH_D} fill="none" stroke="#fff" strokeWidth="4" />
+        )}
+        <path d={PIN_PATH_D} fill={pinColor} stroke={pinColor} strokeWidth={isSelected ? "2" : "1.5"} />
         <text x="13" y="12.5" textAnchor="middle" dominantBaseline="central"
           fill="#fff" stroke="rgba(0,0,0,0.35)" strokeWidth={0.6} paintOrder="stroke"
           fontSize={isSelected ? 11 : 9} fontWeight="800" fontFamily="DM Sans, sans-serif">

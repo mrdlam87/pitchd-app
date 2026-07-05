@@ -18,6 +18,7 @@ import { SEARCH_RESULTS_KEY, parseSearchResultsPayload, type SearchResultsPayloa
 import type { ParsedIntent } from "@/lib/parseIntent";
 import { getRecentEntries, addRecentEntry, type RecentEntry } from "@/lib/recentSearches";
 import { QUICK_CHIPS, AMENITY_CHIPS } from "@/lib/chips";
+import { hexToRgba } from "@/lib/mapPin";
 import { CampsitePin } from "./CampsitePin";
 import { AmenityPin, type AmenityPinMeta } from "./AmenityPin";
 import { useMapData } from "@/hooks/useMapData";
@@ -39,11 +40,16 @@ const DEFAULT_VIEWPORT = {
 
 // Local metadata for each POI type — matches FilterPanel POI_OPTIONS and AmenityType seed data.
 // Colors and icons must stay in sync with the AmenityType seed data in prisma/seed.ts.
+// dump_point and toilets were previously #c8870a and #4a9e6a — both collided with
+// weather-score pin colours (Good #c8a040 and Great #4a9e6a respectively, see
+// lib/weatherScore.ts), which made an amenity pin's colour ambiguous with the
+// weather signal at a glance. Moved to hues clear of every other pin/badge colour
+// in use (weather, activity badges, other POIs).
 const POI_META: Record<string, AmenityPinMeta> = {
-  dump_point: { emoji: "🚐", label: "Dump point", color: "#c8870a" },
+  dump_point: { emoji: "🚐", label: "Dump point", color: "#944294" },
   water_fill: { emoji: "💧", label: "Water fill", color: "#2a8ab0" },
   laundromat: { emoji: "🧺", label: "Laundromat", color: "#7a6ab0" },
-  toilets:    { emoji: "🚻", label: "Toilets",    color: "#4a9e6a" },
+  toilets:    { emoji: "🚻", label: "Toilets",    color: "#536ba2" },
 };
 
 const EMPTY_FILTERS: FilterState = { activities: [], pois: [], startDate: null, endDate: null };
@@ -89,17 +95,6 @@ function consumeSearchResults(): SearchResultsPayload | null {
   } catch {
     return null;
   }
-}
-
-// Converts a "#rrggbb" token colour to an rgba() string with the given alpha —
-// used to tint the cluster halo ring with the cluster's own colour.
-function hexToRgba(hex: string, alpha: number): string {
-  const clean = hex.replace("#", "");
-  const value = parseInt(clean, 16);
-  const r = (value >> 16) & 255;
-  const g = (value >> 8) & 255;
-  const b = value & 255;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 type ClusterBubbleProps = { count: number; color: string; ariaLabel: string; onExpand: () => void };
