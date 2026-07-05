@@ -4,20 +4,24 @@ on:
   pull_request:
     types: [opened, synchronize, ready_for_review, reopened]
 
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   claude-review:
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
-      issues: write
       id-token: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Run Claude Code Review
         uses: anthropics/claude-code-action@v1
@@ -25,33 +29,59 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           use_sticky_comment: true
           settings: '{"permissions":{"allow":["Bash","Read","Glob","Grep"]}}'
-          claude_args: |
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr review:*),Read,Glob,Grep"
+          claude_args: "--allowedTools \"mcp__github_inline_comment__create_inline_comment,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr review:*),Read,Glob,Grep\""
           prompt: |
-            Please review this pull request. Focus on:
-            - Correctness and bugs introduced by this PR
-            - Adherence to project conventions (TypeScript, Tailwind, Prisma, Next.js App Router — see CLAUDE.md)
-            - Security issues introduced by this PR
-            - Anything that looks out of place or incomplete
+            ## Step 1 — Understand intent
+            Run `gh pr view ${{ github.event.pull_request.number }}` to read the PR title, description,
+            and linked issue number. Read CLAUDE.md for project conventions. Then run
+            `gh pr diff ${{ github.event.pull_request.number }}` to get the full diff.
 
-            ## Posting feedback
+            ## Step 2 — Review the diff
+            Check only for issues introduced by this PR:
 
-            For line-specific issues, use `mcp__github_inline_comment__create_inline_comment` (with
-            `confirmed: true`) so feedback appears inline on the diff.
+            **Correctness**
+            - Logic bugs, off-by-one errors, wrong conditions
+            - Unhandled null/undefined (especially after optional chaining or DB queries)
+            - Unhandled promise rejections, missing await
+            - Unbounded loops or queries (missing take/limit)
 
-            For the overall verdict, use `gh pr review ${{ github.event.pull_request.number }}` with one of:
-            - `--approve` — no blocking issues
-            - `--request-changes --body "..."` — there is at least one blocking issue INTRODUCED BY THIS PR
-            - `--comment --body "..."` — observations only, nothing that should block merge
+            **Type safety**
+            - If TypeScript types changed, run `cd app && npx tsc --noEmit` to confirm no breakage
+              in files outside the diff. Flag any errors as blocking.
 
-            ## Critical rule: only block on issues this PR introduced
+            **Test coverage**
+            - If the PR adds or changes logic, check whether tests cover it. Flag missing tests as blocking
+              if the logic is non-trivial and untested.
 
-            NEVER use `--request-changes` for pre-existing issues, issues in files not touched by this PR,
-            or observations about unrelated parts of the codebase. If you spot a pre-existing problem,
-            mention it in the comment body as a note but do not let it influence the verdict.
+            **Security**
+            - User input flowing into queries, prompts, or templates without sanitisation
+            - Auth/permission checks missing on new routes
 
-            The only exception: if this PR's changes cause a *previously passing* file to break (e.g. a
-            type change that breaks an untouched test fixture), that IS introduced by this PR and warrants
-            `--request-changes`.
+            **Conventions (see CLAUDE.md)**
+            - Server vs client component misuse
+            - Raw SQL instead of Prisma
+            - Hardcoded hex values instead of design tokens
+            - Missing error handling on external API/DB calls
 
-            Be concise and constructive. Do not repeat points already made in earlier reviews on this PR.
+            ## Step 3 — Verify before posting
+            Before posting any finding, confirm it is real — check the surrounding code, run tsc if
+            relevant, and use Read/Glob/Grep to inspect files outside the diff that may be affected.
+            Do not flag speculative issues.
+
+            ## Step 4 — Post feedback
+
+            **Inline comments** — use `mcp__github_inline_comment__create_inline_comment` (with
+            `confirmed: true`) for every line-specific finding. Prefix each comment body with either:
+            - `**[blocking]**` — must be resolved before merge (correctness bug, type error, security issue,
+              missing test on non-trivial logic, knock-on breakage in untouched files)
+            - `**[suggestion]**` — worth considering but does not block merge
+
+            **Overall summary** — use `gh pr review ${{ github.event.pull_request.number }} --comment --body "..."`
+            for a brief summary: what the PR does, what looks good, and any non-line-specific notes.
+            Never use --request-changes or --approve.
+
+            ## Rules
+            - Only flag issues this PR introduced. Note pre-existing problems in the summary only —
+              never as inline comments (the author cannot resolve what they didn't write).
+            - Do not repeat points already made in earlier reviews on this PR.
+            - Be concise. One clear sentence per finding is enough.
