@@ -91,6 +91,17 @@ function consumeSearchResults(): SearchResultsPayload | null {
   }
 }
 
+// Converts a "#rrggbb" token colour to an rgba() string with the given alpha —
+// used to tint the cluster halo ring with the cluster's own colour.
+function hexToRgba(hex: string, alpha: number): string {
+  const clean = hex.replace("#", "");
+  const value = parseInt(clean, 16);
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 type ClusterBubbleProps = { count: number; color: string; ariaLabel: string; onExpand: () => void };
 function ClusterBubble({ count, color, ariaLabel, onExpand }: ClusterBubbleProps) {
   const size = count >= 50 ? 48 : count >= 10 ? 40 : 32;
@@ -101,13 +112,17 @@ function ClusterBubble({ count, color, ariaLabel, onExpand }: ClusterBubbleProps
       aria-label={ariaLabel}
       onClick={onExpand}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onExpand(); } }}
-      className="flex items-center justify-center rounded-full cursor-pointer font-black border-[2.5px] border-white shadow-[0_2px_8px_rgba(0,0,0,0.28)] text-white font-[family-name:var(--font-dm-sans)]"
+      className="flex items-center justify-center rounded-full cursor-pointer font-black border-[2.5px] border-white text-white font-[family-name:var(--font-dm-sans)]"
       style={{
         width: size,
         height: size,
         background: color,
         fontSize: size >= 48 ? 14 : 12,
         WebkitTextStroke: "0.6px rgba(0,0,0,0.35)",
+        // Outer tinted halo ring (in addition to the white border) makes cluster
+        // bubbles unambiguous at a glance vs individual teardrop pins, which have
+        // no ring at all — see issue #142 (cluster vs individual pin distinction).
+        boxShadow: `0 0 0 4px ${hexToRgba(color, 0.28)}, 0 2px 8px rgba(0,0,0,0.28)`,
       }}
     >
       {count}
@@ -227,6 +242,9 @@ export default function MapView() {
   const mapLoadedRef = useRef(false);
   const mapRef = useRef<MapRef>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+  // Keyed by chip.key — used to scroll the currently active chip into view
+  // whenever it changes (e.g. arriving from the home screen with a chip pre-active).
+  const chipButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   // skipNextFetch suppresses the moveend handler for one event — used when code
   // calls easeTo/setPadding programmatically to avoid triggering a redundant fetch.
   const skipNextFetch = useRef(false);
@@ -397,6 +415,36 @@ export default function MapView() {
     () => new Map(amenityPois.map((p) => [p.id, p])),
     [amenityPois]
   );
+
+  // Key of whichever quick/amenity chip is currently "active" — mirrors the same
+  // isActive logic used to style each chip below. Used to auto-scroll the chip
+  // row so the active chip is never left clipped off-screen (issue #142).
+  const activeChipKey = useMemo(() => {
+    for (const chip of [...QUICK_CHIPS, ...AMENITY_CHIPS]) {
+      const filterKey = chip.kind === "amenity" ? null : chip.filterKey;
+      const isWeatherChip = chip.kind === "quick" && "weatherFilter" in chip && chip.weatherFilter;
+      const isFreeChip = chip.kind === "quick" && "freeFilter" in chip && chip.freeFilter;
+      const isActive = chip.kind === "amenity"
+        ? activeFilters.pois.includes(chip.poiType)
+        : isWeatherChip
+          ? goodWeatherOnly
+          : isFreeChip
+            ? freeOnly
+            : filterKey !== null
+              ? activeFilters.activities.includes(filterKey)
+              : activeChip === chip.key;
+      if (isActive) return chip.key;
+    }
+    return null;
+  }, [activeFilters, goodWeatherOnly, freeOnly, activeChip]);
+
+  // Scroll the active chip fully into view whenever it changes — covers both
+  // arriving from the home screen with a chip pre-active and direct taps.
+  useEffect(() => {
+    if (!activeChipKey) return;
+    const btn = chipButtonRefs.current.get(activeChipKey);
+    btn?.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
+  }, [activeChipKey]);
 
   // Deselect when the selected campsite transitions from a visible individual pin into
   // a cluster (i.e. the user zoomed out). Only triggers on that visible→clustered
@@ -1320,7 +1368,7 @@ export default function MapView() {
         )}
 
         {/* Quick chips */}
-        <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
+        <div className="flex gap-1.5 overflow-x-auto pl-1 [scrollbar-width:none]">
           {[...QUICK_CHIPS, ...AMENITY_CHIPS].map((chip) => {
             // filterKey is the discriminator: non-null = direct DB filter, null = AI search.
             const filterKey = chip.kind === "amenity" ? null : chip.filterKey;
@@ -1373,6 +1421,10 @@ export default function MapView() {
             return (
               <button
                 key={chip.key}
+                ref={(el) => {
+                  if (el) chipButtonRefs.current.set(chip.key, el);
+                  else chipButtonRefs.current.delete(chip.key);
+                }}
                 type="button"
                 onClick={handleClick}
                 disabled={isDisabled}
