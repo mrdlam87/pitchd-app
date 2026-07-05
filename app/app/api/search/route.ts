@@ -13,6 +13,7 @@ import { hashQuery, getCachedIntent, setCachedIntent } from "@/lib/searchCache";
 import { haversineKm } from "@/lib/distance";
 import { requireAuth } from "@/lib/apiAuth";
 import { fetchWeatherForCandidates, combinedScore, extractForecastDays } from "@/lib/weatherRanking";
+import { isUnnamedCampsite } from "@/lib/campsiteDisplay";
 
 // Re-export for callers that import from the route rather than from the lib directly.
 // The route is the public API surface for search — keeping this here avoids breaking
@@ -202,6 +203,7 @@ export async function POST(req: Request): Promise<Response> {
         lat: true,
         lng: true,
         region: true,
+        state: true,
         blurb: true,
         amenities: {
           select: {
@@ -256,7 +258,7 @@ export async function POST(req: Request): Promise<Response> {
         const days = extractForecastDays(forecast, rankStartDate, rankEndDate);
         return {
           campsite: c,
-          score: combinedScore(c.distanceKm, radiusKm, forecast, rankStartDate, rankEndDate),
+          score: combinedScore(c.distanceKm, radiusKm, forecast, rankStartDate, rankEndDate, isUnnamedCampsite(c.name)),
           days,
         };
       })

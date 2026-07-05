@@ -7,6 +7,7 @@ import { wmoCodeToEmoji, condColorForCode } from "@/lib/weatherScore";
 import type { AmenityPOI, Campsite, POIMeta, WeatherDay } from "@/types/map";
 import { haversineKm } from "@/lib/distance";
 import type { ParsedIntent } from "@/lib/parseIntent";
+import { getDisplayName } from "@/lib/campsiteDisplay";
 
 export type DrawerState = "peek" | "half" | "full";
 export type DrawerMode = "browse" | "ai-search" | "region" | "location" | "amenity-only";
@@ -253,7 +254,7 @@ function CampsiteCard({
         onSelect();
       }
     },
-    "aria-label": `Select campsite ${index + 1}: ${campsite.name}`,
+    "aria-label": `Select campsite ${index + 1}: ${getDisplayName(campsite)}`,
     "aria-pressed": isSelected,
   };
 
@@ -278,7 +279,7 @@ function CampsiteCard({
                 className="text-[15px] font-semibold leading-snug font-[family-name:var(--font-dm-sans)]"
                 style={{ color: FOREST_GREEN }}
               >
-                {campsite.name}
+                {getDisplayName(campsite)}
               </div>
               {(driveTime || campsite.blurb) && (
                 <div className="text-[10px] mt-0.5 leading-relaxed" style={{ color: SAGE }}>
@@ -288,7 +289,7 @@ function CampsiteCard({
                 </div>
               )}
             </div>
-            <NavigateButton lat={campsite.lat} lng={campsite.lng} name={campsite.name} />
+            <NavigateButton lat={campsite.lat} lng={campsite.lng} name={getDisplayName(campsite)} />
           </div>
           {campsite.weather && campsite.weather.length > 0 && (
             <>
@@ -337,7 +338,7 @@ function CampsiteCard({
               className="font-semibold text-[15px] leading-snug font-[family-name:var(--font-dm-sans)]"
               style={{ color: FOREST_GREEN }}
             >
-              {campsite.name}
+              {getDisplayName(campsite)}
             </div>
             {(driveTime || subText) && (
               <div className="text-[11px] mt-0.5 leading-relaxed" style={{ color: SAGE }}>
@@ -347,7 +348,7 @@ function CampsiteCard({
               </div>
             )}
           </div>
-          <NavigateButton lat={campsite.lat} lng={campsite.lng} name={campsite.name} />
+          <NavigateButton lat={campsite.lat} lng={campsite.lng} name={getDisplayName(campsite)} />
         </div>
         {compactWeather && compactWeather.length > 0 && (
           <>
@@ -604,7 +605,7 @@ function CampsiteDetailSheet({
 
       {campsite && (
         <>
-          <ScenicPhoto seed={1000 + (campsite.name.charCodeAt(0) || 0)} />
+          <ScenicPhoto seed={1000 + (getDisplayName(campsite).charCodeAt(0) || 0)} />
           <div className="overflow-y-auto flex-1 px-4 pt-3 pb-4">
             <div className="flex items-start gap-2 mb-1">
               <div className="min-w-0 flex-1">
@@ -612,7 +613,7 @@ function CampsiteDetailSheet({
                   className="text-[18px] font-semibold leading-snug font-[family-name:var(--font-dm-sans)]"
                   style={{ color: FOREST_GREEN }}
                 >
-                  {campsite.name}
+                  {getDisplayName(campsite)}
                 </div>
                 {(driveTime || campsite.region || campsite.blurb) && (
                   <div className="text-[12px] mt-0.5 leading-relaxed" style={{ color: SAGE }}>

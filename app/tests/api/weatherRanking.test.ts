@@ -172,4 +172,21 @@ describe("combinedScore", () => {
     const far = combinedScore(80, 100, forecast, today, tomorrow);
     expect(near).toBeGreaterThan(far);
   });
+
+  it("applies a 0.9 penalty when isUnnamed=true", () => {
+    // combinedScore(0, 100, null, null, null) returns 80
+    // With isUnnamed=true, should return 0.9 * 80 = 72
+    const named = combinedScore(0, 100, null, null, null, false);
+    const unnamed = combinedScore(0, 100, null, null, null, true);
+    expect(unnamed).toBe(72);
+    expect(unnamed).toBe(0.9 * named);
+  });
+
+  it("defaults to false for isUnnamed (omitted parameter)", () => {
+    // Calling without the 6th argument should behave the same as passing false
+    const withoutArg = combinedScore(0, 100, null, null, null);
+    const withFalse = combinedScore(0, 100, null, null, null, false);
+    expect(withoutArg).toBe(withFalse);
+    expect(withoutArg).toBe(80);
+  });
 });

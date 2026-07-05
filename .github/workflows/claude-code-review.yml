@@ -26,16 +26,32 @@ jobs:
           use_sticky_comment: true
           settings: '{"permissions":{"allow":["Bash","Read","Glob","Grep"]}}'
           claude_args: |
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr review:*),Read,Glob,Grep"
           prompt: |
             Please review this pull request. Focus on:
-            - Correctness and bugs
+            - Correctness and bugs introduced by this PR
             - Adherence to project conventions (TypeScript, Tailwind, Prisma, Next.js App Router — see CLAUDE.md)
-            - Security issues
+            - Security issues introduced by this PR
             - Anything that looks out of place or incomplete
 
-            For issues tied to a specific line, use the `mcp__github_inline_comment__create_inline_comment`
-            tool (with `confirmed: true`) so feedback appears inline on the diff instead of in one big blob.
-            Only fall back to a short top-level summary for things that aren't line-specific
-            (e.g. overall scope/architecture notes). Be concise and constructive — don't repeat
-            points already made in earlier reviews on this PR.
+            ## Posting feedback
+
+            For line-specific issues, use `mcp__github_inline_comment__create_inline_comment` (with
+            `confirmed: true`) so feedback appears inline on the diff.
+
+            For the overall verdict, use `gh pr review ${{ github.event.pull_request.number }}` with one of:
+            - `--approve` — no blocking issues
+            - `--request-changes --body "..."` — there is at least one blocking issue INTRODUCED BY THIS PR
+            - `--comment --body "..."` — observations only, nothing that should block merge
+
+            ## Critical rule: only block on issues this PR introduced
+
+            NEVER use `--request-changes` for pre-existing issues, issues in files not touched by this PR,
+            or observations about unrelated parts of the codebase. If you spot a pre-existing problem,
+            mention it in the comment body as a note but do not let it influence the verdict.
+
+            The only exception: if this PR's changes cause a *previously passing* file to break (e.g. a
+            type change that breaks an untouched test fixture), that IS introduced by this PR and warrants
+            `--request-changes`.
+
+            Be concise and constructive. Do not repeat points already made in earlier reviews on this PR.

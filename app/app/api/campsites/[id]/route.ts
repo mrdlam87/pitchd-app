@@ -20,6 +20,7 @@ export async function GET(
         lat: true,
         lng: true,
         region: true,
+        state: true,
         blurb: true,
         amenities: {
           select: {

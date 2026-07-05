@@ -22,6 +22,7 @@ export type Campsite = {
   lat: number;
   lng: number;
   region: string | null;
+  state: string;
   blurb: string | null;
   amenities: { key: string; label: string; icon: string; color: string }[];
   // Multi-day forecast attached client-side after the batch weather fetch.

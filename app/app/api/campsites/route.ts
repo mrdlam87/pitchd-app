@@ -88,8 +88,8 @@ export async function GET(req: Request): Promise<Response> {
         lat: true,
         lng: true,
         region: true,
+        state: true,
         blurb: true,
-        // state is intentionally excluded — not required by this endpoint's response spec
         amenities: {
           select: {
             amenityType: {
