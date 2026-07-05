@@ -245,6 +245,10 @@ export default function MapView() {
   // Keyed by chip.key — used to scroll the currently active chip into view
   // whenever it changes (e.g. arriving from the home screen with a chip pre-active).
   const chipButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  // Key of whichever chip the user most recently tapped directly — takes priority over
+  // array order in activeChipKey below so auto-scroll follows the user's last action
+  // rather than an arbitrary earlier chip that also happens to be active (issue #142 review).
+  const lastTappedChipKeyRef = useRef<string | null>(null);
   // skipNextFetch suppresses the moveend handler for one event — used when code
   // calls easeTo/setPadding programmatically to avoid triggering a redundant fetch.
   const skipNextFetch = useRef(false);
@@ -420,11 +424,11 @@ export default function MapView() {
   // isActive logic used to style each chip below. Used to auto-scroll the chip
   // row so the active chip is never left clipped off-screen (issue #142).
   const activeChipKey = useMemo(() => {
-    for (const chip of [...QUICK_CHIPS, ...AMENITY_CHIPS]) {
+    const isChipActive = (chip: (typeof QUICK_CHIPS)[number] | (typeof AMENITY_CHIPS)[number]) => {
       const filterKey = chip.kind === "amenity" ? null : chip.filterKey;
       const isWeatherChip = chip.kind === "quick" && "weatherFilter" in chip && chip.weatherFilter;
       const isFreeChip = chip.kind === "quick" && "freeFilter" in chip && chip.freeFilter;
-      const isActive = chip.kind === "amenity"
+      return chip.kind === "amenity"
         ? activeFilters.pois.includes(chip.poiType)
         : isWeatherChip
           ? goodWeatherOnly
@@ -433,7 +437,19 @@ export default function MapView() {
             : filterKey !== null
               ? activeFilters.activities.includes(filterKey)
               : activeChip === chip.key;
-      if (isActive) return chip.key;
+    };
+    const allChips = [...QUICK_CHIPS, ...AMENITY_CHIPS];
+    // Independent toggles (weather/free/amenities) can all be active at once — prefer
+    // whichever chip the user just tapped over fixed array order, as long as it's
+    // still active. Falls through to array order for chips that became active without
+    // a direct tap (e.g. arriving from the home screen with a chip pre-active).
+    const lastTapped = lastTappedChipKeyRef.current;
+    if (lastTapped) {
+      const chip = allChips.find((c) => c.key === lastTapped);
+      if (chip && isChipActive(chip)) return lastTapped;
+    }
+    for (const chip of allChips) {
+      if (isChipActive(chip)) return chip.key;
     }
     return null;
   }, [activeFilters, goodWeatherOnly, freeOnly, activeChip]);
@@ -1384,7 +1400,7 @@ export default function MapView() {
                   : filterKey !== null
                     ? activeFilters.activities.includes(filterKey)  // driven by filter state → syncs with FilterPanel and HomeScreen
                     : activeChip === chip.key;                       // AI chips (Pitchd, weather) use activeChip
-            const handleClick = chip.kind === "amenity"
+            const innerHandleClick = chip.kind === "amenity"
               ? () => handleAmenityChip(chip.poiType)
               : isWeatherChip
                 ? () => {
@@ -1412,6 +1428,12 @@ export default function MapView() {
                     : isActive
                       ? handleClearSearch
                       : () => void handleMapSearch(chip.query, chip.key);
+            // Record the tapped chip so activeChipKey can prefer it over fixed array
+            // order when multiple independent toggles are active at once (see above).
+            const handleClick = () => {
+              lastTappedChipKeyRef.current = chip.key;
+              innerHandleClick();
+            };
             // AI chips have no filterKey and are kind="quick" — only they trigger mapSearchLoading.
             // weatherFilter and freeFilter are not AI chips.
             const isAiChip = chip.kind === "quick" && filterKey === null && !isWeatherChip && !isFreeChip;
