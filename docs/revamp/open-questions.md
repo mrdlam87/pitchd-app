@@ -11,7 +11,7 @@
 - **G. Who's the next user after the founder,** and when?
 
 ## ⚠️ Before touching any v2 code
-- [ ] **Set up the harness workflow** — define how v2 is built with Claude Code before the first line of code: `CLAUDE.md` conventions, skills/commands (e.g. updated `/plan`, `/implement`, `/pr`), subagents (`senior-engineer`, `ux-designer`), hooks (lint/test/format), permissions, CI review, and how agent-harness concerns (eval runs, tool tests) fit in. *Scope to confirm with the founder.*
+- [ ] **Set up the harness workflow** — define how v2 is built with Claude Code before the first line of code: `CLAUDE.md` conventions, skills/commands (e.g. updated `/plan`, `/implement`, `/pr`), subagents (`senior-engineer`, `ux-designer`), hooks (lint/test/format), permissions, CI review, and how agent-harness concerns (eval runs, tool tests) fit in. *Confirmed: this means the Claude Code development workflow (how v2 is built), not the Pitchd agent's own harness.*
 - [ ] Repo + database decided (D) and created
 - [ ] Docs moved from `docs/revamp/` into the v2 repo
 
