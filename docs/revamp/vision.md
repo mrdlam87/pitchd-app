@@ -46,17 +46,34 @@ The original origin story still holds — the killer query is the same — but t
 
 MVP of the revamp = **Describe → Agent works → Proposal → Refine → Commit**. Watch, On the trip, Reflect come later.
 
-## 4. Interface principles
+## 4. Lessons from v1's UI
 
-1. **The map is the shared canvas; the conversation drives it.** Not a chat app with a map bolted on, and not a map with a chatbot bolted on. The agent's work shows up spatially. Candidate layout: map full-screen, a conversation sheet that replaces today's results drawer (peek / half / full), keeping Session 1's drawer model.
-2. **Tap and talk are equal.** Anything you can say, you can usually tap (chips, pins, cards), and anything you tap becomes context for the agent. Typing should never be mandatory for a refinement.
-3. **Show the work, briefly.** Visible progress builds trust and hides latency, but keep it to short step lines — no walls of reasoning.
-4. **Answers are structured, not just prose.** The agent returns cards (site, weather days, drive time, why) rendered by the UI, with a short natural-language summary on top. The existing card + weather-pin conventions carry over.
-5. **Assumptions are visible and editable.** "Assuming this weekend (Sat–Sun), 3 hr from Sydney, with your dog" as tappable chips the user can change.
-6. **Honest when it can't.** No dry sites within range → say so and offer the trade-off ("dry if you drive 4.5 h, or showers Sunday morning only at X").
-7. **Search is agent-only; viewing is free.** There is no filter panel — every search goes through the agent, and quick chips are canned prompts. But the map is always explorable: pan, zoom, tap a pin for details, with "Ask Pitchd about this site" to bring the agent in. (See `decisions.md`.)
+**Founder's verdict:** the drawer was glitchy, and the experience overall wasn't well thought out or intuitive.
 
-## 5. What the agent is (and isn't)
+**What the audits show (`docs/ux-session-2.md`):** most issues trace back to two search systems (AI + filters) competing — indistinguishable chips, invisible active filters, no exit from search mode, parsed intent not shown — plus an opaque AI wait, undesigned states (empty, error, no location), and basics (touch targets, accessibility).
+
+**Diagnosis:** v1 was designed screen by screen and component by component; the end-to-end journey was never designed as a whole. The drawer was carrying too much (results, details, loading, filters, modes) through too many states.
+
+**What v2 does differently:**
+1. **Design the journey before the screens.** Write the core flows end to end (describe → agent works → proposal → refine → commit, plus every failure path) and walk through them before any UI is drawn.
+2. **Prototype the hard interaction first.** The map + conversation sheet is the riskiest piece — prototype and test it on a real phone before building anything around it.
+3. **Fewer states.** If there's a sheet, two snap positions (collapsed / expanded) unless a third earns its place. Every state has one clear purpose.
+4. **Don't hand-roll gestures.** Use a proven bottom-sheet implementation (or the platform's native sheet) rather than custom drag logic.
+5. **Test on real trips.** The founder plans actual weekends with the prototype before v2 is built in earnest; anything confusing is fixed in the design, not patched in code.
+
+## 5. Interface principles
+
+1. **One way to search, one mode.** No search mode vs browse mode — map and conversation always coexist.
+2. **The map is the shared canvas; the conversation drives it.** Not a chat app with a map bolted on, and not a map with a chatbot bolted on. The agent's work shows up spatially. Candidate layout: map full-screen with a conversation sheet — redesigned from scratch, not v1's drawer (see §4).
+3. **Tap and talk are equal.** Anything you can say, you can usually tap (chips, pins, cards), and anything you tap becomes context for the agent. Typing should never be mandatory for a refinement.
+4. **Show the work, on the map.** Never a bare spinner — short step lines plus pins appearing. Builds trust and hides latency; no walls of reasoning.
+5. **Answers are structured, not just prose.** The agent returns cards (site, weather days, drive time, why) rendered by the UI, with a short natural-language summary on top. The existing card + weather-pin conventions carry over.
+6. **Always show what Pitchd understood.** After every agent turn, its interpretation is shown as editable chips. "Assuming this weekend (Sat–Sun), 3 hr from Sydney, with your dog" as tappable chips the user can change.
+7. **Every state is designed** — empty, error, no location, offline, agent unavailable — each a deliberate screen, not a fallback. Basics from day one: 44 pt touch targets, accessible text, readable in sunlight.
+8. **Honest when it can't.** No dry sites within range → say so and offer the trade-off ("dry if you drive 4.5 h, or showers Sunday morning only at X").
+9. **Search is agent-only; viewing is free.** There is no filter panel — every search goes through the agent, and quick chips are canned prompts. But the map is always explorable: pan, zoom, tap a pin for details, with "Ask Pitchd about this site" to bring the agent in. (See `decisions.md`.)
+
+## 6. What the agent is (and isn't)
 
 **Is:** a planner for camping trips in Australia, grounded in Pitchd's campsite, amenity and weather data.
 
@@ -64,12 +81,12 @@ MVP of the revamp = **Describe → Agent works → Proposal → Refine → Commi
 
 **Personality (draft):** friendly, concise, practical, a bit Aussie but not a caricature. Gives a straight answer, then the reasoning.
 
-## 6. Personas, revisited
+## 7. Personas, revisited
 
 - **Matt (primary)** — the revamp's first user is effectively the founder, who is Matt. Optimise for the weekend-decision flow first.
 - **Sarah (secondary)** — multi-day, route-based planning was post-MVP before. An agent makes it far more feasible (itinerary = a sequence of tool calls), so it's a strong candidate for revamp phase 2.
 
-## 7. Success signals (draft)
+## 8. Success signals (draft)
 
 - Time from opening the app to a committed trip (target: < 5 minutes, vs 1–2 hours today)
 - Share of sessions ending in a saved trip
