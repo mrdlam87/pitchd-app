@@ -54,7 +54,7 @@ MVP of the revamp = **Describe → Agent works → Proposal → Refine → Commi
 4. **Answers are structured, not just prose.** The agent returns cards (site, weather days, drive time, why) rendered by the UI, with a short natural-language summary on top. The existing card + weather-pin conventions carry over.
 5. **Assumptions are visible and editable.** "Assuming this weekend (Sat–Sun), 3 hr from Sydney, with your dog" as tappable chips the user can change.
 6. **Honest when it can't.** No dry sites within range → say so and offer the trade-off ("dry if you drive 4.5 h, or showers Sunday morning only at X").
-7. **Browse still works.** People can still pan the map and tap pins without talking to the agent. The agent is the focal point, not a gate.
+7. **Search is agent-only; viewing is free.** There is no filter panel — every search goes through the agent, and quick chips are canned prompts. But the map is always explorable: pan, zoom, tap a pin for details, with "Ask Pitchd about this site" to bring the agent in. (See `decisions.md`.)
 
 ## 5. What the agent is (and isn't)
 
