@@ -2,7 +2,7 @@
 
 ## v2 rebuild (answer first — these shape everything else)
 - **A. What's wrong with v1's UI?** Visual feel, navigation, the drawer, how search works, speed? — the most important design input.
-- **B. Brand:** keep the name / wordmark / colours, refresh, or rethink?
+- **B. Brand:** ~~name~~ **kept as Pitchd.** Visual identity: recommendation is to refresh, not rethink — confirm during design.
 - **C. Platform:** mobile-first web (PWA) first then native, or straight to native (React Native / Expo)? → Leaning web first, native later.
 - **D. Repo:** new `pitchd-v2` repo (`web/` + `agent/`) or a `v2/` folder here? → Leaning new repo.
 - **E. Agent personality & scope:** tone, how Aussie, and how strictly it stays on camping topics.

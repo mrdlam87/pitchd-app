@@ -2,6 +2,10 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-09 — Keep the name "Pitchd" for v2
+- **Why:** Short, memorable, the camping pun still fits an agent companion, and it's already live.
+- **Still open (recommendation, not yet decided):** keep the core palette (forest / sage / warm neutrals, coral used sparingly) but refresh — add dark mode, check sunlight contrast, give weather states distinct colours, test the wordmark at icon size, and design a small mark for the agent's presence. Define the agent's voice as part of the brand (ties to open question E).
+
 ## 2026-11-09 — All search is agent-driven; map browsing kept
 - **Decision:** Remove direct search from the UI — no filter panel, no filter state, no direct search API calls from the frontend. Every search goes through the agent (typed, spoken, or via prompt chips).
 - **Kept:** Viewing, not searching — pan/zoom the map, tap a pin for details ("Ask Pitchd about this site"), saved trips.
