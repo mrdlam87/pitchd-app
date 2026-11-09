@@ -5,14 +5,15 @@
 - **Next step for layout (Product & UX #1):** map-first, but the conversation sheet is redesigned from scratch — not v1's drawer.
 - **B. Brand:** ~~name~~ **kept as Pitchd.** Visual identity: recommendation is to refresh, not rethink — confirm during design.
 - **C. Platform:** **Decided:** mobile-first web first, native later (see `decisions.md`).
-- **D. Repo:** new `pitchd-v2` repo (`web/` + `agent/`) or a `v2/` folder here? → Leaning new repo.
+- **D. Repo & database:** **Decided:** new `pitchd-v2` repo + separate Supabase project (see `decisions.md`).
 - **E. Agent personality & scope:** tone, how Aussie, and how strictly it stays on camping topics.
 - **F. v1's future:** keep running until v2 replaces it, freeze it, or retire it early?
 - **G. Who's the next user after the founder,** and when?
 
 ## ⚠️ Before touching any v2 code
 - [ ] **Set up the harness workflow** — define how v2 is built with Claude Code before the first line of code: `CLAUDE.md` conventions, skills/commands (e.g. updated `/plan`, `/implement`, `/pr`), subagents (`senior-engineer`, `ux-designer`), hooks (lint/test/format), permissions, CI review, and how agent-harness concerns (eval runs, tool tests) fit in. *Confirmed: this means the Claude Code development workflow (how v2 is built), not the Pitchd agent's own harness.*
-- [ ] Repo + database decided (D) and created
+- [x] Repo + database decided (D)
+- [ ] `pitchd-v2` repo created on GitHub (founder) and new Supabase project created
 - [ ] Docs moved from `docs/revamp/` into the v2 repo
 
 ## Product & UX
@@ -27,7 +28,7 @@
 9. **Name & positioning:** does "Pitchd" still fit an agent companion? (Probably yes.)
 
 ## Technical
-10. **Repo layout:** `agent/` folder in this repo (monorepo) vs a separate repo?
+10. ~~Repo layout~~ **Resolved:** new `pitchd-v2` repo (see D).
 11. **Agent hosting:** Fly.io vs Railway vs Render vs Cloud Run.
 12. **Python data layer:** SQLAlchemy vs psycopg with plain SQL vs calling existing Next.js API routes as tools. (Note: current convention says Prisma only for the Next.js app.)
 13. **Models:** which models for planning vs sub-tasks — decide with evals in phase 5. `CLAUDE.md` currently says Haiku for MVP; revisit for the agent.

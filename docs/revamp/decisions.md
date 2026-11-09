@@ -2,6 +2,13 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-09 — New `pitchd-v2` repo + separate Supabase project
+- **Repo:** new `pitchd-v2` repo containing `web/` (Next.js thin client), `agent/` (Python planner + data agent, tools, prompts, evals), `docs/` (moved from `docs/revamp/`), and a fresh `CLAUDE.md`.
+- **Database:** a new Supabase project for v2. Campsite + amenity data copied across once; v2 owns its schema; the data agent can't affect live v1.
+- **Why:** v1 stays live and untouched; v1 conventions don't leak into v2; web + agent change together so they share one repo; useful v1 code (OSM ingestion, weather scoring) is ported, not depended on.
+- **Trade-off accepted:** data improvements in v2 don't flow back to v1 (ties to question F).
+- **Next step:** founder creates an empty `pitchd-v2` repo on GitHub and starts a session with it; harness workflow is set up before any code.
+
 ## 2026-11-09 — Platform: mobile-first web app first, native later
 - **Decision:** v2 starts as a mobile-first web app (Next.js PWA). A native app (likely React Native / Expo) comes later.
 - **Why:** Keeps learning focus on agents rather than a new frontend framework; fastest way to iterate on the risky part (the agent experience); reuses known stack and Vercel; desktop planning comes free.
