@@ -4,7 +4,7 @@
 - **A. What's wrong with v1's UI?** **Answered:** glitchy drawer; journey not well thought out or intuitive. Lessons and v2 design principles captured in `vision.md` §4.
 - **Next step for layout (Product & UX #1):** map-first, but the conversation sheet is redesigned from scratch — not v1's drawer.
 - **B. Brand:** ~~name~~ **kept as Pitchd.** Visual identity: recommendation is to refresh, not rethink — confirm during design.
-- **C. Platform:** mobile-first web (PWA) first then native, or straight to native (React Native / Expo)? → Leaning web first, native later.
+- **C. Platform:** **Decided:** mobile-first web first, native later (see `decisions.md`).
 - **D. Repo:** new `pitchd-v2` repo (`web/` + `agent/`) or a `v2/` folder here? → Leaning new repo.
 - **E. Agent personality & scope:** tone, how Aussie, and how strictly it stays on camping topics.
 - **F. v1's future:** keep running until v2 replaces it, freeze it, or retire it early?

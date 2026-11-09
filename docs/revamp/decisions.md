@@ -2,6 +2,13 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-09 — Platform: mobile-first web app first, native later
+- **Decision:** v2 starts as a mobile-first web app (Next.js PWA). A native app (likely React Native / Expo) comes later.
+- **Why:** Keeps learning focus on agents rather than a new frontend framework; fastest way to iterate on the risky part (the agent experience); reuses known stack and Vercel; desktop planning comes free.
+- **Built for native from day one:** all logic lives in the Python agent service behind a clean streaming API; the web app is a thin client, so native is a new frontend, not a rewrite.
+- **Sheet risk:** use a proven web bottom-sheet library (e.g. `vaul`) and prototype on a real phone first. If it still feels glitchy, that's an early signal to go native sooner.
+- **Go native when:** weather-watch push alerts, offline use at camp, or sheet/map smoothness become the bottleneck — most likely around roadmap phase 6.
+
 ## 2026-11-09 — Keep the name "Pitchd" for v2
 - **Why:** Short, memorable, the camping pun still fits an agent companion, and it's already live.
 - **Still open (recommendation, not yet decided):** keep the core palette (forest / sage / warm neutrals, coral used sparingly) but refresh — add dark mode, check sunlight contrast, give weather states distinct colours, test the wordmark at icon size, and design a small mark for the agent's presence. Define the agent's voice as part of the brand (ties to open question E).
