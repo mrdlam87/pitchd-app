@@ -41,6 +41,10 @@
 - **Output contract:** the agent returns a short text summary plus structured results (site IDs, ranks, reasons) that the UI renders as cards and pins. Site IDs must come from tool results — validated server-side before rendering.
 - **Models:** to be decided with evals. Likely a capable model for planning, a cheap model for sub-tasks.
 
+## Data agent (background)
+
+A second agent runs offline to enrich, verify and dedupe campsite data — see `data-agent.md`. It writes to a review queue (`CampsiteUpdateProposal`) and a provenance table (`CampsiteFact`), never straight to live records. The planner reads `CampsiteFact` so it can cite sources and freshness ("Dogs allowed — Parks NSW, checked 3 weeks ago"). It shares the Python codebase and tools with the planner but runs on a schedule / batch, not behind the user-facing API.
+
 ## Scaling considerations (design now, build later)
 
 - **Stateless service** — conversation and trip state live in Postgres, so the service can scale horizontally.

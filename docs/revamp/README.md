@@ -7,6 +7,7 @@
 |---|---|
 | [vision.md](vision.md) | What Pitchd is becoming, who it's for, and the agent-first UX |
 | [architecture.md](architecture.md) | Proposed system shape: Next.js frontend + Python agent service |
+| [data-agent.md](data-agent.md) | Second agent track: campsite data enrichment, verification and dedupe |
 | [learning-roadmap.md](learning-roadmap.md) | Phased build plan that doubles as a learning path |
 | [decisions.md](decisions.md) | Decision log — what we chose and why |
 | [open-questions.md](open-questions.md) | Things still to work out |

@@ -20,6 +20,13 @@
 15. **Routing data:** drive times — Mapbox Directions cost at scale?
 16. **What happens to the current `/api/search` pipeline** — becomes a tool, or retired?
 
+## Data agent
+19. **Auto-approve threshold:** which changes can skip human review (e.g. high-confidence, official source only)?
+20. **Review UI:** a simple admin page, a CLI, or a spreadsheet export for reviewing proposals?
+21. **Source access:** do park authority sites allow automated access? Check terms; prefer official open-data feeds (e.g. data.gov.au) where they exist.
+22. **User reports:** how are they weighed — and how many reports before a fact changes?
+23. **Display:** how does the UI show freshness/confidence without clutter?
+
 ## Scaling & cost
 17. Budget per planned trip — what's acceptable?
 18. When does the beta open beyond the founder, and who's next?
