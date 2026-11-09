@@ -10,6 +10,11 @@
 - **F. v1's future:** keep running until v2 replaces it, freeze it, or retire it early?
 - **G. Who's the next user after the founder,** and when?
 
+## ⚠️ Before touching any v2 code
+- [ ] **Set up the harness workflow** — define how v2 is built with Claude Code before the first line of code: `CLAUDE.md` conventions, skills/commands (e.g. updated `/plan`, `/implement`, `/pr`), subagents (`senior-engineer`, `ux-designer`), hooks (lint/test/format), permissions, CI review, and how agent-harness concerns (eval runs, tool tests) fit in. *Scope to confirm with the founder.*
+- [ ] Repo + database decided (D) and created
+- [ ] Docs moved from `docs/revamp/` into the v2 repo
+
 ## Product & UX
 1. **Layout:** map-first with a conversation sheet (evolves today's drawer), or conversation-first with the map as a panel? → Leaning map-first; prototype both.
 2. **Home screen:** keep a home screen at all, or open straight onto the map with the agent prompt?
