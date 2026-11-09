@@ -1,7 +1,8 @@
 # Open Questions
 
 ## v2 rebuild (answer first — these shape everything else)
-- **A. What's wrong with v1's UI?** Visual feel, navigation, the drawer, how search works, speed? — the most important design input.
+- **A. What's wrong with v1's UI?** **Answered:** glitchy drawer; journey not well thought out or intuitive. Lessons and v2 design principles captured in `vision.md` §4.
+- **Next step for layout (Product & UX #1):** map-first, but the conversation sheet is redesigned from scratch — not v1's drawer.
 - **B. Brand:** ~~name~~ **kept as Pitchd.** Visual identity: recommendation is to refresh, not rethink — confirm during design.
 - **C. Platform:** mobile-first web (PWA) first then native, or straight to native (React Native / Expo)? → Leaning web first, native later.
 - **D. Repo:** new `pitchd-v2` repo (`web/` + `agent/`) or a `v2/` folder here? → Leaning new repo.
