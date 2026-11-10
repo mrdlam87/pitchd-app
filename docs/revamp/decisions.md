@@ -2,6 +2,25 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Memory: what's remembered, and how it's seen and edited
+- **What's remembered:**
+  | Kind | Examples | Rule |
+  |---|---|---|
+  | **Stated about yourself** | Dog (name, "on a lead is fine"), setup (car camping / tent / 17 ft van, 2WD / 4WD), home base, drive tolerance, who usually comes, must-haves (toilets, showers) | **Saved automatically** when said clearly, with a visible "Remembered · Undo" note |
+  | **Inferred from behaviour** | Prefers showers (last 4 picks), favourite regions, shorter drives in winter | **Ask first** ("Want me to remember you prefer showers?") — never saved silently |
+  | **Trip history** | Saved trips, ratings, places been | **Kept automatically** — it's the user's own record; powers "same as last time" / "somewhere new" |
+  | **Conversations** | Past threads | Kept and resumable; only become memory through the two rules above |
+  | **Never kept** | Location history (only a stated home base), anything not about camping | Not stored |
+- **How it's seen and edited (option D — all three):**
+  1. **Inline when saved:** "Remembered: 17 ft van · Undo" under the agent's message.
+  2. **Visible when used:** memory that shapes an answer shows in the assumption chips ("With Bindi 🐕", "Van-friendly").
+  3. **"What Pitchd knows" list** in the expanded sheet (behind the avatar): each fact shows its source ("you said, 3 Nov"), can be edited or deleted; "Forget everything" at the bottom.
+  4. **By conversation:** "I've got a 4WD now" updates the fact and shows the same note.
+- **Rejected:** settings page only (memory hidden at the moment it matters); inline only (no overview); conversation only (can't see what it knows).
+- **Why:** no setup form — "asked once, used forever"; asking before saving inferences keeps memory accurate and avoids "why does it think that?"; showing memory when used builds trust with an audience that left WikiCamp over trust; the overview and "Forget everything" make it ready for more users, not just the founder.
+- **Build note:** each fact stores value + source (stated / inferred-confirmed) + date, mirroring `CampsiteFact` provenance. Lands in roadmap phase 4 (Memory & state).
+- **Revisit if:** the "want me to remember?" prompts feel naggy in real use → batch them (at most one per conversation) or raise the evidence bar.
+
 ## 2026-11-10 — Ask or assume: assume and show; ask only when it really matters
 - **Decision:** Pitchd fills gaps with sensible defaults and shows them as editable chips. It asks **one** question (with tap answers) only when there's no sensible default **and** a wrong guess would ruin the answer.
 - **Defaults (no question):**
@@ -62,7 +81,7 @@
 - **Scope:** clearly about camping trips — sites, weather, drive times, amenities, dog rules, multi-stop trips, packing, what to know before you go. Trip-adjacent asks (coffee/servo on the way) are fine when tools cover them; general chat, bookings/payments, and anything it can't back with data get a friendly redirect.
 - **Safety first:** fire bans, closures and flood warnings are surfaced prominently, even unprompted. Emergencies → 000 and official sources; never improvised safety advice; never claims certainty about road access, water or safety.
 - **Locale:** Australian English spelling, metric units, local time zones (multi-state trips cross zones).
-- **Memory:** trip-relevant facts (dog, setup, home base, favourite regions, drive tolerance) remembered automatically, always visible and editable; nothing else without asking.
+- **Memory:** trip-relevant facts (dog, setup, home base, favourite regions, drive tolerance) remembered automatically, always visible and editable; nothing else without asking. *Detailed in the Memory entry above.*
 - **Why:** a frequent-use companion needs a voice that wears well; trust is the product; mobile, time-pressed use; focused scope makes a better, cheaper, more testable agent; outdoor safety is a real-world harm and a differentiator.
 - **Revisit if:** the founder's own use finds the voice too flat or too chatty.
 

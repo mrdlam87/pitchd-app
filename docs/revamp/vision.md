@@ -21,7 +21,7 @@ The original origin story still holds — the killer query is the same — but t
 1. **Decide, not just find.** End with a confident recommendation ("Go to X. Here's why."), not 40 pins to sift through.
 2. **Show the reasoning.** Every recommendation says why: weather, drive time, amenities, the user's own preferences.
 3. **Never invent places.** The agent may only recommend campsites that came from Pitchd's tools and data. Trust is the product — WikiCamp users left over bad data.
-4. **Remember me.** Dog, setup (car camper / caravan), favourite regions, how far I'll drive — asked once, used forever (and editable).
+4. **Remember me.** Dog, setup (car camper / caravan), favourite regions, how far I'll drive — asked once, used forever (and editable). What you say about yourself is saved automatically (with Undo); anything Pitchd works out from your behaviour is asked first; memory that shapes an answer shows in the chips; everything is listed in "What Pitchd knows". (See `decisions.md`.)
 5. **Stay with the trip.** A plan isn't finished at search time — Pitchd watches the forecast and speaks up when something changes.
 6. **Fast enough for Thursday night.** Matt plans in a short window. Something useful on screen within a couple of seconds; the full answer streams in.
 
