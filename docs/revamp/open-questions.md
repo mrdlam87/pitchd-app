@@ -2,7 +2,7 @@
 
 ## v2 rebuild (answer first — these shape everything else)
 - **A. What's wrong with v1's UI?** **Answered:** glitchy drawer; journey not well thought out or intuitive. Lessons and v2 design principles captured in `vision.md` §4.
-- **B. Brand:** ~~name~~ **kept as Pitchd.** Visual identity refresh, worked through one sub-question at a time: ~~B1 palette~~ **decided** (keep the family, coral = Pitchd only); ~~B2 dark mode~~ **decided** (follow the phone, with an override); ~~B3 sunlight contrast~~ **decided** (default light theme built for outdoors); ~~B4 weather-state colours~~ **decided** (sun-to-rain scale); B5 wordmark at icon size + app icon, B6 agent-presence mark, B7 type — still open.
+- **B. Brand:** ~~name~~ **kept as Pitchd.** Visual identity refresh, worked through one sub-question at a time: ~~B1 palette~~ **decided** (keep the family, coral = Pitchd only); ~~B2 dark mode~~ **decided** (follow the phone, with an override); ~~B3 sunlight contrast~~ **decided** (default light theme built for outdoors); ~~B4 weather-state colours~~ **decided** (sun-to-rain scale); ~~B5 wordmark at icon size + app icon~~ **decided** (coral "d" on forest; wordmark min 15 px); B6 agent-presence mark, B7 type — still open.
 - **C. Platform:** **Decided:** mobile-first web first, native later (see `decisions.md`).
 - **D. Repo & database:** **Decided:** new `pitchd-v2` repo + separate Supabase project (see `decisions.md`).
 - **E. Agent personality & scope:** **Decided:** knowledgeable local mate; camping-trip scope; safety first (see `decisions.md`).

@@ -2,6 +2,20 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Visual identity B5 · App icon: the coral "d" on forest; wordmark minimum 15 px
+- **Decision (option D):** the app icon is the wordmark's coral "d" (Lora bold, #e8674a) alone on a forest square (#2d4a2d). Sketch (all options at real sizes): https://claude.ai/artifact/9g4dXtEegZv822wQUKHavZ
+- **Why:** it's the one part of the wordmark only Pitchd has ("Pitch" + "d" = pitched); one bold glyph stays legible down to 16 px; coral means Pitchd (B1), so the icon, the send button and the agent mark (B6) all point the same way. Coral on forest is 3.0:1 — enough for a large glyph.
+- **Wordmark size rule:**
+  | Size | Use |
+  |---|---|
+  | 32 px+ | Sign-in, first-run sheet, splash — wordmark beside the icon here teaches the link |
+  | 20 px | Desktop sidebar header |
+  | **15 px minimum** | Expanded sheet header, emails |
+  | below 15 px | Use the "d" icon instead (browser tab, push notifications, "Ask Pitchd" chips) — the coral "d" becomes a speck |
+- **Build note:** PWA icon set — 180 px apple-touch-icon, 192 and 512 px, a maskable version (glyph inside the safe zone), and a favicon (16/32 px and SVG). Export the "d" as an outlined path so it doesn't depend on the font loading. v1 has no app icon or web manifest.
+- **Rejected:** A, shrunk wordmark (unreadable below ~60 px); B, "P" monogram (drops the coral; looks like many other apps); C, "Pd" pair (cramped at 16 px; kept as the fallback); E, tent pictogram (almost every camping app uses one; says nothing about the name).
+- **Revisit if:** stage 2 testers don't connect the "d" with Pitchd → switch to the "Pd" pair (C).
+
 ## 2026-11-10 — Visual identity B4 · Weather colours: one "sun to rain" scale for pins and day columns
 - **Decision (option B):** gold → blue → navy, used for both map pins and card day columns. Sketch (with colour-blind and glare views): https://claude.ai/artifact/UFQap2zw6D1grvZM6A8W8H
   | State | Light pin | Light day tint (dark text) | Dark pin | Dark day tint / text | Meaning |
@@ -232,7 +246,7 @@
 
 ## 2026-11-09 — Keep the name "Pitchd" for v2
 - **Why:** Short, memorable, the camping pun still fits an agent companion, and it's already live.
-- **Visual identity refresh — in progress (B1–B7).** B1 palette, B2 dark mode, B3 sunlight contrast and B4 weather colours decided (see their entries above). Original recommendation: keep the core palette (forest / sage / warm neutrals, coral used sparingly) but refresh — add dark mode, check sunlight contrast, give weather states distinct colours, test the wordmark at icon size, and design a small mark for the agent's presence. Define the agent's voice as part of the brand (ties to open question E).
+- **Visual identity refresh — in progress (B1–B7).** B1 palette, B2 dark mode, B3 sunlight contrast, B4 weather colours and B5 app icon decided (see their entries above). Original recommendation: keep the core palette (forest / sage / warm neutrals, coral used sparingly) but refresh — add dark mode, check sunlight contrast, give weather states distinct colours, test the wordmark at icon size, and design a small mark for the agent's presence. Define the agent's voice as part of the brand (ties to open question E).
 
 ## 2026-11-09 — All search is agent-driven; map browsing kept
 - **Decision:** Remove direct search from the UI — no filter panel, no filter state, no direct search API calls from the frontend. Every search goes through the agent (typed, spoken, or via prompt chips).
