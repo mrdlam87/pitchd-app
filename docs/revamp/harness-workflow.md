@@ -36,7 +36,7 @@ These are already decided (see `decisions.md`). H1 decides *where* each one goes
 | H4 | Subagents — `senior-engineer`, `ux-designer`, any new ones; agent memory | **Decided:** built-in Explore + five role agents + both advisers rewritten |
 | H5 | Hooks — format / lint / test for Python + TS, guard rails | **Decided:** format + lint-fix per edit, guard rails, session-start status; no test hooks; lefthook pre-commit |
 | H6 | Permissions — allow / ask / deny rules | **Decided:** committed allow / ask / deny lists; auto mode for `/harness` runs |
-| H7 | CI — checks and Claude review on PRs | **Decided:** agent / web / contract checks required; Claude review once per PR, then on request |
+| H7 | CI — checks and Claude review on PRs | **Decided:** agent / web / contract checks on every PR (not enforced — private repo on Free); Claude review once per PR, then on request |
 | H8 | Tool tests and eval runs — where they fit | **Decided:** four tiers — tool tests + fake-model loop tests every PR; smoke eval for `evals` work; full eval before model/prompt changes merge |
 | H9 | Setup order — what gets created in `pitchd-v2` before the first line of code | **Decided:** core harness by hand, dry-run issue, `/eval` at P1, deploys at P3 |
 
@@ -210,7 +210,8 @@ These are already decided (see `decisions.md`). H1 decides *where* each one goes
   | **agent** | `agent/` changes | `uv sync`; ruff lint + format check; pyright; pytest against a PostGIS service container; migration round trip (upgrade → downgrade → upgrade); `alembic check` — fails if models changed without a migration |
   | **web** | `web/` changes | `npm ci`; ESLint + Prettier check; `tsc --noEmit`; vitest; `next build` |
   | **contract** | Either changes | Generate the OpenAPI spec, regenerate the TS types, fail if they differ from what's committed — `agent/` and `web/` can't drift (Q12) |
-  - Branch protection on `main` requires all three. Deploy workflows (Cloud Run via Workload Identity, Q11) are added at P3.
+  - ~~Branch protection on `main` requires all three.~~ **Amended — private repo on GitHub Free (option A):** `pitchd-v2` is private and the founder is on GitHub Free, which has no branch protection or rulesets for private repos. The checks and the Claude review still run on every PR (Actions works on Free, 2,000 minutes a month — plenty), but GitHub won't block merging a red PR. Guards instead: H6's deny rules (Claude can't push to `main` or merge); a lefthook **pre-push** hook that blocks pushing to `main` from the founder's machine too; the founder merges only on green. **Move to GitHub Pro (~US$4/month) for real branch protection if a second person contributes, or a red PR ever gets merged by mistake.** Rejected: Pro now (small cost for a gap only the founder can hit); public repo (decisions, costs, plans and prompts all public).
+  - Deploy workflows (Cloud Run via Workload Identity, Q11) are added at P3.
 - **Claude review (option B):** runs once when a PR is opened or marked ready; again only on `@claude review` or a `re-review` label (the triager adds it if a fix round turns out large). Advisory, not a required check — the founder is the merge gate.
 - **Review prompt:**
   1. Read the root `CLAUDE.md` plus `agent/` or `web/` `CLAUDE.md`, then the PR's `planning/<id>/plan.md` and `review.md`.
@@ -246,7 +247,7 @@ These are already decided (see `decisions.md`). H1 decides *where* each one goes
   |---|---|---|---|
   | 0 | Create the `pitchd-v2` repo, the Supabase project (Sydney) and the GitHub secret for Claude review | Founder | Pre-code checklist |
   | 1 | Move `docs/revamp/` into `pitchd-v2/docs/` (this doc included); freeze v1 | Session | Pre-code checklist |
-  | 2 | **Core harness, by hand:** `agent/`, `web/`, `planning/` layout; the three `CLAUDE.md` files (H1); `.claude/settings.json` with permissions (H6), hooks (H5), Superpowers pinned + Figma; lefthook; five role agents + two rewritten advisers (H4); `/harness` and `/decide` skills + shared checklist files (H3); `docker compose` Postgres + PostGIS; CI checks + review workflows (H7); branch protection | Local session, using `writing-skills` / `skill-creator` | No product code |
+  | 2 | **Core harness, by hand:** `agent/`, `web/`, `planning/` layout; the three `CLAUDE.md` files (H1); `.claude/settings.json` with permissions (H6), hooks (H5), Superpowers pinned + Figma; lefthook; five role agents + two rewritten advisers (H4); `/harness` and `/decide` skills + shared checklist files (H3); `docker compose` Postgres + PostGIS; CI checks + review workflows (H7); lefthook pre-push guard for `main` (no branch protection on Free) | Local session, using `writing-skills` / `skill-creator` | No product code |
   | 3 | **Check the open points:** must `code-review` run from the main session? Can agent files preload skills? Does Superpowers' session-start nudge override `/harness`? Is auto mode available? Does the bash sandbox work with Docker and `--host`? | Session | Each answer goes back into its H entry |
   | 4 | **Dry run:** a tiny issue through all 12 steps — e.g. "agent/ health endpoint + first Alembic migration enabling PostGIS" (exercises `check first`, CI, review, PR) | `/harness` | Fix the harness from what goes wrong, then start real work |
   | 5 | At P1 (first eval cases): `/eval` + eval-runner tiers 3–4 | `/harness` | Tiers 1–2 run in CI from step 2 |

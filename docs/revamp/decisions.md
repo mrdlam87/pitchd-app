@@ -2,6 +2,11 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Harness H7 amendment · `pitchd-v2` is private on GitHub Free: checks run, merges not enforced
+- **Decision (option A):** private repo on GitHub Free, which has no branch protection for private repos. CI checks and the Claude review still run on every PR; GitHub just won't block a red merge. Guards: H6's deny rules (Claude can't push to `main` or merge), a lefthook pre-push hook blocking pushes to `main` locally, and the founder merges only on green.
+- **Rejected:** GitHub Pro now (~US$4/month for a gap only the founder can hit); public repo (decisions, costs, plans and prompts public).
+- **Revisit if:** a second person contributes, or a red PR gets merged by mistake → GitHub Pro + branch protection.
+
 ## 2026-11-10 — Harness H9 · Setup order: core by hand, a dry run, the rest when a phase needs it
 - **Decision (option B, with C's dry run):** founder creates `pitchd-v2`, the Sydney Supabase project and the review secret; docs move and v1 freezes; one local session builds the core harness by hand (layout, three `CLAUDE.md` files, settings with permissions + hooks + pinned Superpowers, lefthook, agents, `/harness` + `/decide`, docker compose PostGIS, CI + review, branch protection); the open points from H3–H6 are checked; a tiny dry-run issue goes through all 12 steps and the harness is fixed from it. `/eval` comes at P1, deploy workflows at P3, the cloud setup script last.
 - **Rejected:** everything up front; bootstrapping with a half-built harness; copying v1's setup.
