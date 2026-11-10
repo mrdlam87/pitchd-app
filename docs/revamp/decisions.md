@@ -2,6 +2,18 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Campsite availability: know, link, warn — no availability claims
+- **Decision (option B):** Pitchd knows whether a site needs booking, gives a one-tap "Check & book" link, warns in busy periods and offers a backup. It never claims a site is available unless it actually checked.
+  - **Data:** the data agent adds sourced booking facts like any other `CampsiteFact`: `booking` (required / first_come / unknown), `booking_url` + provider (NSW Parks, Parks Vic, Hipcamp, park's own site), and `fee`.
+  - **Cards:** one line — "Book ahead · NSW Parks ↗" / "First come, first served" / "Booking unknown — check before you go". The link opens the official booking page (dates pre-filled where the site allows). Pitchd never handles bookings or payments (keeps E's scope).
+  - **Agent wording:** "Bookable, but I can't see availability — tap to check before you lock it in."
+  - **Busy periods:** public holidays, school holidays (by state) and long weekends, from a small calendar table in code. In a busy period the agent says so ("It's the long weekend — book now") and automatically includes one first-come backup.
+  - **Commit:** saving a trip on a booking-required site adds a "Booked?" tick; until ticked, the home-sheet trip card shows "Not booked yet".
+- **Later:** live availability checks (option C) as a spike — NSW parks first, only after a terms-of-use check; only for the top 2–3 picks, only when asked ("is it free?") or on save; always timestamped ("Free Sat–Sun, checked 8:40 pm"); on failure fall back to B, never guess. Partner APIs (D) only at scale.
+- **Rejected:** website link only (you find out it's booked out after deciding); live checks now (fragile pages, unchecked terms, slower answers, too big too early); partner APIs now (need commercial agreements).
+- **Why:** solves most of the real problem — know whether to book, book in one tap, have a backup when it's busy — at almost no cost; keeps "honest about uncertainty"; fits the data agent's provenance model; leaves a clear path to real checks.
+- **Revisit if:** the founder's trips keep hitting booked-out picks despite the link and warnings → bring the live-check spike forward.
+
 ## 2026-11-10 — Voice: dictation into the input box now; full voice mode with native
 - **Decision (option B):** a mic button in the input uses the browser's speech recognition; the words appear in the input box, the user checks and taps send. Auto-send after a pause can be tested later.
   - **Fallback:** where the browser has no speech recognition (patchy on iPhone, especially as a Home Screen app), hide the mic and rely on the keyboard's dictation key.
