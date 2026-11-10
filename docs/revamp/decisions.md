@@ -2,6 +2,20 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Agent hosting (Q11): Cloud Run in Sydney, Supabase in Sydney
+- **Decision:** the Python agent service runs on Google Cloud Run in `australia-southeast1` (Sydney). v2's Supabase project is created in `ap-southeast-2` (Sydney); Vercel functions are pinned to `syd1`.
+  - **Planner:** a Cloud Run service (FastAPI). Request timeout raised well above the 5-min default (60 min max) to cover phase 5b's longer runs.
+  - **Background work:** the data agent and weather watch run as **Cloud Run Jobs** triggered by **Cloud Scheduler** — same container image, different entry points. If Q14 moves scheduled work to Managed Agents, the Jobs just aren't used.
+  - **No work after the response:** CPU is only allocated during requests by default, so anything slow or deferred goes to a Job, never a background task in the service.
+  - **Resumable streams:** agent events are written to Postgres with IDs (already planned), so a reconnect that lands on a different instance resumes correctly.
+  - **Cold starts vs the ~2 s first-pins target:** stage 1 scales to zero and the web app sends a warm-up ping on open (the service is awake by the time you've typed); from stage 2, one minimum instance + startup CPU boost.
+  - **Auth between web and service** (left open in Q12): the browser streams **directly** from the agent service, not through Vercel (proxying would burn serverless time on long streams). A Next.js route turns the Auth.js session into a short-lived signed token (~10 min, refreshed) carrying user ID + role; the service verifies it with a public key, so only Next.js holds the private key. Needs a custom API domain and CORS limited to the web app's origin.
+  - **Ops:** secrets in Secret Manager; deploys from GitHub Actions with Workload Identity Federation (no stored keys); a billing budget alert from day one; confirm Sydney pricing for a minimum instance on the live calculator before stage 2.
+  - **Portability:** a plain `Dockerfile` with config in environment variables — it runs on Fly.io unchanged if Google Cloud gets in the way.
+- **Rejected:** Fly.io (close second — simpler setup and no cold starts, but a patchier reliability record, more to manage yourself, and basic scheduling); Railway and Render (no Australian region — every database query in a turn would cross to Singapore and back).
+- **Why:** same city as the database, which matters because one turn makes many queries; one platform fits both the interactive planner and the batch/scheduled agents; long timeouts suit agent turns; costs close to nothing at one user and scales without code changes; no lock-in.
+- **Revisit if:** cold starts still hurt with the warm-up ping, or Google Cloud setup and permissions eat more time than the learning is worth → move the same container to Fly.io `syd`.
+
 ## 2026-11-10 — Python data layer (Q12): Python owns the schema; the web app reads through the agent API
 - **Decision (option B):** the Python service owns v2's schema and migrations, and is the only thing that talks to the database.
   - **Schema + migrations:** SQLAlchemy 2.0 models and Alembic migrations in `agent/`. Alembic autogenerates from model changes; every migration is reviewed and committed with the code that needs it.

@@ -64,5 +64,5 @@ CampsiteUpdateProposal
 
 ## 7. Where it runs
 
-- Offline / scheduled — no latency pressure. Candidates: Message Batches API for bulk extraction, Managed Agents scheduled runs, or a simple cron job calling the Python service.
+- Offline / scheduled — no latency pressure. Host decided (Q11): a **Cloud Run Job** on Cloud Scheduler, from the same image as the planner. Still open: Message Batches API for bulk extraction, and whether Managed Agents takes the scheduled runs (Q14).
 - Independent of the v2 UI — improves data for v1 too, so it can start immediately.

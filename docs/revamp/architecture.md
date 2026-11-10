@@ -6,8 +6,8 @@
 
 ```
  ┌───────────────────────────┐  stream (SSE) + read API   ┌──────────────────────────────┐
- │ Next.js (Vercel)          │ ◄────────────────────────► │ Python agent service         │
- │ - Auth (Google OAuth, JWT)│  user msg / agent events;  │ (FastAPI)                    │
+ │ Next.js (Vercel, syd1)    │ ◄────────────────────────► │ Python agent service         │
+ │ - Auth (Google OAuth, JWT)│  user msg / agent events;  │ (FastAPI, Cloud Run Sydney)  │
  │ - Map + conversation UI   │  pins, trips, memory reads │ - Agent loop (Anthropic SDK) │
  │ - Renders structured cards│                            │ - Tools (Python functions)   │
  │ - No database access      │                            │ - Prompts, evals             │
@@ -16,14 +16,14 @@
                                                     SQLAlchemy   │          │        │
                                                     (psycopg 3)  ▼          ▼        ▼
  ┌───────────────────────────────────────────────────────────────────┐  Open-Meteo  Routing /
- │ Supabase Postgres + PostGIS (v2's own project)                    │  (weather)   geocode
+ │ Supabase Postgres + PostGIS (v2's own project, Sydney)            │  (weather)   geocode
  │ campsites, amenities, facts, proposals, users, trips, stops,      │              (Mapbox)
  │ preferences, conversations, tool/agent logs                       │
  └───────────────────────────────────────────────────────────────────┘
 ```
 
 - **Frontend** stays Next.js on Vercel. It owns sign-in and the UI. It has no database access: it calls the agent service with the user's identity for conversations *and* for plain reads (map pins, site details, saved trips, memory) — the same API a native app will use. TS types are generated from the service's OpenAPI spec.
-- **Agent service** is a separate Python service, because agent turns can run for tens of seconds — a poor fit for serverless function limits. Candidate hosts: Fly.io, Railway, Render, Cloud Run.
+- **Agent service** is a separate Python service, because agent turns can run for tens of seconds — a poor fit for serverless function limits. **Hosted on Cloud Run in Sydney** (`australia-southeast1`), next to the Sydney Supabase project; the data agent and weather watch run as Cloud Run Jobs on Cloud Scheduler from the same image. The browser streams from it directly with a short-lived token minted by Next.js (see the Q11 entry in `decisions.md`).
 - **Database** is v2's own Supabase project (decision D) with PostGIS. The Python service owns the schema — SQLAlchemy 2.0 models + Alembic migrations in `agent/` — and is the only reader and writer. Plain SQL via SQLAlchemy Core where it earns it (geo queries). See the Q12 entry in `decisions.md` for auth flow and Supabase connection gotchas.
 
 ## Agent
