@@ -2,6 +2,12 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Harness H8 · Tool tests and evals: four tiers
+- **Decision (option C):** (1) tool tests with recorded API responses and (2) agent-loop tests with a scripted fake model run on every PR, free; (3) a ~5-query smoke eval (~US$1) runs locally at `/harness` step 9 for `evals`-labelled work; (4) the full 20–50 query eval + data-agent accuracy (~US$10–25 per setup) runs via `/eval full`, required before any model or prompt config change merges and at model releases. Deterministic checks first, Opus grader second; reports quality, cost per trip and time to first pins vs a committed `agent/evals/baseline.json`. US$30 cap per eval run. Detail in `harness-workflow.md`.
+- **Rejected:** full evals on every PR; evals only by hand; nightly full evals.
+- **Why:** free tests guard every change; real-model runs happen where model behaviour can change.
+- **Revisit if:** data changes shift answers between model changes → weekly smoke eval.
+
 ## 2026-11-10 — Harness H7 · CI: three required checks; Claude review once, then on request
 - **Decision (option B for review):** required `agent` (ruff, pyright, pytest on PostGIS, migration round trip, `alembic check`), `web` (ESLint, Prettier, `tsc`, vitest, build) and `contract` (regenerated OpenAPI types must match) checks; deploy workflows at P3. Claude review (Opus) runs once on open/ready and again only on `@claude review` or a `re-review` label; it reads the `CLAUDE.md` files, `plan.md` and `review.md`, checks against the plan and a Pitchd checklist, doesn't repeat `review.md`, never approves. `claude.yml` kept. Detail in `harness-workflow.md`.
 - **Rejected:** review on every push (v1); on every code-changing push; no CI review.

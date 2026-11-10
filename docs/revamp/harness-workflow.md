@@ -37,7 +37,7 @@ These are already decided (see `decisions.md`). H1 decides *where* each one goes
 | H5 | Hooks — format / lint / test for Python + TS, guard rails | **Decided:** format + lint-fix per edit, guard rails, session-start status; no test hooks; lefthook pre-commit |
 | H6 | Permissions — allow / ask / deny rules | **Decided:** committed allow / ask / deny lists; auto mode for `/harness` runs |
 | H7 | CI — checks and Claude review on PRs | **Decided:** agent / web / contract checks required; Claude review once per PR, then on request |
-| H8 | Tool tests and eval runs — where they fit | Open |
+| H8 | Tool tests and eval runs — where they fit | **Decided:** four tiers — tool tests + fake-model loop tests every PR; smoke eval for `evals` work; full eval before model/prompt changes merge |
 | H9 | Setup order — what gets created in `pitchd-v2` before the first line of code | Open |
 
 <!-- Decisions are filled in below as they're made. -->
@@ -223,3 +223,19 @@ These are already decided (see `decisions.md`). H1 decides *where* each one goes
 - **Rejected:** A, review on every push (v1 — fix rounds re-reviewed, repeat findings); C, every code-changing push (fix rounds still re-trigger); D, no CI review (loses the independent check and GitHub record).
 - **Why:** checks keep both stacks and their contract honest on every push; one independent review per PR is enough once local review has done the heavy work.
 - **Revisit if:** problems keep reaching `main` that a later re-review would have caught → switch to C.
+
+### H8 — Tool tests and evals: four tiers (decided 2026-11-10)
+- **Decision (option C):**
+  | Tier | What | When | Where | Cost |
+  |---|---|---|---|---|
+  | **1. Tool tests** | Each tool against the test DB; Open-Meteo / Mapbox replayed from recorded responses, never live; strict tool schemas checked; scoring and alert thresholds (TDD, H3b) | Every PR | CI `agent` job + verify (step 6) | Free |
+  | **2. Loop tests with a scripted fake model** | Agent-loop mechanics: cost-cap wrap-up (Q17), refusal handling + `stop_reason` checks (Q13), tool-call limits, invented site IDs rejected, resumable event stream | Every PR | Same | Free |
+  | **3. Smoke eval** | ~5 real queries; deterministic checks + grader; compared with the baseline | `/harness` step 9 when labelled `evals` (prompts, tool descriptions or schemas, model config, scoring) | Local, founder's API key | ~US$1 |
+  | **4. Full eval** | The 20–50 query set (Matt's weekend asks, Sarah's multi-day trips, ask-or-assume cases, misheard place names) + data-agent accuracy on the D2 reviewed sites | `/eval full` by hand; **required before merging any model or prompt config change** and at each model release | Local; also a manual GitHub workflow for cloud use | ~US$10–25 per setup |
+- **Grading:** deterministic checks first (site IDs real, constraints met — dogs, drive limit, weather — asked only when the ask-or-assume rules say so), then the Opus grader (Q13) for quality and voice. Every run reports quality, cost per trip and time to first pins against the baseline.
+- **Layout in `pitchd-v2`:** `agent/evals/cases/` (query files — new cases from real logs, every bug found, and Sarah's queries from the start); `agent/evals/baseline.json` (last accepted scores, committed; an accepted full run updates it in the same PR); raw run logs in an ignored folder or CI artifacts, never committed.
+- **Spend guard:** `/eval` caps a run at US$30 — stops and reports if exceeded (same idea as Q17).
+- **Before phase 5:** tiers 3–4 start with the first hand-written cases in phase 1 (logging from day one); the D1 pilot's hand reviews become the data agent's first set.
+- **Rejected:** A, full evals on every PR (~US$10–25 per push); B, evals only by hand (model and prompt changes merge unmeasured); D, a nightly full eval (~US$300–700 a month for little gain at one user).
+- **Why:** free tests guard every change; real-model runs happen exactly where model behaviour can change, so the phase 5 model choice and every later switch are made from evidence.
+- **Revisit if:** data changes start shifting answers between model changes → add a weekly smoke eval; or the full set outgrows the run cap → split it by persona.
