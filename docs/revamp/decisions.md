@@ -2,6 +2,12 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Harness H7 · CI: three required checks; Claude review once, then on request
+- **Decision (option B for review):** required `agent` (ruff, pyright, pytest on PostGIS, migration round trip, `alembic check`), `web` (ESLint, Prettier, `tsc`, vitest, build) and `contract` (regenerated OpenAPI types must match) checks; deploy workflows at P3. Claude review (Opus) runs once on open/ready and again only on `@claude review` or a `re-review` label; it reads the `CLAUDE.md` files, `plan.md` and `review.md`, checks against the plan and a Pitchd checklist, doesn't repeat `review.md`, never approves. `claude.yml` kept. Detail in `harness-workflow.md`.
+- **Rejected:** review on every push (v1); on every code-changing push; no CI review.
+- **Why:** checks keep both stacks and their contract honest; one independent review per PR is enough after local review.
+- **Revisit if:** problems reach `main` that a later re-review would have caught.
+
 ## 2026-11-10 — Harness H6 · Permissions: committed allow / ask / deny lists, auto mode for `/harness`
 - **Decision (option C):** allow checks, local DB work, git (incl. pushing non-main branches) and `gh` issue/PR create; ask for new dependencies, `rm -rf`, fetches outside the allowlist and `.claude/` edits; deny secrets, force pushes, pushes to `main`, `gh pr merge`, `sudo`, deploys and Secret Manager (CI only), and Supabase DB commands. Auto mode during `/harness` runs; B (same lists, default mode) if auto mode isn't available. Bash sandbox checked at H9. Lists in `harness-workflow.md`.
 - **Rejected:** ask for everything; bypass in a dev container.

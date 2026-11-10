@@ -1,6 +1,7 @@
 # Harness Workflow — How v2 Is Built with Claude Code
 
 > First item on the pre-code checklist in `open-questions.md`. This is about the **Claude Code development workflow** for `pitchd-v2`: how the code gets written, checked and reviewed. It is *not* about the Pitchd agent's own harness (its tool loop and prompts), which is covered in `architecture.md`.
+> **Applies to the new `pitchd-v2` repo** (decision D) — nothing here changes `pitchd-app`, whose `.claude/` setup and workflows stay as they are while v1 is frozen. This doc moves to `pitchd-v2/docs/` with the rest of `docs/revamp/`.
 > Status: in progress, one decision at a time (H1–H9). Each decision is recorded here and in `decisions.md` once approved.
 
 ## What carries over from v1 (`pitchd-app`)
@@ -35,7 +36,7 @@ These are already decided (see `decisions.md`). H1 decides *where* each one goes
 | H4 | Subagents — `senior-engineer`, `ux-designer`, any new ones; agent memory | **Decided:** built-in Explore + five role agents + both advisers rewritten |
 | H5 | Hooks — format / lint / test for Python + TS, guard rails | **Decided:** format + lint-fix per edit, guard rails, session-start status; no test hooks; lefthook pre-commit |
 | H6 | Permissions — allow / ask / deny rules | **Decided:** committed allow / ask / deny lists; auto mode for `/harness` runs |
-| H7 | CI — checks and Claude review on PRs | Open |
+| H7 | CI — checks and Claude review on PRs | **Decided:** agent / web / contract checks required; Claude review once per PR, then on request |
 | H8 | Tool tests and eval runs — where they fit | Open |
 | H9 | Setup order — what gets created in `pitchd-v2` before the first line of code | Open |
 
@@ -201,3 +202,24 @@ These are already decided (see `decisions.md`). H1 decides *where* each one goes
 - **Rejected:** A, ask for everything (stalls `/harness` whenever the founder is away); D, bypass inside a dev container (Docker-in-Docker for Postgres, awkward phone testing, gives up H2's local benefits). B kept as the fallback.
 - **Why:** `/harness` keeps moving over Remote Control; the dangerous actions — secrets, force pushes, merges, deploys, the live DB — are blocked whatever the mode.
 - **Revisit if:** prompts still interrupt often → run `fewer-permission-prompts` and widen the allow list; or auto mode lets through something it shouldn't → add it to deny.
+
+### H7 — CI: three required checks; Claude review once, then on request (decided 2026-11-10)
+- **Checks** (GitHub Actions, path-filtered, actions pinned by commit SHA):
+  | Job | Runs when | What |
+  |---|---|---|
+  | **agent** | `agent/` changes | `uv sync`; ruff lint + format check; pyright; pytest against a PostGIS service container; migration round trip (upgrade → downgrade → upgrade); `alembic check` — fails if models changed without a migration |
+  | **web** | `web/` changes | `npm ci`; ESLint + Prettier check; `tsc --noEmit`; vitest; `next build` |
+  | **contract** | Either changes | Generate the OpenAPI spec, regenerate the TS types, fail if they differ from what's committed — `agent/` and `web/` can't drift (Q12) |
+  - Branch protection on `main` requires all three. Deploy workflows (Cloud Run via Workload Identity, Q11) are added at P3.
+- **Claude review (option B):** runs once when a PR is opened or marked ready; again only on `@claude review` or a `re-review` label (the triager adds it if a fix round turns out large). Advisory, not a required check — the founder is the merge gate.
+- **Review prompt:**
+  1. Read the root `CLAUDE.md` plus `agent/` or `web/` `CLAUDE.md`, then the PR's `planning/<id>/plan.md` and `review.md`.
+  2. Check the PR against the plan and acceptance criteria, not just the diff.
+  3. Pitchd checklist: no DB access in `web/`; site IDs validated from tool results; model + effort from config (Q13); cost cap respected (Q17); untrusted input kept out of instructions; migration present and reviewed; timeouts on external calls; colour tokens, not hex; unhappy-path tests.
+  4. Don't repeat anything in `review.md` — look for what it missed.
+  5. `[blocking]` / `[suggestion]` inline comments plus a short summary; never approve or request changes.
+  6. Model: Opus, matching the local reviewer (H4).
+- **Kept from v1:** `claude.yml` for `@claude` mentions on issues and PRs (handy from the phone).
+- **Rejected:** A, review on every push (v1 — fix rounds re-reviewed, repeat findings); C, every code-changing push (fix rounds still re-trigger); D, no CI review (loses the independent check and GitHub record).
+- **Why:** checks keep both stacks and their contract honest on every push; one independent review per PR is enough once local review has done the heavy work.
+- **Revisit if:** problems keep reaching `main` that a later re-review would have caught → switch to C.
