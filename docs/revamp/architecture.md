@@ -49,7 +49,7 @@
 
 ## Data agent (background)
 
-A second agent runs offline to enrich, verify and dedupe campsite data — see `data-agent.md`. It writes to a review queue (`CampsiteUpdateProposal`) and a provenance table (`CampsiteFact`), never straight to live records. The planner reads `CampsiteFact` so it can cite sources and freshness ("Dogs allowed — Parks NSW, checked 3 weeks ago"). It shares the Python codebase and tools with the planner but runs on a schedule / batch, not behind the user-facing API.
+A second agent runs offline to enrich, verify and dedupe campsite data — see `data-agent.md`. It writes to a review queue (`CampsiteUpdateProposal`) and a provenance table (`CampsiteFact`), never straight to live records. The planner reads `CampsiteFact` so it can cite sources and freshness ("Dogs allowed — Parks NSW, checked 3 weeks ago") when the ask depends on it. The read API returns a display state per fact (`confirmed` | `unconfirmed` | `warning` | `camper_note`) so every client renders it the same way (Q23). It shares the Python codebase and tools with the planner but runs on a schedule / batch, not behind the user-facing API.
 
 ## Scaling considerations (design now, build later)
 

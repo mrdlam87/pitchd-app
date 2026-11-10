@@ -2,6 +2,19 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Display of freshness & confidence (Q23): quiet unless it matters
+- **Decision (option C):**
+  1. **Checked facts look plain.** An `official` or `council` fact at high/medium confidence, checked within 12 months, shows with no label ("Dogs: no").
+  2. **Shaky facts say "unconfirmed" in words** — OSM or `agent_inferred` sources, low confidence, or older than 12 months. Muted text; never coral (B1) or weather colours (B4).
+  3. **Warnings come first:** "closed", "no water", "road impassable" (official, or cautious camper reports per Q19/Q22) as one line at the top of the card, with an icon and words.
+  4. **Camper notes get one dated line** ("Showers broken — camper note, 3 days ago") and disappear when they expire.
+  5. **Tap a fact for its source.** Site detail has a "Sources" section: each fact with source, checked date and link — this is also the attribution Q21 requires.
+  6. **The planner mentions freshness only when the ask depends on it** ("Dogs allowed — NSW Parks, checked 3 weeks ago" / "the dogs rule is unconfirmed, check before you go"), never for every fact.
+  - The "unconfirmed" rule lives in the service (one function), and the read API returns a display state per fact (`confirmed` | `unconfirmed` | `warning` | `camper_note`) so web and native render the same thing.
+- **Rejected:** A — label every fact (clutter, poor in sun); B — nothing on cards (a guess looks like a checked fact); D — one site-level trust badge (hides which fact is shaky).
+- **Why:** most facts are fine and stay quiet; detail appears only where it should change what you do, and the full source is one tap away.
+- **Revisit if:** testers miss "unconfirmed" labels on facts they relied on, or so many facts are unconfirmed that the label becomes noise (fix the data first, then the 12-month window).
+
 ## 2026-11-10 — User reports (Q22): camper notes now, facts change only after a check
 - **Decision (option C):**
   1. **A report never changes a fact by itself.** Facts change only via an official-source re-check by the data agent or a human review.
