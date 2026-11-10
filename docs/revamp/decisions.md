@@ -2,6 +2,18 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Auto-approve threshold (Q19): earn trust per kind of fact
+- **Decision (option C):**
+  1. **No-change re-checks apply straight away.** A re-check that finds the same value only updates `checkedAt` — not a change, no review. This is most of the volume after the first pass.
+  2. **Pilot: every real change is human-reviewed.** That review is needed anyway to measure the ≥ 90% target, and each verdict is recorded (it is the first eval set).
+  3. **After the pilot, auto-approve is switched on per fact key** (`toilets`, `dogs_allowed`, …) once the agent's proposals for that key have matched the reviewer ≥ 95% over ≥ 30 reviews — and even then only for `official` sources at `high` confidence.
+  4. **Cautious changes apply at once and are flagged.** An official source saying "closed" or "no dogs" goes live immediately (shown to users) and still lands in the queue for a look. Wrongly cautious costs a different campsite; wrongly permissive sends someone to a closed site or a fine.
+  5. **Spot checks:** ~1 in 20 auto-approved changes is sent to the queue at random. If a key's agreement drops below 95%, its auto-approve switches off automatically.
+  - Rules live in code (a small per-key trust table: reviews, agreements, enabled), never in the prompt. The model never decides whether its own proposal is approved.
+- **Rejected:** A — review everything (≈1,000 items for the pilot, doesn't scale); B — official + high confidence from day one (trusts extraction before it's measured); D — the model decides (it would approve its own work; breaks data-agent rule 6).
+- **Why:** as safe as A during the pilot at no extra cost, as cheap as B once trust is earned, and trust is evidence-based per fact.
+- **Revisit if:** the review queue is still too big after the pilot (lower the 30-review bar or widen to council sources), or spot checks keep catching errors on an enabled key.
+
 ## 2026-11-10 — Models (Q13): Sonnet planner + Haiku sub-tasks to start; phase 5 evals pick; cheap to switch
 - **Decision (option B) — starting roles:**
   | Job | Model | Effort |

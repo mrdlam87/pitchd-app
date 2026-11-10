@@ -26,7 +26,7 @@ The work is slow, repetitive, and needs judgement (reading park websites, reconc
 
 ## 4. Design rules
 
-1. **Propose, don't overwrite.** Agents write to a review queue, never straight to live records. Auto-approve only high-confidence changes from official sources; everything else is human-reviewed.
+1. **Propose, don't overwrite.** Agents write to a review queue, never straight to live records. Auto-approve is earned per fact key (Q19): no-change re-checks just update `checkedAt`; the pilot reviews every change; after it, a key auto-approves official + high-confidence changes once it has ≥ 95% agreement over ≥ 30 reviews; cautious changes (closed, no dogs) apply at once and are flagged; ~1 in 20 auto-approvals is spot-checked, and a key drops back to review if agreement falls.
 2. **Every fact has provenance.** Store value + source URL + source type + checked date + confidence, e.g. *dogs: no — nationalparks.nsw.gov.au — 2026-11-09 — high*. The planner can then say "verified last month" or "unverified, check before you go".
 3. **Source priority:** park authority > council / official tourism > OSM > user reports. Encoded in code, not left to the model.
 4. **Refresh by priority, not all at once.** Re-verify most-viewed, soonest-booked (saved trips), and oldest-checked records first.
@@ -52,6 +52,13 @@ CampsiteUpdateProposal
   status       Enum      // pending | approved | rejected | auto_approved
   createdBy    String    // agent run id
   reviewedAt   DateTime?
+  verdict      Enum?     // correct | wrong — reviewer's call, feeds the trust table
+
+FactKeyTrust            // per fact key; rules in code (Q19)
+  key          String
+  reviews      Int
+  agreements   Int
+  autoApprove  Boolean
 ```
 
 ## 6. Pilot (first agent to build)

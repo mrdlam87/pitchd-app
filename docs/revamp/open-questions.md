@@ -38,7 +38,7 @@
 16. ~~What happens to the current `/api/search` pipeline?~~ **Resolved:** becomes the agent's `search_campsites` tool (see `decisions.md`).
 
 ## Data agent
-19. **Auto-approve threshold:** which changes can skip human review (e.g. high-confidence, official source only)?
+19. ~~**Auto-approve threshold**~~ **Decided:** no-change re-checks apply; pilot reviews everything; then auto-approve per fact key once ≥ 95% agreement over ≥ 30 reviews (official + high only); cautious changes apply at once and are flagged; 1-in-20 spot checks (see `decisions.md`).
 20. **Review UI:** a simple admin page, a CLI, or a spreadsheet export for reviewing proposals?
 21. **Source access:** do park authority sites allow automated access? Check terms; prefer official open-data feeds (e.g. data.gov.au) where they exist.
 22. **User reports:** how are they weighed — and how many reports before a fact changes?

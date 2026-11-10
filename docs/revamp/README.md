@@ -19,6 +19,6 @@
 
 ## Next session — start here
 1. Read every file in `docs/revamp/` (start with `decisions.md` and `open-questions.md`).
-2. **Next up:** the Data agent questions (19–23) in `open-questions.md`. Technical and Scaling & cost are decided. All Product & UX and visual identity questions are decided; sketches are linked from their `decisions.md` entries.
+2. **Next up:** the Data agent questions (20–23) in `open-questions.md` (Q19 decided). Technical and Scaling & cost are decided. All Product & UX and visual identity questions are decided; sketches are linked from their `decisions.md` entries.
 3. Format the founder likes: one question at a time, options table, clear recommendation + why, record on approval, commit and push after each.
 4. Remember the pre-code checklist in `open-questions.md` — the Claude Code development workflow must be set up in `pitchd-v2` before any code.
