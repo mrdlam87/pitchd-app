@@ -34,7 +34,7 @@
 12. ~~**Python data layer**~~ **Decided:** Python owns the schema (SQLAlchemy 2.0 + Alembic, PostGIS); the web app has no database access and reads through the agent service's API (see `decisions.md`).
 13. **Models:** which models for planning vs sub-tasks — decide with evals in phase 5. `CLAUDE.md` currently says Haiku for MVP; revisit for the agent.
 14. **Managed Agents:** use for the weather-watch / scheduled work, or self-host everything?
-15. **Routing data:** drive times — Mapbox Directions cost at scale?
+15. ~~**Routing data**~~ **Decided:** straight-line estimate in PostGIS, Mapbox Matrix only for the ~10 sites shown; own-data geocoding first; self-host a router if Mapbox passes ~US$50/month (see `decisions.md`). *Confirm Mapbox prices and terms before the build.*
 16. ~~What happens to the current `/api/search` pipeline?~~ **Resolved:** becomes the agent's `search_campsites` tool (see `decisions.md`).
 
 ## Data agent
@@ -45,5 +45,5 @@
 23. **Display:** how does the UI show freshness/confidence without clutter?
 
 ## Scaling & cost
-17. Budget per planned trip — what's acceptable?
+17. ~~Budget per planned trip~~ **Decided:** ≤ US$0.30 per trip (median), hard cap US$1.50 per conversation, per-user caps from stage 2 (see `decisions.md`).
 18. ~~When does the beta open?~~ **Resolved:** see G.

@@ -35,8 +35,8 @@
   | `search_campsites` | Area/radius + filters (dogs, amenities, setup) → candidate sites from DB |
   | `get_forecast` | Multi-day forecast for a set of points (batched, cached) |
   | `find_amenities` | Dump points, water, toilets, fuel near a point or along a route |
-  | `geocode` | Place name → coordinates |
-  | `drive_time` | Origin → destinations travel time |
+  | `geocode` | Place name → coordinates — own data first (DB + Geoscience Australia gazetteer, fuzzy match), Mapbox fallback, not stored |
+  | `drive_time` | Origin → destinations travel time — PostGIS estimate for ranking, Mapbox Matrix for the ~10 shown; provider behind an interface |
   | `get_user_profile` / `update_preferences` | Remembered setup, dog, favourite regions |
   | `save_trip` | Commit a plan — a trip is an ordered list of stops (a weekend trip is one stop) |
   | `plan_route` *(phase 5b)* | Route geometry between stops; split into days by drive limit |
@@ -54,8 +54,8 @@ A second agent runs offline to enrich, verify and dedupe campsite data — see `
 ## Scaling considerations (design now, build later)
 
 - **Stateless service** — conversation and trip state live in Postgres, so the service can scale horizontally.
-- **Cost controls** — prompt caching on system prompt + tools, cap tool calls per turn, cheaper models for sub-tasks, per-user cost tracking from API usage.
-- **Latency** — stream everything, run independent tool calls in parallel, cache forecasts (~1 h) and geocodes.
+- **Cost controls** — target ≤ US$0.30 per planned trip; hard cap US$1.50 per conversation (graceful wrap-up); per-user caps from stage 2 (~US$1/day, ~US$10/month); prompt caching on system prompt + tools, cap tool calls per turn, cheaper models for sub-tasks, per-user cost tracking from API usage (see Q15/Q17 in `decisions.md`).
+- **Latency** — stream everything, run independent tool calls in parallel, cache forecasts (~1 h); geocode from our own place data (Mapbox geocoding results aren't stored).
 - **Safety & limits** — per-user rate limits, keep invite-only roles, timeouts on every external call, treat user text as data in prompts.
 - **Observability** — log every model turn and tool call (inputs, outputs, latency, tokens) from day one; this also becomes eval data.
 

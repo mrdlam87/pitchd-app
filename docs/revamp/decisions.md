@@ -2,6 +2,35 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Budget per planned trip (Q17): target ≤ US$0.30, with hard caps
+- **Decision (option B):**
+  - **Target:** median **≤ US$0.30 per planned trip**, all-in (model + routing). The model is almost the whole bill — weather is free, Cloud Run roughly free at this scale.
+  - **Hard cap per conversation: US$1.50.** The agent loop tracks spend from each response's `usage`; near the cap it stops calling tools and answers with what it has ("Here's my best pick so far…") — never a cut-off answer. Also catches runaway loops.
+  - **Per-user caps from stage 2:** ~US$1/day and ~US$10/month, adjustable by role. Founder: no cap, alerts only.
+  - **Visible spend:** cost per trip, turn and tool logged from day one; Q13 evals report quality *and* cost per trip, so the model choice weighs both.
+  - **Billing alerts:** Anthropic and Google Cloud at A$20/month in stage 1.
+- **Starting estimate** (US$, ~16 model calls per trip — ~4 turns × ~4 calls; per call ~10k cached input, ~5k new, ~1.5k output incl. thinking; replace with real logs):
+  | Model (in / out / cache read per MTok) | Per trip | Light trip (8 calls) |
+  |---|---|---|
+  | Opus 5.5 ($4 / $20 / $0.20) | ~$0.90 | ~$0.45 |
+  | Sonnet 5.5 ($2 / $10 / $0.10) | ~$0.45 | ~$0.23 |
+  | Haiku 5.5 ($0.10 / $0.50) | ~$0.02 | ~$0.01 |
+- **Where the target comes from:** if Pitchd ever charged ~A$5/month, model cost should stay under ~a third of that; at ~4 trips/month plus small asks that's ~US$0.30 a trip. Reachable with a Sonnet-class planner + Haiku sub-tasks after caching and effort tuning; Opus only where evals show it's needed and it fits.
+- **Rejected:** A, no target (nothing to tune against; costs creep unnoticed); C, ≤ US$0.05 (forces Haiku everywhere and decides Q13 before the evals).
+- **Why:** gives the Q13 evals a real bar; caps protect against runaway loops and abuse before the beta; graceful wrap-up keeps the "never a broken answer" rule.
+- **Revisit if:** evals show quality needs a model that can't meet the target after tuning → decide then whether to raise it, knowing the cost; or real logs show trips cost far less than estimated → tighten it.
+
+## 2026-11-10 — Routing & drive times (Q15): estimate first, Mapbox for the top few
+- **Decision (option B):**
+  - **Estimate in PostGIS first:** filter and rank candidates by straight-line distance × a road factor (tuned per region type — coast, mountains, inland). Call the **Mapbox Matrix API only for the ~10 sites the agent will actually show** (~30 origin–destination pairs per trip vs ~100). Free for roughly 3,000 trips/month; ~US$0.06 a trip beyond that.
+  - **"On the way" amenities:** one Mapbox Directions request per trip for the route line — negligible.
+  - **`drive_time` is a thin interface over a provider,** so switching to a self-hosted router changes one module. **Trigger:** Mapbox routing passes ~US$50/month, or the terms block a cache we need → self-host OSRM or Valhalla on Australian OSM data (option C).
+  - **Geocode against our own data first:** towns, parks and campsite names from our DB plus the free Geoscience Australia gazetteer, with fuzzy matching (also handles misheard names like "Gan Guddy" → Ganguddy). Mapbox geocoding is the fallback, and its results aren't stored.
+  - **Before the build:** confirm Mapbox prices and product terms on mapbox.com — especially whether drive times may be cached briefly within a conversation, and the rule that routing results are shown on a Mapbox map (we use Mapbox maps, so it should be fine). Prices above are from third-party summaries: ~100k Matrix pairs and ~100k Directions requests free a month, then ~US$2 per 1,000; default terms appear to prohibit storing results; stored ("permanent") geocoding ~US$5 per 1,000.
+- **Rejected:** A, Mapbox Matrix for every candidate (~US$0.20 a trip at scale — nearly the whole Sonnet bill — for sites mostly dropped); C now, our own router (another service to run before volume justifies it); D, Google Routes (dearer, a second map vendor) or OpenRouteService (free-tier daily caps too tight).
+- **Why:** cuts routing to about a third, keeps it free through the beta, real drive times where the user sees them, and a clean exit to self-hosting.
+- **Revisit if:** estimated drive times rank sites badly (the road factor misleads) → widen the Matrix shortlist; or Mapbox spend hits the trigger → self-host.
+
 ## 2026-11-10 — Agent hosting (Q11): Cloud Run in Sydney, Supabase in Sydney
 - **Decision:** the Python agent service runs on Google Cloud Run in `australia-southeast1` (Sydney). v2's Supabase project is created in `ap-southeast-2` (Sydney); Vercel functions are pinned to `syd1`.
   - **Planner:** a Cloud Run service (FastAPI). Request timeout raised well above the 5-min default (60 min max) to cover phase 5b's longer runs.

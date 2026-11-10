@@ -13,12 +13,12 @@
 | [open-questions.md](open-questions.md) | Things still to work out |
 
 ## Status
-- **Stage:** Brainstorming (started 2026-11-09). Core v2 questions A–G answered 2026-11-10 — see `decisions.md`. Product & UX: the six design-stage questions (layout, home screen, ask-or-assume, memory, proactive alerts, voice) plus campsite availability, multi-day route planning and offline decided 2026-11-10. Visual identity refresh (B1–B7: palette, dark mode, sunlight, weather colours, app icon, agent mark, type) decided 2026-11-10 — sketches linked from each entry. Technical: Q12 (Python data layer) and Q11 (agent hosting) decided 2026-11-10.
+- **Stage:** Brainstorming (started 2026-11-09). Core v2 questions A–G answered 2026-11-10 — see `decisions.md`. Product & UX: the six design-stage questions (layout, home screen, ask-or-assume, memory, proactive alerts, voice) plus campsite availability, multi-day route planning and offline decided 2026-11-10. Visual identity refresh (B1–B7: palette, dark mode, sunlight, weather colours, app icon, agent mark, type) decided 2026-11-10 — sketches linked from each entry. Technical: Q12 (Python data layer), Q11 (agent hosting), Q15 (routing) and Q17 (budget per trip) decided 2026-11-10.
 - **Current app:** M1–M6 live at https://pitchd-app.vercel.app — stays running while the revamp is explored
 - **Goals:** (1) make the agent the focal experience, (2) a hands-on learning exercise in building agents, (3) start with one user (the founder) but design to scale
 
 ## Next session — start here
 1. Read every file in `docs/revamp/` (start with `decisions.md` and `open-questions.md`).
-2. **Next up:** Technical questions in this order — 15 + 17 (routing cost, budget per trip), 14 (Managed Agents), 13 (models); then Data agent and Scaling & cost. All Product & UX and visual identity questions are decided; sketches are linked from their `decisions.md` entries.
+2. **Next up:** Technical questions in this order — 14 (Managed Agents), 13 (models); then Data agent and Scaling & cost. All Product & UX and visual identity questions are decided; sketches are linked from their `decisions.md` entries.
 3. Format the founder likes: one question at a time, options table, clear recommendation + why, record on approval, commit and push after each.
 4. Remember the pre-code checklist in `open-questions.md` — the Claude Code development workflow must be set up in `pitchd-v2` before any code.
