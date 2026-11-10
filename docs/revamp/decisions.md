@@ -2,6 +2,12 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Harness H1 · `CLAUDE.md` layout: short root + `agent/` and `web/` files
+- **Decision (option B, with D's way out):** a short root `CLAUDE.md` (project, repo map, workflow, rules for both stacks), plus `agent/CLAUDE.md` (Python, Q11/Q12/Q13/Q17 rules, data-agent rules) and `web/CLAUDE.md` (thin client, generated types, auth token route, B1–B7 visual rules). ~100–150 lines each; a rule for both stacks lives only in the root. Topic files in `.claude/rules/` only if a folder file outgrows that. Full table in `harness-workflow.md`.
+- **Rejected:** one root file (too long with two stacks); topic rule files from the start (overkill before there's code).
+- **Why:** each session gets only the rules for the code it touches; matches the repo layout.
+- **Revisit if:** sessions keep missing a rule from the other folder → move it to the root.
+
 ## 2026-11-10 — Display of freshness & confidence (Q23): quiet unless it matters
 - **Decision (option C):**
   1. **Checked facts look plain.** An `official` or `council` fact at high/medium confidence, checked within 12 months, shows with no label ("Dogs: no").

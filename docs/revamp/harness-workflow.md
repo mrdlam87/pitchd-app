@@ -29,7 +29,7 @@ These are already decided (see `decisions.md`). H1 decides *where* each one goes
 
 | # | Topic | Status |
 |---|---|---|
-| H1 | `CLAUDE.md` layout — one file or split per folder | Open |
+| H1 | `CLAUDE.md` layout — one file or split per folder | **Decided:** short root + `agent/` and `web/` files |
 | H2 | Work tracking — issues, plan files, how a piece of work flows | Open |
 | H3 | Skills / commands — updated `/plan`, `/implement`, `/pr`, others; new ones | Open |
 | H4 | Subagents — `senior-engineer`, `ux-designer`, any new ones; agent memory | Open |
@@ -40,3 +40,15 @@ These are already decided (see `decisions.md`). H1 decides *where* each one goes
 | H9 | Setup order — what gets created in `pitchd-v2` before the first line of code | Open |
 
 <!-- Decisions are filled in below as they're made. -->
+
+### H1 — `CLAUDE.md` layout: short root + one file per folder (decided 2026-11-10)
+- **Decision (option B, with D's way out):** three files. Claude Code always loads the root file and loads a folder's file only when it works in that folder, so each session gets just the rules for the code it's touching.
+  | File | Gets |
+  |---|---|
+  | Root `CLAUDE.md` | What Pitchd v2 is, repo map, key docs, branch/PR workflow, "before writing code" + pre-PR self-review; rules for both stacks: Q17 cost caps as a principle, site IDs only from tool results, untrusted input, scoring and thresholds in code, AU English + metric |
+  | `agent/CLAUDE.md` | Python style and tests; Q12 (SQLAlchemy 2.0 + Alembic, PostGIS, Supabase gotchas); Q11 (Cloud Run, no work after the response, Jobs, resumable events, token check); Q13 model-switching rules; Q17 cap implementation; data-agent rules (propose, don't overwrite; source allowlist) |
+  | `web/CLAUDE.md` | Thin client (no DB, no ORM); generated OpenAPI types; Auth.js + token-minting route; `syd1`; B1–B7 visual rules (semantic tokens, coral = Pitchd, 13 px floor); prototype / Figma references |
+- **Rules:** each file aims for ~100–150 lines; a rule that applies to both stacks lives once in the root, never copied into both folders. If a folder file outgrows ~150 lines, move one topic (e.g. migrations, model calls) into a path-scoped file in `.claude/rules/` — not before.
+- **Rejected:** A, one root file (grows past 300 lines with two stacks; every session reads all of it); C, topic rule files from the start (many small files, hard to see all the rules, overkill before there's code).
+- **Why:** matches the repo's `web/` + `agent/` split, keeps the rules short and relevant, needs no new mechanics.
+- **Revisit if:** sessions keep missing a rule from the other folder (e.g. a `web/` change that needs an API contract rule) → move that rule to the root.
