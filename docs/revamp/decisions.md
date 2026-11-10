@@ -2,6 +2,12 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Staged rollout: founder → trusted campers → closed beta
+- **Stage 1 — founder only.** Move on when: ~3 real trips planned in v2; data pilot ≥ 90% accurate on high-confidence facts; cost per planned trip known; per-user rate limits and cost caps in place.
+- **Stage 2 — 3–5 trusted campers.** Deliberately varied: a caravan / long-trip camper (Sarah), a dog owner, a non-technical user, ideally someone outside Sydney. Invite-only via roles; short post-trip check-ins. Move on when they plan real trips unaided and the main confusions are fixed.
+- **Stage 3 — closed beta, 20–50 users.** Displaced WikiCamp users from AU camping Facebook groups, Reddit, Whirlpool. Waitlist, invites in batches, in-app feedback ("Was this a good pick?"). Move on (wider launch, native) when people return unprompted and cost per user is sustainable.
+- **Why:** the founder's phrasing is a narrow test set; every agent turn costs money; this audience's trust is fragile; varied testers cover both personas; each stage feeds the eval set.
+
 ## 2026-11-10 — v1 is frozen; retired once v2 handles real trips
 - **Context:** the founder is v1's only user.
 - **Now:** freeze v1 — no new features, M7 polish stops. Only fix what blocks the founder (login, outages). Close or label open M7 issues/PRs "v1 frozen"; carry anything worth keeping into v2's backlog.

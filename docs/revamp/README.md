@@ -13,6 +13,6 @@
 | [open-questions.md](open-questions.md) | Things still to work out |
 
 ## Status
-- **Stage:** Brainstorming (started 2026-11-09)
+- **Stage:** Brainstorming (started 2026-11-09). Core v2 questions A–G answered 2026-11-10 — see `decisions.md`.
 - **Current app:** M1–M6 live at https://pitchd-app.vercel.app — stays running while the revamp is explored
 - **Goals:** (1) make the agent the focal experience, (2) a hands-on learning exercise in building agents, (3) start with one user (the founder) but design to scale

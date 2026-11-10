@@ -8,7 +8,7 @@
 - **D. Repo & database:** **Decided:** new `pitchd-v2` repo + separate Supabase project (see `decisions.md`).
 - **E. Agent personality & scope:** **Decided:** knowledgeable local mate; camping-trip scope; safety first (see `decisions.md`).
 - **F. v1's future:** **Decided:** freeze now, keep live as fallback, retire after ~3 real trips in v2 (see `decisions.md`).
-- **G. Who's the next user after the founder,** and when?
+- **G. Next users:** **Decided:** staged rollout — founder → 3–5 trusted campers → 20–50 closed beta, each gated by criteria (see `decisions.md`). *Open: names for stage 2.*
 
 ## ⚠️ Before touching any v2 code
 - [ ] **Set up the harness workflow** — define how v2 is built with Claude Code before the first line of code: `CLAUDE.md` conventions, skills/commands (e.g. updated `/plan`, `/implement`, `/pr`), subagents (`senior-engineer`, `ux-designer`), hooks (lint/test/format), permissions, CI review, and how agent-harness concerns (eval runs, tool tests) fit in. *Confirmed: this means the Claude Code development workflow (how v2 is built), not the Pitchd agent's own harness.*
@@ -46,4 +46,4 @@
 
 ## Scaling & cost
 17. Budget per planned trip — what's acceptable?
-18. When does the beta open beyond the founder, and who's next?
+18. ~~When does the beta open?~~ **Resolved:** see G.
