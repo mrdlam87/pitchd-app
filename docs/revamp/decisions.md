@@ -2,6 +2,12 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Harness H2 · Local-first sessions via Remote Control; plans live on the issue
+- **Decision:** v2 is built locally (Docker Postgres + PostGIS, real-phone testing over Wi-Fi, open network for evals), driven from the Claude app via Remote Control; cloud sessions are an occasional extra and the harness stays cloud-compatible at low priority. Work tracking is option B: one milestone per roadmap phase, issues with acceptance criteria and area labels (+ `evals`), `/plan` posts a single "Plan" comment on the issue that `/implement` reads, one issue → one PR, no `.claude/context/`. Detail in `harness-workflow.md`.
+- **Rejected:** cloud as the main build machine (per-container DB setup, network allowlist, no phone-over-Wi-Fi testing); committed plan files (go stale); markdown backlog; Projects board; gitignored local plan files (invisible to phone, cloud and CI).
+- **Why:** local suits DB, Docker, phone and eval work; Remote Control keeps the phone workflow; plans on the issue read the same everywhere, including to the CI reviewer.
+- **Revisit if:** plan comments prove clumsy → a plan section in the issue body.
+
 ## 2026-11-10 — Harness H1 · `CLAUDE.md` layout: short root + `agent/` and `web/` files
 - **Decision (option B, with D's way out):** a short root `CLAUDE.md` (project, repo map, workflow, rules for both stacks), plus `agent/CLAUDE.md` (Python, Q11/Q12/Q13/Q17 rules, data-agent rules) and `web/CLAUDE.md` (thin client, generated types, auth token route, B1–B7 visual rules). ~100–150 lines each; a rule for both stacks lives only in the root. Topic files in `.claude/rules/` only if a folder file outgrows that. Full table in `harness-workflow.md`.
 - **Rejected:** one root file (too long with two stacks); topic rule files from the start (overkill before there's code).
