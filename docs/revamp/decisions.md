@@ -2,6 +2,19 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — User reports (Q22): camper notes now, facts change only after a check
+- **Decision (option C):**
+  1. **A report never changes a fact by itself.** Facts change only via an official-source re-check by the data agent or a human review.
+  2. **It shows at once as a dated camper note** beside the official fact ("A camper reported the showers broken 3 days ago — not yet confirmed"); the planner mentions it when relevant.
+  3. **It bumps the site to the front of the data agent's re-check list** and lands in the review queue.
+  4. **Camper notes expire** after ~30 days unless reported again — they describe temporary conditions.
+  5. **Counting:** signed-in users only; one report per person per site per fact; 2+ different campers within 30 days → top of the queue, marked "likely".
+  6. **Cautious reports** ("closed", "no water", "road impassable") show as a warning on the site immediately — same asymmetry as Q19.
+  7. **Later (stage 2):** per-user report rate limits; per-reporter trust scores only if logs show a need.
+- **Rejected:** A — queue only (others see nothing, even "closed"); B — N reports auto-change a fact (gameable; a true "closed" waits for more people); D — trust scores (overkill for an invite-only beta).
+- **Why:** campers get today's news immediately, the official record stays clean, and repeated reports can't rewrite facts.
+- **Revisit if:** reports are frequent and accurate enough that waiting for a check is the bottleneck, or abuse appears.
+
 ## 2026-11-10 — Source access (Q21): open data first, then polite reads of approved official sites
 - **Decision (option B, with C later):**
   1. **Open data first** (data.gov.au, data.nsw, OSM) wherever a feed exists; read web pages only for facts feeds don't carry (dogs, showers, booking).

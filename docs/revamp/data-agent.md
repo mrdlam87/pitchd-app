@@ -22,7 +22,7 @@ The work is slow, repetitive, and needs judgement (reading park websites, reconc
 | **Dedupe** | Finds the same site under two names or slightly different coordinates; proposes merges | DB query, distance check |
 | **Describe** | Writes short, factual blurbs from verified facts only | DB read |
 | **Resolve conflicts** | Source A says dogs allowed, B says no → prefers the higher-priority source and records why, or flags for review | source-priority rules (in code) |
-| **Ingest user reports** | Planner conversations like "the showers there are closed" become reports in the review queue | `report_issue` (planner tool) |
+| **Ingest user reports** | Planner conversations like "the showers there are closed" become reports: shown at once as a dated camper note (expires ~30 days), queued for review, and the site jumps the re-check list; never changes a fact alone (Q22) | `report_issue` (planner tool) |
 
 ## 4. Design rules
 
@@ -54,6 +54,15 @@ CampsiteUpdateProposal
   createdBy    String    // agent run id
   reviewedAt   DateTime?
   verdict      Enum?     // correct | wrong — reviewer's call, feeds the trust table
+
+CampsiteReport          // user reports (Q22)
+  campsiteId   → Campsite
+  userId       → User      // one per user per site per key
+  key          String
+  value        Json
+  note         String?
+  createdAt    DateTime
+  expiresAt    DateTime    // ~30 days
 
 FactKeyTrust            // per fact key; rules in code (Q19)
   key          String

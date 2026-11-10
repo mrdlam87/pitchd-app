@@ -42,7 +42,7 @@
 19. ~~**Auto-approve threshold**~~ **Decided:** no-change re-checks apply; pilot reviews everything; then auto-approve per fact key once ≥ 95% agreement over ≥ 30 reviews (official + high only); cautious changes apply at once and are flagged; 1-in-20 spot checks (see `decisions.md`).
 20. ~~**Review UI**~~ **Decided:** terminal review tool for the pilot; `/admin/review` page at D3 on the same review functions (see `decisions.md`).
 21. ~~**Source access**~~ **Decided:** open data first; then polite reads of an allowlist of official sites, each terms-checked before it's added; store facts + short quotes + link; ask authorities for feeds later (see `decisions.md`).
-22. **User reports:** how are they weighed — and how many reports before a fact changes?
+22. ~~**User reports**~~ **Decided:** never change a fact alone; show at once as a dated, expiring camper note; bump the site's re-check; 2+ campers in 30 days → top of queue; cautious reports show as a warning (see `decisions.md`).
 23. **Display:** how does the UI show freshness/confidence without clutter?
 
 ## Scaling & cost
