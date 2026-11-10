@@ -2,7 +2,6 @@
 
 ## v2 rebuild (answer first — these shape everything else)
 - **A. What's wrong with v1's UI?** **Answered:** glitchy drawer; journey not well thought out or intuitive. Lessons and v2 design principles captured in `vision.md` §4.
-- **Next step for layout (Product & UX #1):** map-first, but the conversation sheet is redesigned from scratch — not v1's drawer.
 - **B. Brand:** ~~name~~ **kept as Pitchd.** Visual identity: recommendation is to refresh, not rethink — confirm during design.
 - **C. Platform:** **Decided:** mobile-first web first, native later (see `decisions.md`).
 - **D. Repo & database:** **Decided:** new `pitchd-v2` repo + separate Supabase project (see `decisions.md`).
@@ -18,15 +17,16 @@
 - [ ] v1 frozen: open M7 issues/PRs closed or labelled "v1 frozen"
 
 ## Product & UX
-1. **Layout:** map-first with a conversation sheet (evolves today's drawer), or conversation-first with the map as a panel? → Leaning map-first; prototype both.
-2. **Home screen:** keep a home screen at all, or open straight onto the map with the agent prompt?
-3. **Clarifying questions:** how eager? Ask before searching, or assume and show editable assumptions? → Leaning "assume + show".
-4. **Voice input:** worth it early (planning in the car, hands busy at camp)?
-5. **Proactive messages:** push notifications, email, or in-app only for weather-watch alerts?
-6. **Memory:** what should Pitchd remember automatically vs only when asked? How does the user see and edit it?
-7. **Sarah's multi-day route planning:** revamp phase 2, or later?
-8. **Offline / patchy signal** on the trip — how much matters for v1?
-9. **Name & positioning:** does "Pitchd" still fit an agent companion? (Probably yes.)
+1. ~~**Layout**~~ **Decided:** map-first with a two-snap conversation sheet; sidebar on desktop (see `decisions.md`).
+2. ~~**Home screen**~~ **Decided:** no separate home — open on the map, collapsed sheet is home, upcoming trip card leads (see `decisions.md`).
+3. ~~**Clarifying questions**~~ **Decided:** assume + show editable chips; ask one question only when there's no default and a wrong guess would ruin the answer (see `decisions.md`).
+4. ~~**Voice input**~~ **Decided:** dictation into the input box (browser speech recognition, check before sending); full voice mode waits for native (see `decisions.md`).
+5. ~~**Proactive messages**~~ **Decided:** in-app trip card + web push, email fallback; opt-in per trip; strict triggers; safety always (see `decisions.md`).
+6. ~~**Memory**~~ **Decided:** stated facts saved automatically with Undo; inferences asked first; shown in chips when used; "What Pitchd knows" list + conversational edits (see `decisions.md`).
+7. ~~**Sarah's multi-day route planning**~~ **Decided:** trips modelled as ordered stops from day one + "on the way" amenities in the first build; full multi-day itineraries in new roadmap phase 5b, straight after evals, before the stage 2 caravan tester (see `decisions.md`).
+8. ~~**Offline / patchy signal**~~ **Decided:** first build copes with weak signal (resumable streams, designed offline states, saved trips offline); trip pack + queued messages with the "On the trip" stage; offline maps with native (see `decisions.md`).
+9. ~~**Name & positioning**~~ **Resolved:** keeping "Pitchd" (see B in `decisions.md`). Visual identity refresh still open.
+24. ~~**Campsite availability**~~ **Decided:** know whether to book, "Check & book" link, busy-period warnings + backup, "Not booked yet" nudge; never claim availability unless checked; live checks a later spike (see `decisions.md`).
 
 ## Technical
 10. ~~Repo layout~~ **Resolved:** new `pitchd-v2` repo (see D).

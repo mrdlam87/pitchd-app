@@ -17,7 +17,7 @@ The work is slow, repetitive, and needs judgement (reading park websites, reconc
 
 | Job | What the agent does | Tools |
 |---|---|---|
-| **Enrich** | Finds official sources for a site (NSW National Parks, Parks Victoria, councils) and extracts dogs, toilets, showers, fees, booking, caravan/2WD access | web search, web fetch, `propose_campsite_update` |
+| **Enrich** | Finds official sources for a site (NSW National Parks, Parks Victoria, councils) and extracts dogs, toilets, showers, fees, booking (required / first-come + booking URL and provider), caravan/2WD access | web search, web fetch, `propose_campsite_update` |
 | **Verify** | Checks a site is still open; looks for closures and changes; proposes `active` / `unverified` / `removed` with evidence | web search/fetch, park alerts |
 | **Dedupe** | Finds the same site under two names or slightly different coordinates; proposes merges | DB query, distance check |
 | **Describe** | Writes short, factual blurbs from verified facts only | DB read |
@@ -38,7 +38,7 @@ The work is slow, repetitive, and needs judgement (reading park websites, reconc
 ```
 CampsiteFact
   campsiteId   → Campsite
-  key          String    // "dogs_allowed" | "toilets" | "showers" | "fee" | "booking_required" | "access_2wd" | ...
+  key          String    // "dogs_allowed" | "toilets" | "showers" | "fee" | "booking" | "booking_url" | "access_2wd" | ...
   value        Json
   sourceUrl    String?
   sourceType   Enum      // official | council | osm | user_report | agent_inferred

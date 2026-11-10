@@ -21,7 +21,7 @@ The original origin story still holds — the killer query is the same — but t
 1. **Decide, not just find.** End with a confident recommendation ("Go to X. Here's why."), not 40 pins to sift through.
 2. **Show the reasoning.** Every recommendation says why: weather, drive time, amenities, the user's own preferences.
 3. **Never invent places.** The agent may only recommend campsites that came from Pitchd's tools and data. Trust is the product — WikiCamp users left over bad data.
-4. **Remember me.** Dog, setup (car camper / caravan), favourite regions, how far I'll drive — asked once, used forever (and editable).
+4. **Remember me.** Dog, setup (car camper / caravan), favourite regions, how far I'll drive — asked once, used forever (and editable). What you say about yourself is saved automatically (with Undo); anything Pitchd works out from your behaviour is asked first; memory that shapes an answer shows in the chips; everything is listed in "What Pitchd knows". (See `decisions.md`.)
 5. **Stay with the trip.** A plan isn't finished at search time — Pitchd watches the forecast and speaks up when something changes.
 6. **Fast enough for Thursday night.** Matt plans in a short window. Something useful on screen within a couple of seconds; the full answer streams in.
 
@@ -35,13 +35,13 @@ The original origin story still holds — the killer query is the same — but t
 
 | Stage | What the user experiences | Agent behaviour |
 |---|---|---|
-| **Describe** | Types or speaks a trip in plain English; quick-start chips for common asks | Asks at most one clarifying question if something essential is missing (e.g. dates); otherwise makes sensible assumptions and states them |
+| **Describe** | Types or speaks a trip in plain English; quick-start chips for common asks | Defaults what it can (next weekend, current location, remembered drive limit) and shows the guesses as chips; asks one question with tap answers only when there's no default and a wrong guess would ruin the answer (no starting point, too vague, unsafe-if-wrong). Questions about the user are asked once and remembered |
 | **Agent works** | Sees progress *on the map*: regions being checked, weather overlays appearing, candidate pins dropping in | Streams tool activity as human steps: "Checking weather around Mudgee, Blue Mountains, Hunter…" |
 | **Proposal** | A short ranked shortlist (≈3), a clear top pick, one-line reason each, trade-offs called out | Ranks on weather + drive time + fit to preferences; explains the trade-off between top options |
 | **Refine** | "Closer", "drier", "somewhere with a shower" — by chat or refinement chips; tap a pin to ask "why this one?" | Keeps the conversation context; re-runs only what changed |
-| **Commit** | Saves the trip (site, dates, who's coming, setup) | Writes to the trip store; offers a packing list matched to the forecast |
-| **Watch** | Gets a nudge if the forecast turns: "Saturday now 70% rain at X — want alternatives?" | Background job re-checks saved trips; proposes options rather than just alerting |
-| **On the trip** | Nearby dump points, water, fuel, toilets; works on patchy signal | Lightweight queries; cached data where possible |
+| **Commit** | Saves the trip (site, dates, who's coming, setup); for sites that need booking, a "Check & book" link and a "Booked?" tick ("Not booked yet" shows on the trip card until ticked) | Writes to the trip store; offers a packing list matched to the forecast; never claims a site is available unless it checked |
+| **Watch** | Opts in when saving a trip. Gets a push (or email if no push) only when the forecast materially turns — "Saturday now 70% rain at X — want alternatives?" — plus safety alerts (fire ban, closure, flood) always, and a final check the day before | Background job re-checks saved trips; thresholds in code; max one weather alert per trip per day, quiet hours; proposes options rather than just alerting |
+| **On the trip** | Nearby dump points, water, fuel, toilets; saved trip and a downloaded trip pack (amenities within ~50 km, last forecast, fire danger) work with no signal; messages typed offline send when signal returns | Lightweight queries; trip pack refreshed at save and at the day-before check; offline maps wait for native |
 | **Reflect** | Quick rating ("great site, too windy") | Updates preferences and adds signal for future ranking |
 
 MVP of the revamp = **Describe → Agent works → Proposal → Refine → Commit**. Watch, On the trip, Reflect come later.
@@ -64,14 +64,15 @@ MVP of the revamp = **Describe → Agent works → Proposal → Refine → Commi
 ## 5. Interface principles
 
 1. **One way to search, one mode.** No search mode vs browse mode — map and conversation always coexist.
-2. **The map is the shared canvas; the conversation drives it.** Not a chat app with a map bolted on, and not a map with a chatbot bolted on. The agent's work shows up spatially. Candidate layout: map full-screen with a conversation sheet — redesigned from scratch, not v1's drawer (see §4).
-3. **Tap and talk are equal.** Anything you can say, you can usually tap (chips, pins, cards), and anything you tap becomes context for the agent. Typing should never be mandatory for a refinement.
+2. **The map is the shared canvas; the conversation drives it.** Not a chat app with a map bolted on, and not a map with a chatbot bolted on. The agent's work shows up spatially. **Layout (decided):** map full-screen with a two-snap conversation sheet — collapsed shows the current turn (summary, assumption chips, card carousel synced with pins, input); expanded shows the full thread. Input always visible; no half state. Desktop: the same pieces in a left sidebar beside the map. Redesigned from scratch, not v1's drawer (see §4 and `decisions.md`).
+3. **Tap and talk are equal.** Anything you can say, you can usually tap (chips, pins, cards), and anything you tap becomes context for the agent. Typing should never be mandatory for a refinement. Speaking works too: the mic in the input dictates into the box so you can check it before sending; spoken replies and hands-free mode wait for native.
 4. **Show the work, on the map.** Never a bare spinner — short step lines plus pins appearing. Builds trust and hides latency; no walls of reasoning.
 5. **Answers are structured, not just prose.** The agent returns cards (site, weather days, drive time, why) rendered by the UI, with a short natural-language summary on top. The existing card + weather-pin conventions carry over.
-6. **Always show what Pitchd understood.** After every agent turn, its interpretation is shown as editable chips. "Assuming this weekend (Sat–Sun), 3 hr from Sydney, with your dog" as tappable chips the user can change.
+6. **Always show what Pitchd understood.** After every agent turn, its interpretation is shown as editable chips. "Assuming this weekend (Sat–Sun), 3 hr from Sydney, with your dog" as tappable chips the user can change. Guessed values come first and look different from what the user said; tapping one offers quick alternatives and re-runs only what changed.
 7. **Every state is designed** — empty, error, no location, offline, agent unavailable — each a deliberate screen, not a fallback. Basics from day one: 44 pt touch targets, accessible text, readable in sunlight.
-8. **Honest when it can't.** No dry sites within range → say so and offer the trade-off ("dry if you drive 4.5 h, or showers Sunday morning only at X").
+8. **Honest when it can't.** No dry sites within range → say so and offer the trade-off ("dry if you drive 4.5 h, or showers Sunday morning only at X"). Same for availability: Pitchd says whether a site needs booking and links to it, but never claims it's free unless it checked.
 9. **Search is agent-only; viewing is free.** There is no filter panel — every search goes through the agent, and quick chips are canned prompts. But the map is always explorable: pan, zoom, tap a pin for details, with "Ask Pitchd about this site" to bring the agent in. (See `decisions.md`.)
+10. **No home screen — the map is home.** The app opens on the map with the sheet collapsed: a greeting, context-aware chips and the input. An upcoming trip leads as a card; saved trips and recent conversations live in the expanded sheet. Location is asked in context, never on launch. (See `decisions.md`.)
 
 ## 6. What the agent is (and isn't)
 
@@ -84,7 +85,7 @@ MVP of the revamp = **Describe → Agent works → Proposal → Refine → Commi
 ## 7. Personas, revisited
 
 - **Matt (primary)** — the revamp's first user is effectively the founder, who is Matt. Optimise for the weekend-decision flow first.
-- **Sarah (secondary)** — multi-day, route-based planning was post-MVP before. An agent makes it far more feasible (itinerary = a sequence of tool calls), so it's a strong candidate for revamp phase 2.
+- **Sarah (secondary)** — multi-day, route-based planning was post-MVP before. An agent makes it far more feasible (itinerary = a sequence of tool calls). **Decided:** trips are ordered stops from day one and "on the way" amenities ship in the first build; full itineraries (days split by drive limit, a site per night, per-day weather, caravan constraints, route line + day-by-day cards) come in roadmap phase 5b, straight after evals and before the stage 2 caravan tester.
 
 ## 8. Success signals (draft)
 
