@@ -2,6 +2,22 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Proactive alerts: in-app card + web push, email fallback, strict triggers
+- **Channels:** the home-sheet trip card (Q2) always shows changes on open; **web push** is the main out-of-app channel; **email** is the fallback for anyone without push (notably iPhone users who haven't added Pitchd to their Home Screen — iOS web push only works for installed PWAs). No SMS.
+- **Opt-in per trip:** on saving a trip, Pitchd asks "Want me to watch the forecast for this trip?" — and asks for push permission then, when the value is obvious. Never on first open.
+- **Triggers:**
+  | Trigger | Alert? |
+  |---|---|
+  | Material forecast change — a day goes dry → rain, strong wind, extreme heat | Yes, with 2–3 alternatives |
+  | Small wobble (e.g. 20% → 30% rain) | No — trip card updates only |
+  | **Safety** — total fire ban, park/road closure, flood warning for the site | **Always**, for any saved trip even without weather opt-in; push + email |
+  | Day before departure | One final check: "Still dry — have a good one", or a warning |
+- **Limits:** max one weather alert per trip per day; quiet hours 9 pm–7 am local (the trip's or user's time zone), except safety alerts within 48 h of the trip. Every alert opens the trip's conversation with alternatives ready — never a bare "it might rain".
+- **Rejected:** in-app only (you'd hear about Thursday's change too late); email only (slow to notice, heavy for a weather nudge); SMS (per-message cost, phone numbers, too much for weather).
+- **Why:** the value of watching is hearing in time to act; push fits the "mate keeping an eye out" role and email leaves nobody out; strict triggers keep alerts rare enough not to be ignored; safety-always matches E's "safety first".
+- **Build note:** roadmap phase 6 (background weather watch). "Material change" thresholds live in code and get eval/backtest cases, not left to the model. Log every alert sent and whether it was opened.
+- **Revisit if:** web push proves unreliable or Add-to-Home-Screen friction blocks most iPhone users → the trigger to go native (see the platform decision); or alerts get ignored → raise thresholds.
+
 ## 2026-11-10 — Memory: what's remembered, and how it's seen and edited
 - **What's remembered:**
   | Kind | Examples | Rule |

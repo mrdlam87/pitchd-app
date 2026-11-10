@@ -40,7 +40,7 @@ The original origin story still holds — the killer query is the same — but t
 | **Proposal** | A short ranked shortlist (≈3), a clear top pick, one-line reason each, trade-offs called out | Ranks on weather + drive time + fit to preferences; explains the trade-off between top options |
 | **Refine** | "Closer", "drier", "somewhere with a shower" — by chat or refinement chips; tap a pin to ask "why this one?" | Keeps the conversation context; re-runs only what changed |
 | **Commit** | Saves the trip (site, dates, who's coming, setup) | Writes to the trip store; offers a packing list matched to the forecast |
-| **Watch** | Gets a nudge if the forecast turns: "Saturday now 70% rain at X — want alternatives?" | Background job re-checks saved trips; proposes options rather than just alerting |
+| **Watch** | Opts in when saving a trip. Gets a push (or email if no push) only when the forecast materially turns — "Saturday now 70% rain at X — want alternatives?" — plus safety alerts (fire ban, closure, flood) always, and a final check the day before | Background job re-checks saved trips; thresholds in code; max one weather alert per trip per day, quiet hours; proposes options rather than just alerting |
 | **On the trip** | Nearby dump points, water, fuel, toilets; works on patchy signal | Lightweight queries; cached data where possible |
 | **Reflect** | Quick rating ("great site, too windy") | Updates preferences and adds signal for future ranking |
 

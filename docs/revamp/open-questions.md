@@ -21,7 +21,7 @@
 2. ~~**Home screen**~~ **Decided:** no separate home — open on the map, collapsed sheet is home, upcoming trip card leads (see `decisions.md`).
 3. ~~**Clarifying questions**~~ **Decided:** assume + show editable chips; ask one question only when there's no default and a wrong guess would ruin the answer (see `decisions.md`).
 4. **Voice input:** worth it early (planning in the car, hands busy at camp)?
-5. **Proactive messages:** push notifications, email, or in-app only for weather-watch alerts?
+5. ~~**Proactive messages**~~ **Decided:** in-app trip card + web push, email fallback; opt-in per trip; strict triggers; safety always (see `decisions.md`).
 6. ~~**Memory**~~ **Decided:** stated facts saved automatically with Undo; inferences asked first; shown in chips when used; "What Pitchd knows" list + conversational edits (see `decisions.md`).
 7. **Sarah's multi-day route planning:** revamp phase 2, or later?
 8. **Offline / patchy signal** on the trip — how much matters for v1?
