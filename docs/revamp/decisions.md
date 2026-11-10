@@ -2,6 +2,12 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Harness H9 · Setup order: core by hand, a dry run, the rest when a phase needs it
+- **Decision (option B, with C's dry run):** founder creates `pitchd-v2`, the Sydney Supabase project and the review secret; docs move and v1 freezes; one local session builds the core harness by hand (layout, three `CLAUDE.md` files, settings with permissions + hooks + pinned Superpowers, lefthook, agents, `/harness` + `/decide`, docker compose PostGIS, CI + review, branch protection); the open points from H3–H6 are checked; a tiny dry-run issue goes through all 12 steps and the harness is fixed from it. `/eval` comes at P1, deploy workflows at P3, the cloud setup script last.
+- **Rejected:** everything up front; bootstrapping with a half-built harness; copying v1's setup.
+- **Why:** each piece is built when there's something real to test it on; the dry run shakes out the harness first.
+- **Revisit if:** the dry run shows a core piece is missing → fix before the next issue.
+
 ## 2026-11-10 — Harness H8 · Tool tests and evals: four tiers
 - **Decision (option C):** (1) tool tests with recorded API responses and (2) agent-loop tests with a scripted fake model run on every PR, free; (3) a ~5-query smoke eval (~US$1) runs locally at `/harness` step 9 for `evals`-labelled work; (4) the full 20–50 query eval + data-agent accuracy (~US$10–25 per setup) runs via `/eval full`, required before any model or prompt config change merges and at model releases. Deterministic checks first, Opus grader second; reports quality, cost per trip and time to first pins vs a committed `agent/evals/baseline.json`. US$30 cap per eval run. Detail in `harness-workflow.md`.
 - **Rejected:** full evals on every PR; evals only by hand; nightly full evals.

@@ -2,7 +2,7 @@
 
 > First item on the pre-code checklist in `open-questions.md`. This is about the **Claude Code development workflow** for `pitchd-v2`: how the code gets written, checked and reviewed. It is *not* about the Pitchd agent's own harness (its tool loop and prompts), which is covered in `architecture.md`.
 > **Applies to the new `pitchd-v2` repo** (decision D) — nothing here changes `pitchd-app`, whose `.claude/` setup and workflows stay as they are while v1 is frozen. This doc moves to `pitchd-v2/docs/` with the rest of `docs/revamp/`.
-> Status: in progress, one decision at a time (H1–H9). Each decision is recorded here and in `decisions.md` once approved.
+> Status: **all decisions made (H1–H9), 2026-11-10.** Each is recorded here and in `decisions.md`. Next: build it in `pitchd-v2` following H9.
 
 ## What carries over from v1 (`pitchd-app`)
 
@@ -38,7 +38,7 @@ These are already decided (see `decisions.md`). H1 decides *where* each one goes
 | H6 | Permissions — allow / ask / deny rules | **Decided:** committed allow / ask / deny lists; auto mode for `/harness` runs |
 | H7 | CI — checks and Claude review on PRs | **Decided:** agent / web / contract checks required; Claude review once per PR, then on request |
 | H8 | Tool tests and eval runs — where they fit | **Decided:** four tiers — tool tests + fake-model loop tests every PR; smoke eval for `evals` work; full eval before model/prompt changes merge |
-| H9 | Setup order — what gets created in `pitchd-v2` before the first line of code | Open |
+| H9 | Setup order — what gets created in `pitchd-v2` before the first line of code | **Decided:** core harness by hand, dry-run issue, `/eval` at P1, deploys at P3 |
 
 <!-- Decisions are filled in below as they're made. -->
 
@@ -239,3 +239,20 @@ These are already decided (see `decisions.md`). H1 decides *where* each one goes
 - **Rejected:** A, full evals on every PR (~US$10–25 per push); B, evals only by hand (model and prompt changes merge unmeasured); D, a nightly full eval (~US$300–700 a month for little gain at one user).
 - **Why:** free tests guard every change; real-model runs happen exactly where model behaviour can change, so the phase 5 model choice and every later switch are made from evidence.
 - **Revisit if:** data changes start shifting answers between model changes → add a weekly smoke eval; or the full set outgrows the run cap → split it by persona.
+
+### H9 — Setup order: core first, a dry run, the rest when a phase needs it (decided 2026-11-10)
+- **Decision (option B, with C's dry run):**
+  | # | Step | Who | Notes |
+  |---|---|---|---|
+  | 0 | Create the `pitchd-v2` repo, the Supabase project (Sydney) and the GitHub secret for Claude review | Founder | Pre-code checklist |
+  | 1 | Move `docs/revamp/` into `pitchd-v2/docs/` (this doc included); freeze v1 | Session | Pre-code checklist |
+  | 2 | **Core harness, by hand:** `agent/`, `web/`, `planning/` layout; the three `CLAUDE.md` files (H1); `.claude/settings.json` with permissions (H6), hooks (H5), Superpowers pinned + Figma; lefthook; five role agents + two rewritten advisers (H4); `/harness` and `/decide` skills + shared checklist files (H3); `docker compose` Postgres + PostGIS; CI checks + review workflows (H7); branch protection | Local session, using `writing-skills` / `skill-creator` | No product code |
+  | 3 | **Check the open points:** must `code-review` run from the main session? Can agent files preload skills? Does Superpowers' session-start nudge override `/harness`? Is auto mode available? Does the bash sandbox work with Docker and `--host`? | Session | Each answer goes back into its H entry |
+  | 4 | **Dry run:** a tiny issue through all 12 steps — e.g. "agent/ health endpoint + first Alembic migration enabling PostGIS" (exercises `check first`, CI, review, PR) | `/harness` | Fix the harness from what goes wrong, then start real work |
+  | 5 | At P1 (first eval cases): `/eval` + eval-runner tiers 3–4 | `/harness` | Tiers 1–2 run in CI from step 2 |
+  | 6 | At P3 (first deploy): Cloud Run + Vercel deploy workflows with Workload Identity; consider `deploy-checklist` | `/harness` | Q11 |
+  | 7 | Lowest priority: cloud environment setup script | `/harness` | H2's "cloud-compatible" |
+- **Not blocking the harness, but before the data pilot:** NSW National Parks terms check (Q21).
+- **Rejected:** A, everything up front (days of setup; `/eval` and deploys have nothing to work on yet); C alone, building the harness with a half-built harness from the start; D, copying v1's setup (brings back the Prisma / Haiku-only rules v2 replaced).
+- **Why:** each piece arrives when there's something real to test it on; the dry run shakes out the harness on a tiny issue before it carries real work.
+- **Revisit if:** the dry run shows a core piece is missing or wrong → fix it before the next issue, not mid-phase.
