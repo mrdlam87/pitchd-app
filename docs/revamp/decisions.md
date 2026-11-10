@@ -2,6 +2,128 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Visual identity B7 · Type: Lora for the wordmark and a few headings, DM Sans for everything else
+- **Decision (option B):** two faces. Nunito (v1's default body font) is dropped. Sketch (all five body options at real sizes): https://claude.ai/artifact/Le1D31kxmCFKJHBRkoyfC3
+- **Lora** — Bold for the wordmark and the app icon "d" (exported as outlined SVG, so they never wait for the font — B5); SemiBold 17–19 px for the collapsed-sheet greeting; headings in the expanded sheet (trip titles, "Trips", "What Pitchd knows") and site detail titles. Never for reading text or anything under 15 px.
+- **DM Sans** — everything the agent says and all UI text:
+  | Role | Size / line | Weight |
+  |---|---|---|
+  | Agent summary, input | 15 / 21 | 400; lead sentence 700 |
+  | Card title | 15 / 20 | 700 |
+  | Chips, card facts, day columns, step lines | 13 / 18 | 500–600 (B3: 500+ under 15 px) |
+  | Numbers (drive times, temperatures, rain %, times) | any | tabular figures |
+- **Rules:** 13 px is the smallest text anywhere (B3); sizes in rem so the phone's text-size setting scales them; load only the weights used (Lora 600/700; DM Sans 400–700 with optical sizes); fonts cached by the PWA service worker after first load.
+- **Rejected:** A, Nunito (rounded ends blur first in glare; wide letters fit less in the sheet; looks young next to Lora); C, Inter (adds no character; a bit cold next to Lora); D, system font (looks different on every phone, no brand character — kept as the fallback if load size ever matters more); E, Atkinson Hyperlegible (quirky next to Lora; fewer weights; no tabular figures).
+- **Why:** already the prototype's look; optical sizes keep small text legible in sun; tabular figures for the numbers cards are full of; pairs warmly with Lora; two faces instead of v1's three.
+- **Revisit if:** the midday sunlight test (B3) shows DM Sans at 13 px struggling → raise the floor or weight first; only then try the system font.
+
+## 2026-11-10 — Visual identity B6 · Agent mark: the app icon's "d" tile, small
+- **Decision (option C):** the agent's presence is shown by the B5 "d" tile at 20 px beside what Pitchd says — the icon you tapped is the one talking to you. State is shown by a coral ring around the tile, never by a new shape. Sketch (options, states, sheet moments, "d" vs "Pd"): https://claude.ai/artifact/AoL2DqbEW4r8ac82JX2AyF
+  | State | Mark |
+  |---|---|
+  | Ready | Still tile beside the greeting and each answer |
+  | Working | Coral arc circles the tile while tools run, with the step line ("Checking weather around Mudgee…") and the map showing the area being checked |
+  | Writing | Arc stops once the answer streams |
+  | Listening | Pulsing ring while dictation is on |
+  | Offline / unavailable | Grey tile, with the offline banner |
+- **Where:**
+  | Place | Mark |
+  |---|---|
+  | Agent's summary line, greeting | 20 px tile, left of the text |
+  | Expanded thread | First line of each agent turn only — not on step lines, cards or chips |
+  | Input | No tile; the send button becomes a stop button with the same coral arc while working (no two coral marks side by side) |
+  | Map — "Ask Pitchd about this site" | 16 px tile on the button |
+  | Push notifications, browser tab | The app icon (B5) |
+- **Rules:** every state also has words — the mark is never the only signal; with reduced motion the arc and ring are drawn dotted and still; coral on screen stays limited to the tile, the top pick and send (B1).
+- **"Pd" considered** (as the mark, and as the icon): reads more like initials, but wouldn't match the "d" app icon, shrinks the coral to ~9 px at 20 px and runs together at 16 px. Kept "d" for both; "Pd" stays B5's fallback, and would replace both together if ever used.
+- **Rejected:** A, no mark (nothing shows Pitchd is working; agent text looks like app text); B, mascot (cartoon cuteness clashes with "no hype" and safety messages; a character to maintain); D, ember dot (reads as "unread"; not tied to the name — kept as the fallback); E, sparkle ✦ (every product uses it; points at the technology, not the mate).
+- **Why:** nothing new to learn; ties B1 (coral = Pitchd) and B5 together; carries the "never a bare spinner" principle.
+- **Revisit if:** the arc reads as a loading spinner rather than "Pitchd is working" in testing → lean more on the step lines and map, keep the tile still.
+
+## 2026-11-10 — Visual identity B5 · App icon: the coral "d" on forest; wordmark minimum 15 px
+- **Decision (option D):** the app icon is the wordmark's coral "d" (Lora bold, #e8674a) alone on a forest square (#2d4a2d). Sketch (all options at real sizes): https://claude.ai/artifact/9g4dXtEegZv822wQUKHavZ
+- **Why:** it's the one part of the wordmark only Pitchd has ("Pitch" + "d" = pitched); one bold glyph stays legible down to 16 px; coral means Pitchd (B1), so the icon, the send button and the agent mark (B6) all point the same way. Coral on forest is 3.0:1 — enough for a large glyph.
+- **Wordmark size rule:**
+  | Size | Use |
+  |---|---|
+  | 32 px+ | Sign-in, first-run sheet, splash — wordmark beside the icon here teaches the link |
+  | 20 px | Desktop sidebar header |
+  | **15 px minimum** | Expanded sheet header, emails |
+  | below 15 px | Use the "d" icon instead (browser tab, push notifications, "Ask Pitchd" chips) — the coral "d" becomes a speck |
+- **Build note:** PWA icon set — 180 px apple-touch-icon, 192 and 512 px, a maskable version (glyph inside the safe zone), and a favicon (16/32 px and SVG). Export the "d" as an outlined path so it doesn't depend on the font loading. v1 has no app icon or web manifest.
+- **Rejected:** A, shrunk wordmark (unreadable below ~60 px); B, "P" monogram (drops the coral; looks like many other apps); C, "Pd" pair (cramped at 16 px; kept as the fallback); E, tent pictogram (almost every camping app uses one; says nothing about the name).
+- **Revisit if:** stage 2 testers don't connect the "d" with Pitchd → switch to the "Pd" pair (C).
+
+## 2026-11-10 — Visual identity B4 · Weather colours: one "sun to rain" scale for pins and day columns
+- **Decision (option B):** gold → blue → navy, used for both map pins and card day columns. Sketch (with colour-blind and glare views): https://claude.ai/artifact/UFQap2zw6D1grvZM6A8W8H
+  | State | Light pin | Light day tint (dark text) | Dark pin | Dark day tint / text | Meaning |
+  |---|---|---|---|---|---|
+  | **Dry** | #f0b72f | #fbe7b0 | #f5c542 | #3d3417 / #f5e3a8 | Under ~20% rain chance, no hazards |
+  | **Mixed** | #5f93bf | #dbe8f1 | #7ab0e0 | #22313c / #cfe1ee | Showers, or a wet part of the day |
+  | **Wet** | #24486e | #a9c3de | #3f72b8 | #1c3550 / #cfe0f5 | Rain most of the day |
+  | **Typical** | hollow dashed pin | hatched neutral | same | same | Past the forecast range — "typical for May" (phase 5b) |
+  | **Hazard** | dark "!" badge on any state | dark outline + reason in words | light "!" badge | light outline | Storm, strong wind, extreme heat, fire ban |
+- **Rules:** day-column text 8–12:1 on every tint; an icon and label on every day (B3); pins set off from the map by B3's white ring + hairline (light ring in dark mode); coral never used for weather (B1) — it stays the top-pick ring.
+- **Simpler than v1:** three colours replace v1's six strip colours (`condColorForCode`) and the separate Great/Good/Poor badge (`getWeatherBadge`). The 0–100 score still ranks sites in code; it just isn't shown as extra colours. Thresholds between states live in code with tests, like the alert thresholds.
+- **To check later:** v1's water-fill amenity pin is blue (#2a8ab0) — amenity pins carry icons, but review the clash when amenity pins are designed.
+- **Rejected:** A, v1 traffic light (wet = coral clashes with the brand; green/amber merge for red-green colour blindness; green pins vanish on a green map; white on amber 2.5:1); C, colour-blind-safe traffic light (vermilion still near coral; green still blends into the map; red for rain reads as danger, which belongs to safety); D, blues only (dry — the answer people want — is the faintest thing on the map).
+- **Why:** a scale campers already read; yellow vs blue survives red-green colour blindness (~1 in 12 Australian men); light-to-dark steps survive glare and greyscale; no green or red, so no clash with the map, the brand or safety alerts.
+- **Revisit if:** testers misread the scale without "green = good" → strengthen the icons and labels before changing colours.
+
+## 2026-11-10 — Visual identity B3 · Sunlight contrast: the default light theme is built for outdoors
+- **Decision (option B):** no separate outdoor mode — the normal light theme is sunlight-ready, and is checked on a real phone outside at midday before it's signed off. Sketch (with a rough glare slider): https://claude.ai/artifact/3uMTxiURbJA4Ym9rJi2XPg
+- **Rules:**
+  | Element | v1 | Contrast | v2 | Contrast |
+  |---|---|---|---|---|
+  | Key facts (summary line, card names) | #2d4a2d | 9.1:1 | #1a2e1a (`TEXT`) — aim 7:1+ | 13.3:1 |
+  | Secondary text | #8a9e8a muted / #5a7a5a sage | 2.6 / 4.4:1 | #4f6b4f (sage, one shade darker); muted grey retired for text (disabled and decoration only) | 5.4:1 |
+  | Coral text | #e8674a | 3.0:1 | #b84a33 coral ink (B1) | 4.7:1 |
+  | Text on weather colours | white on amber / green | 2.5 / 3.3:1 | ≥ 4.5:1 (colours in B4) | — |
+  | Input and chip borders | #e0dbd0 | 1.4:1 | #928a7a (3:1 for controls, on both the background and white cards); card borders stay soft but gain a shadow | 3.1:1 on background, 3.4:1 on white |
+  | Pins | flat colour, thin white ring | — | darker fill, 3 px white ring, dark hairline; top pick 28 px | — |
+  | Text size | — | — | 13 px floor; weight 500+ below 15 px | — |
+- **Weather never by colour alone:** every day column has a label and an icon (ties to B4).
+- **Contrast measured** against the background (#f7f5f0) and white cards. Dark mode (B2) already clears these bars.
+- **Rejected:** A, WCAG AA as the bar (set for indoor screens; 4.5:1 text washes out in direct sun); C, automatic outdoor mode (the web can't read the light sensor on iPhone; a third theme); D, a manual high-contrast toggle (nobody finds it while squinting at a campsite; a third theme).
+- **Why:** Pitchd is used outdoors, so the default must work there; no setting to find; also helps older eyes and cheap screens.
+- **Revisit if:** the midday phone test still fails on something → darken that value; if the theme feels heavy indoors, soften decoration (borders, shadows), never text.
+
+## 2026-11-10 — Visual identity B2 · Dark mode: follow the phone, with an override
+- **Decision (option B):** light and dark are both designed. The app follows the phone's setting; "Appearance: System / Light / Dark" lives in the expanded sheet (beside "What Pitchd knows"). Sketch: https://claude.ai/artifact/9nMEPK1XHYhNkNnGNC5L2a
+- **Dark values (starting point):**
+  | Role | Light (B1) | Dark | Contrast on dark card |
+  |---|---|---|---|
+  | Background | #f7f5f0 | #141a14 (green-black, not blue-black) | — |
+  | Card / sheet | #ffffff | #1d241d | — |
+  | Border | #e0dbd0 | #344034 | — |
+  | Text / headings | #2d4a2d | #e6ede1 | 13.3:1 |
+  | Secondary (sage) | #4f6b4f (B3; v1 was #5a7a5a) | #a3baa0 | 7.6:1 |
+  | Coral (fills) | #e8674a | #f07a5e | 5.8:1 |
+  | Coral ink (text) | #b84a33 | #f4917a | 6.9:1 |
+  | Text on coral | white | #1d241d (white on the brighter coral is only 2.7:1) | 5.8:1 |
+  | Weather | B4 | dark versions chosen with B4 | — |
+  | Map | Mapbox Standard, day preset | Mapbox Standard, night preset (no second custom style) | — |
+- **Build note:** semantic colour tokens (CSS variables, light + dark) from the first build — components never use raw hex — so dark mode is a token set, not a retrofit. Every designed state (empty, error, offline) is checked in both themes.
+- **Rejected:** A, light only (glaring at night at camp, when people check tomorrow's weather or the nearest toilet; white flash for dark-mode phones); C, manual toggle only (rarely found, ignores the phone); D, an extra red night-vision mode (weather colours stop working, a third theme to maintain — a gimmick before there are users).
+- **Why:** much of the real use is after dark at camp; following the phone is right with no effort; warm green-black keeps it feeling like Pitchd; B1's roles carry over unchanged.
+- **Revisit if:** testers at camp ask for something dimmer than dark mode → reconsider a night mode then.
+
+## 2026-11-10 — Visual identity B1 · Palette: keep the family, give each colour one job
+- **Decision (option B):** keep forest / sage / warm neutrals with coral, and tighten the roles. Sketch: https://claude.ai/artifact/Sd5Bg25avPg9ohMpCzxhDB
+  | Colour | Token (v1 value) | Job |
+  |---|---|---|
+  | Warm neutrals | `SURFACE` #f7f5f0, white cards, `BORDER` #e0dbd0 | Most of the screen |
+  | Forest | `FOREST_GREEN` #2d4a2d (`TEXT` #1a2e1a for body) | Headings, the agent's summary line, "Pitch" in the wordmark, user bubbles |
+  | Sage | `SAGE` #5a7a5a → **#4f6b4f** (darkened in B3 to reach 4.5:1 on the background) | Secondary text, chip labels, step lines — **one** sage (the prototype's #7a9e7a and #4a6a4a are retired) |
+  | **Coral = Pitchd** | `CORAL` #e8674a | Only: the wordmark "d", the send / primary action, the top-pick outline, and the agent's mark (B6). At most one or two coral things on screen |
+  | Coral ink *(new)* | #b84a33 | Coral **text** ("Top pick", links) — 4.7:1 on the background; v1's coral text is 3.0:1 |
+  | Weather | decided in B4 | Its own set — **never coral** |
+- **What changes from v1:** coral stops meaning "poor weather" (`weatherScore.ts` uses #e8674a for the Poor badge and severe strip) and stops being used for text; duplicate prototype tokens are merged.
+- **Rejected:** A, keep v1 exactly (coral does four jobs, so a wet day looks like a highlight; coral text fails AA); C, ochre accent (sits next to the showers amber, blurs top pick and showery days; changes the wordmark); D, new "night sky + campfire" identity (loses the outdoorsy warmth; closer to generic tech apps; same accent-vs-weather clash).
+- **Why:** the palette isn't the problem — overloading one colour is. Coral meaning only "Pitchd" lets it carry into the agent's mark, and frees the weather colours for B4. Keeps v1's recognition.
+- **Still to tune:** exact values for dark mode (B2) and sunlight (B3) — roles stay as above.
+- **Revisit if:** sunlight testing (B3) shows the forest/sage contrast isn't enough outdoors → darken values, not change hues.
+
 ## 2026-11-10 — Offline & patchy signal: cope with weak signal now, trip pack later, offline maps with native
 - **Decision (option C, in two steps):**
   1. **First build** (needed for any real phone use):
@@ -162,7 +284,7 @@
 
 ## 2026-11-09 — Keep the name "Pitchd" for v2
 - **Why:** Short, memorable, the camping pun still fits an agent companion, and it's already live.
-- **Still open (recommendation, not yet decided):** keep the core palette (forest / sage / warm neutrals, coral used sparingly) but refresh — add dark mode, check sunlight contrast, give weather states distinct colours, test the wordmark at icon size, and design a small mark for the agent's presence. Define the agent's voice as part of the brand (ties to open question E).
+- **Visual identity refresh — decided (B1–B7, 2026-11-10):** palette, dark mode, sunlight contrast, weather colours, app icon, agent mark and type — see their entries above. Original recommendation, now confirmed: keep the core palette (forest / sage / warm neutrals, coral used sparingly) but refresh — add dark mode, check sunlight contrast, give weather states distinct colours, test the wordmark at icon size, and design a small mark for the agent's presence. Define the agent's voice as part of the brand (ties to open question E).
 
 ## 2026-11-09 — All search is agent-driven; map browsing kept
 - **Decision:** Remove direct search from the UI — no filter panel, no filter state, no direct search API calls from the frontend. Every search goes through the agent (typed, spoken, or via prompt chips).
