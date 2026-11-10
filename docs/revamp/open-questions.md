@@ -19,7 +19,7 @@
 ## Product & UX
 1. ~~**Layout**~~ **Decided:** map-first with a two-snap conversation sheet; sidebar on desktop (see `decisions.md`).
 2. ~~**Home screen**~~ **Decided:** no separate home — open on the map, collapsed sheet is home, upcoming trip card leads (see `decisions.md`).
-3. **Clarifying questions:** how eager? Ask before searching, or assume and show editable assumptions? → Leaning "assume + show".
+3. ~~**Clarifying questions**~~ **Decided:** assume + show editable chips; ask one question only when there's no default and a wrong guess would ruin the answer (see `decisions.md`).
 4. **Voice input:** worth it early (planning in the car, hands busy at camp)?
 5. **Proactive messages:** push notifications, email, or in-app only for weather-watch alerts?
 6. **Memory:** what should Pitchd remember automatically vs only when asked? How does the user see and edit it?

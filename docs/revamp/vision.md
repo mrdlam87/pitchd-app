@@ -35,7 +35,7 @@ The original origin story still holds — the killer query is the same — but t
 
 | Stage | What the user experiences | Agent behaviour |
 |---|---|---|
-| **Describe** | Types or speaks a trip in plain English; quick-start chips for common asks | Asks at most one clarifying question if something essential is missing (e.g. dates); otherwise makes sensible assumptions and states them |
+| **Describe** | Types or speaks a trip in plain English; quick-start chips for common asks | Defaults what it can (next weekend, current location, remembered drive limit) and shows the guesses as chips; asks one question with tap answers only when there's no default and a wrong guess would ruin the answer (no starting point, too vague, unsafe-if-wrong). Questions about the user are asked once and remembered |
 | **Agent works** | Sees progress *on the map*: regions being checked, weather overlays appearing, candidate pins dropping in | Streams tool activity as human steps: "Checking weather around Mudgee, Blue Mountains, Hunter…" |
 | **Proposal** | A short ranked shortlist (≈3), a clear top pick, one-line reason each, trade-offs called out | Ranks on weather + drive time + fit to preferences; explains the trade-off between top options |
 | **Refine** | "Closer", "drier", "somewhere with a shower" — by chat or refinement chips; tap a pin to ask "why this one?" | Keeps the conversation context; re-runs only what changed |
@@ -68,7 +68,7 @@ MVP of the revamp = **Describe → Agent works → Proposal → Refine → Commi
 3. **Tap and talk are equal.** Anything you can say, you can usually tap (chips, pins, cards), and anything you tap becomes context for the agent. Typing should never be mandatory for a refinement.
 4. **Show the work, on the map.** Never a bare spinner — short step lines plus pins appearing. Builds trust and hides latency; no walls of reasoning.
 5. **Answers are structured, not just prose.** The agent returns cards (site, weather days, drive time, why) rendered by the UI, with a short natural-language summary on top. The existing card + weather-pin conventions carry over.
-6. **Always show what Pitchd understood.** After every agent turn, its interpretation is shown as editable chips. "Assuming this weekend (Sat–Sun), 3 hr from Sydney, with your dog" as tappable chips the user can change.
+6. **Always show what Pitchd understood.** After every agent turn, its interpretation is shown as editable chips. "Assuming this weekend (Sat–Sun), 3 hr from Sydney, with your dog" as tappable chips the user can change. Guessed values come first and look different from what the user said; tapping one offers quick alternatives and re-runs only what changed.
 7. **Every state is designed** — empty, error, no location, offline, agent unavailable — each a deliberate screen, not a fallback. Basics from day one: 44 pt touch targets, accessible text, readable in sunlight.
 8. **Honest when it can't.** No dry sites within range → say so and offer the trade-off ("dry if you drive 4.5 h, or showers Sunday morning only at X").
 9. **Search is agent-only; viewing is free.** There is no filter panel — every search goes through the agent, and quick chips are canned prompts. But the map is always explorable: pan, zoom, tap a pin for details, with "Ask Pitchd about this site" to bring the agent in. (See `decisions.md`.)

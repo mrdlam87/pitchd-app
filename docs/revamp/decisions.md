@@ -2,6 +2,25 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Ask or assume: assume and show; ask only when it really matters
+- **Decision:** Pitchd fills gaps with sensible defaults and shows them as editable chips. It asks **one** question (with tap answers) only when there's no sensible default **and** a wrong guess would ruin the answer.
+- **Defaults (no question):**
+  | Missing | Default |
+  |---|---|
+  | Dates | Next weekend (Fri pm–Sun); from Sunday evening, the following weekend |
+  | Starting point | Current location → home base |
+  | Drive time | Remembered limit → ~3 h |
+  | Dog, setup, amenities | Remembered values → nothing assumed |
+- **Ask only when:**
+  1. **No starting point at all** (no location, no home base) — "Where are you heading from?"
+  2. **Too vague to search** ("somewhere nice", nothing else) — "Coast, mountains or inland?"
+  3. **A wrong guess could be unsafe or a dead end** and Pitchd doesn't know yet — e.g. setup when the best options are on dirt roads: "Towing a van, or car camping?"
+- **Ask once, remember forever:** questions about *you* (dog, setup, drive tolerance) are asked once and saved to memory; questions about *the trip* (dates, region) are asked fresh when they can't be defaulted.
+- **Assumption chips:** 3–4 per turn, guessed values first and styled differently from what the user actually said. Tapping one offers quick alternatives; picking one re-runs only what changed.
+- **Rejected:** ask first (slow, form-like, fails the Thursday-night test); always assume (some gaps have no default; wrong guesses can be unsafe); ask and answer at once (two things to read; the answer shown may be the wrong one).
+- **Why:** one turn to an answer for most requests; never wastes a search on a guess that couldn't work; questions get rarer with use; the rules are concrete enough to become eval cases ("should it have asked here?").
+- **Revisit if:** evals or the founder's trips show frequent wrong defaults (adjust the defaults) or users re-editing the same chip every time (it should be remembered).
+
 ## 2026-11-10 — Home screen: none — open on the map, the collapsed sheet is home (+ trip card)
 - **Decision:** no separate home screen. The app opens on the map (centred on the user, their home base, or an upcoming trip) with the sheet collapsed. Sketch: https://claude.ai/artifact/APTJwNAEX32ahex7iyqNZp (wireframe only).
   - **Normal day:** a short greeting ("Evening Matt — where to this weekend?"), 3–4 quick chips and the input. Chips adapt to context: day of week ("Dry this weekend" on Thu/Fri), location ("Dump point near me" away from home), remembered preferences ("Dog-friendly within 2 h").
