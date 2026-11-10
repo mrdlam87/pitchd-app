@@ -2,6 +2,19 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Python data layer (Q12): Python owns the schema; the web app reads through the agent API
+- **Decision (option B):** the Python service owns v2's schema and migrations, and is the only thing that talks to the database.
+  - **Schema + migrations:** SQLAlchemy 2.0 models and Alembic migrations in `agent/`. Alembic autogenerates from model changes; every migration is reviewed and committed with the code that needs it.
+  - **Python access:** SQLAlchemy async ORM on psycopg 3; plain SQL via SQLAlchemy Core where it earns it (PostGIS, heavy queries). PostGIS is enabled in the new Supabase project (GeoAlchemy2) for radius and along-route queries (`find_amenities`, phase 5b `plan_route`).
+  - **Web access:** none directly — no Prisma or other ORM in `web/`. Map viewport pins, site details, saved trips and "What Pitchd knows" are plain read endpoints on the Python service, the same API the future native app uses. TS types are generated from FastAPI's OpenAPI spec (`openapi-typescript`).
+  - **Auth:** Auth.js keeps Google OAuth with JWT sessions (no database adapter). Its sign-in callback asks the Python service to upsert the user and return their role (`admin | beta | user`). How the web app proves the user's identity on each call (a signed token the service verifies) is settled with Q11.
+  - **v1 data:** the one-off campsite + amenity copy is a Python script into v2's schema; v2 tables don't have to match v1's.
+  - **Supabase gotchas (into v2's `CLAUDE.md`):** turn off the auto-generated Data API, or enable RLS with no policies on every table, so the anon key can't read anything; the app connects through the Supavisor pooler in transaction mode with psycopg prepared statements disabled (`prepare_threshold=None`); Alembic uses the direct connection.
+- **Rejected:** A, Prisma owns it (the main writer would depend on a TS schema and a Node migration step; two model definitions drift; weak PostGIS support); C, psycopg + hand-written SQL migrations (every mapping by hand, no autogenerate while the schema is still moving — plain SQL stays available through Core); D, shared SQL migrations with both apps reading directly (data rules in two places, a third client for native, breaks the thin-client decision); E, the agent calling Next.js API routes as tools (backwards dependency, serverless cold starts on every tool call, logic in the thin layer). Also SQLModel (lags SQLAlchemy, awkward with Alembic) and supabase-py / PostgREST (HTTP hop, weak for transactions and geo queries).
+- **Why:** the owner of the schema should be its main writer; one API keeps logic in Python as the platform decision requires, so native is a new frontend; generated types keep the web app typed without an ORM; PostGIS becomes first-class; SQLAlchemy + Alembic is the standard Python stack with the most learning material.
+- **Supersedes:** `architecture.md`'s "schema migrations stay owned by Prisma" (written before D gave v2 its own database), and v1's "Prisma for all DB interactions — no raw SQL" convention for v2.
+- **Revisit if:** map viewport reads through the service are noticeably slow on a phone → serve pins as cached vector tiles or a CDN-cached endpoint before giving the web app its own database access.
+
 ## 2026-11-10 — Visual identity B7 · Type: Lora for the wordmark and a few headings, DM Sans for everything else
 - **Decision (option B):** two faces. Nunito (v1's default body font) is dropped. Sketch (all five body options at real sizes): https://claude.ai/artifact/Le1D31kxmCFKJHBRkoyfC3
 - **Lora** — Bold for the wordmark and the app icon "d" (exported as outlined SVG, so they never wait for the font — B5); SemiBold 17–19 px for the collapsed-sheet greeting; headings in the expanded sheet (trip titles, "Trips", "What Pitchd knows") and site detail titles. Never for reading text or anything under 15 px.

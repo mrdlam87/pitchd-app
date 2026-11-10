@@ -31,7 +31,7 @@
 ## Technical
 10. ~~Repo layout~~ **Resolved:** new `pitchd-v2` repo (see D).
 11. **Agent hosting:** Fly.io vs Railway vs Render vs Cloud Run.
-12. **Python data layer:** SQLAlchemy vs psycopg with plain SQL vs calling existing Next.js API routes as tools. (Note: current convention says Prisma only for the Next.js app.)
+12. ~~**Python data layer**~~ **Decided:** Python owns the schema (SQLAlchemy 2.0 + Alembic, PostGIS); the web app has no database access and reads through the agent service's API (see `decisions.md`).
 13. **Models:** which models for planning vs sub-tasks — decide with evals in phase 5. `CLAUDE.md` currently says Haiku for MVP; revisit for the agent.
 14. **Managed Agents:** use for the weather-watch / scheduled work, or self-host everything?
 15. **Routing data:** drive times — Mapbox Directions cost at scale?

@@ -5,25 +5,26 @@
 ## Shape
 
 ```
- ┌───────────────────────────┐        stream (SSE)        ┌──────────────────────────────┐
+ ┌───────────────────────────┐  stream (SSE) + read API   ┌──────────────────────────────┐
  │ Next.js (Vercel)          │ ◄────────────────────────► │ Python agent service         │
- │ - Auth (Google OAuth)     │   user msg / agent events  │ (FastAPI)                    │
- │ - Map + conversation UI   │                            │ - Agent loop (Anthropic SDK) │
+ │ - Auth (Google OAuth, JWT)│  user msg / agent events;  │ (FastAPI)                    │
+ │ - Map + conversation UI   │  pins, trips, memory reads │ - Agent loop (Anthropic SDK) │
  │ - Renders structured cards│                            │ - Tools (Python functions)   │
- └───────────┬───────────────┘                            │ - Prompts, evals             │
-             │                                            └──────┬───────────┬───────────┘
-             │ Prisma                                            │           │
-             ▼                                                   ▼           ▼
- ┌───────────────────────────────────────────────┐        Open-Meteo    Routing / geocode
- │ Supabase Postgres                             │        (weather)     (Mapbox)
- │ campsites, amenities, users, trips,           │
- │ preferences, conversations, tool/agent logs   │
- └───────────────────────────────────────────────┘
+ │ - No database access      │                            │ - Prompts, evals             │
+ └───────────────────────────┘                            │ - SQLAlchemy models, Alembic │
+                                                          └──────┬──────────┬────────┬───┘
+                                                    SQLAlchemy   │          │        │
+                                                    (psycopg 3)  ▼          ▼        ▼
+ ┌───────────────────────────────────────────────────────────────────┐  Open-Meteo  Routing /
+ │ Supabase Postgres + PostGIS (v2's own project)                    │  (weather)   geocode
+ │ campsites, amenities, facts, proposals, users, trips, stops,      │              (Mapbox)
+ │ preferences, conversations, tool/agent logs                       │
+ └───────────────────────────────────────────────────────────────────┘
 ```
 
-- **Frontend** stays Next.js on Vercel. It owns auth and the UI, and calls the agent service with the user's identity.
+- **Frontend** stays Next.js on Vercel. It owns sign-in and the UI. It has no database access: it calls the agent service with the user's identity for conversations *and* for plain reads (map pins, site details, saved trips, memory) — the same API a native app will use. TS types are generated from the service's OpenAPI spec.
 - **Agent service** is a separate Python service, because agent turns can run for tens of seconds — a poor fit for serverless function limits. Candidate hosts: Fly.io, Railway, Render, Cloud Run.
-- **Database** stays the existing Supabase Postgres. Python reads it with its own data layer (Prisma is TypeScript-only). Schema migrations stay owned by Prisma to keep one source of truth.
+- **Database** is v2's own Supabase project (decision D) with PostGIS. The Python service owns the schema — SQLAlchemy 2.0 models + Alembic migrations in `agent/` — and is the only reader and writer. Plain SQL via SQLAlchemy Core where it earns it (geo queries). See the Q12 entry in `decisions.md` for auth flow and Supabase connection gotchas.
 
 ## Agent
 
