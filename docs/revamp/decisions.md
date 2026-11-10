@@ -2,6 +2,157 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Display of freshness & confidence (Q23): quiet unless it matters
+- **Decision (option C):**
+  1. **Checked facts look plain.** An `official` or `council` fact at high/medium confidence, checked within 12 months, shows with no label ("Dogs: no").
+  2. **Shaky facts say "unconfirmed" in words** — OSM or `agent_inferred` sources, low confidence, or older than 12 months. Muted text; never coral (B1) or weather colours (B4).
+  3. **Warnings come first:** "closed", "no water", "road impassable" (official, or cautious camper reports per Q19/Q22) as one line at the top of the card, with an icon and words.
+  4. **Camper notes get one dated line** ("Showers broken — camper note, 3 days ago") and disappear when they expire.
+  5. **Tap a fact for its source.** Site detail has a "Sources" section: each fact with source, checked date and link — this is also the attribution Q21 requires.
+  6. **The planner mentions freshness only when the ask depends on it** ("Dogs allowed — NSW Parks, checked 3 weeks ago" / "the dogs rule is unconfirmed, check before you go"), never for every fact.
+  - The "unconfirmed" rule lives in the service (one function), and the read API returns a display state per fact (`confirmed` | `unconfirmed` | `warning` | `camper_note`) so web and native render the same thing.
+- **Rejected:** A — label every fact (clutter, poor in sun); B — nothing on cards (a guess looks like a checked fact); D — one site-level trust badge (hides which fact is shaky).
+- **Why:** most facts are fine and stay quiet; detail appears only where it should change what you do, and the full source is one tap away.
+- **Revisit if:** testers miss "unconfirmed" labels on facts they relied on, or so many facts are unconfirmed that the label becomes noise (fix the data first, then the 12-month window).
+
+## 2026-11-10 — User reports (Q22): camper notes now, facts change only after a check
+- **Decision (option C):**
+  1. **A report never changes a fact by itself.** Facts change only via an official-source re-check by the data agent or a human review.
+  2. **It shows at once as a dated camper note** beside the official fact ("A camper reported the showers broken 3 days ago — not yet confirmed"); the planner mentions it when relevant.
+  3. **It bumps the site to the front of the data agent's re-check list** and lands in the review queue.
+  4. **Camper notes expire** after ~30 days unless reported again — they describe temporary conditions.
+  5. **Counting:** signed-in users only; one report per person per site per fact; 2+ different campers within 30 days → top of the queue, marked "likely".
+  6. **Cautious reports** ("closed", "no water", "road impassable") show as a warning on the site immediately — same asymmetry as Q19.
+  7. **Later (stage 2):** per-user report rate limits; per-reporter trust scores only if logs show a need.
+- **Rejected:** A — queue only (others see nothing, even "closed"); B — N reports auto-change a fact (gameable; a true "closed" waits for more people); D — trust scores (overkill for an invite-only beta).
+- **Why:** campers get today's news immediately, the official record stays clean, and repeated reports can't rewrite facts.
+- **Revisit if:** reports are frequent and accurate enough that waiting for a check is the bottleneck, or abuse appears.
+
+## 2026-11-10 — Source access (Q21): open data first, then polite reads of approved official sites
+- **Decision (option B, with C later):**
+  1. **Open data first** (data.gov.au, data.nsw, OSM) wherever a feed exists; read web pages only for facts feeds don't carry (dogs, showers, booking).
+  2. **Source allowlist in code.** The agent may fetch only listed domains — also stops a planted link steering it (data-agent rule 6).
+  3. **Terms check before a source is added.** Each entry records licence, terms URL, robots.txt result and date checked. NSW National Parks is checked before the pilot (not verified from this session — the site was outside its network allowlist; search results suggest CC BY 4.0 with exclusions).
+  4. **Polite fetching:** generic bot user agent with the Pitchd URL (no personal details), obey robots.txt, a few seconds between requests per host, off-peak runs, no repeat fetches within a run.
+  5. **Store facts, not pages:** the fact, a short evidence quote and the source URL. The UI credits and links the source ("Source: NSW National Parks").
+  6. **Recheck each source's terms before charging money (stage 2+)** — CC BY usually allows commercial use with attribution, but excluded material doesn't.
+  7. **Later (C):** once the pilot has results, ask NPWS and Parks Victoria about an official feed or closure alerts. Not on the critical path.
+- **Found so far:** no NSW open campground dataset with facility detail. Useful feeds: NPWS Estate (park boundaries, CC BY, quarterly), NPWS facilities geodatabase (may include campgrounds — check fields), TfNSW NSW Rest Areas, data.gov.au open space layer.
+- **Rejected:** A — open data only (doesn't carry the facts that matter); D — fetch anything reachable (terms breaches, blocking, junk sources).
+- **Why:** gets the key facts from the official source, within each site's rules, and keeps the agent on vetted sites.
+- **Revisit if:** a source refuses or blocks automated access (drop it, or ask permission), or an authority offers a feed.
+
+## 2026-11-10 — Review UI (Q20): terminal tool for the pilot, admin page at D3
+- **Decision (option B, then A):**
+  - **Pilot: a terminal review tool** (`pitchd review`) in the data agent's CLI. Shows one proposal at a time — site, current value, proposed value, source link and quoted evidence — with keys for approve / reject / skip and a right/wrong verdict.
+  - **One review code path.** Approve/reject and verdicts go through shared review functions that also update the per-key trust table (Q19). Nothing edits `status` directly.
+  - **Read-only CSV export** of past verdicts for accuracy reports — never imported back.
+  - **Later (D3, when the data agent is scheduled): an `/admin/review` page** in the v2 web app, `admin` role only, served through the agent API and calling the same review functions — a new screen, not new logic. Built when the queue becomes a few items a week worth clearing from a phone.
+- **Rejected:** A first — blocks the pilot on the v2 web app, auth and API; C spreadsheet round-trip — import errors and stale copies; D Supabase table editor — raw JSON, no evidence view, bypasses the trust table.
+- **Why:** reviewing can start now with almost nothing to build, every verdict is recorded in one place, and the nicer screen comes when it's needed.
+- **Revisit if:** the pilot review is slow enough in a terminal that a basic page would pay for itself sooner.
+
+## 2026-11-10 — Auto-approve threshold (Q19): earn trust per kind of fact
+- **Decision (option C):**
+  1. **No-change re-checks apply straight away.** A re-check that finds the same value only updates `checkedAt` — not a change, no review. This is most of the volume after the first pass.
+  2. **Pilot: every real change is human-reviewed.** That review is needed anyway to measure the ≥ 90% target, and each verdict is recorded (it is the first eval set).
+  3. **After the pilot, auto-approve is switched on per fact key** (`toilets`, `dogs_allowed`, …) once the agent's proposals for that key have matched the reviewer ≥ 95% over ≥ 30 reviews — and even then only for `official` sources at `high` confidence.
+  4. **Cautious changes apply at once and are flagged.** An official source saying "closed" or "no dogs" goes live immediately (shown to users) and still lands in the queue for a look. Wrongly cautious costs a different campsite; wrongly permissive sends someone to a closed site or a fine.
+  5. **Spot checks:** ~1 in 20 auto-approved changes is sent to the queue at random. If a key's agreement drops below 95%, its auto-approve switches off automatically.
+  - Rules live in code (a small per-key trust table: reviews, agreements, enabled), never in the prompt. The model never decides whether its own proposal is approved.
+- **Rejected:** A — review everything (≈1,000 items for the pilot, doesn't scale); B — official + high confidence from day one (trusts extraction before it's measured); D — the model decides (it would approve its own work; breaks data-agent rule 6).
+- **Why:** as safe as A during the pilot at no extra cost, as cheap as B once trust is earned, and trust is evidence-based per fact.
+- **Revisit if:** the review queue is still too big after the pilot (lower the 30-review bar or widen to council sources), or spot checks keep catching errors on an enabled key.
+
+## 2026-11-10 — Models (Q13): Sonnet planner + Haiku sub-tasks to start; phase 5 evals pick; cheap to switch
+- **Decision (option B) — starting roles:**
+  | Job | Model | Effort |
+  |---|---|---|
+  | Planner (user-facing) | Sonnet 5.5 | Medium; low for simple asks ("dump points near Mudgee") |
+  | Small sub-tasks (stated-fact detection for memory, conversation titles, step-line wording) | Haiku 5.5 | Low; small prompts |
+  | Data agent extraction | Haiku 5.5 via the Message Batches API | Sonnet 5.5 only for source conflicts |
+  | Eval grader | Opus 5.5 | Offline, low volume — stronger than what it grades |
+- **How phase 5 chooses:** run the 20–50 query eval set across Haiku 5.5 (medium / high), Sonnet 5.5 (low / medium / high) and Opus 5.5 (low / medium). Score answer quality, cost per trip, time to first pins (~2 s target), and ask-or-assume correctness. **Pick the cheapest setup that passes the quality bar within ≤ US$0.30 a trip (Q17).** Haiku is the one to beat (~20× cheaper). Try the same model at lower effort before building any router — simpler, and one prompt cache.
+- **Switching rules (go into v2's `CLAUDE.md`) — so changing a model is a config change plus an eval run:**
+  1. **Model + effort per job live in config,** never hard-coded; every turn logs the model and effort used.
+  2. **Write to what all three models share:** never turn thinking off (depth is controlled by effort only); always set effort explicitly (defaults differ: medium on Opus/Haiku, high on Sonnet); never force a tool call (unsupported on Opus 5.5 / Sonnet 5.5) — use structured outputs and strict tool schemas for the card output contract.
+  3. **One refusal handler** that works with or without the API's built-in fallback model (on for Sonnet/Opus; Haiku has none, so plain retry + error path); always check `stop_reason` before reading content.
+  4. **Cap context size per job** (compaction / context editing) — Haiku's price jumps 5× above 100k-token prompts.
+  5. **Pass conversation history back unchanged,** including thinking blocks, so a model switch mid-conversation just works (the API drops reasoning the new model can't read). Expect one prompt-cache restart.
+  6. **Model upgrades:** read the migration notes → change config → run the evals → fix regressions. Usually half a day to two days, mostly prompt tuning.
+- **Cost of switching (with the rules):** config change in minutes; one eval run ~an hour and ~US$10–25 per setup at Sonnet prices (full sweep ~US$50–100); prompt re-tuning sometimes a day or two, guided by the evals.
+- **Rejected:** A, Haiku everywhere (v1's rule — in phases 1–4 you couldn't tell a tool bug from a model that isn't capable enough); C, Opus planner (2–3× the budget, slower first answers); D, a Haiku/Sonnet router now (premature — router only if logs justify it, per the search decision; two models means two prompt caches).
+- **Why:** a planner strong enough that early failures point at tools and prompts; close to budget after tuning; the switching rules keep the phase 5 choice — and every later model release — cheap.
+- **Supersedes:** v1's "Claude Haiku for all MVP AI features" convention, for v2.
+- **Revisit:** at phase 5 (the evals make the real choice), and at each new model release.
+
+## 2026-11-10 — Managed Agents (Q14): self-host now; trial it for the data agent at D3
+- **Decision (option C):**
+  - **Weather watch — no Managed Agents.** A Cloud Run Job on Cloud Scheduler (Q11) re-fetches each saved trip's forecast and applies the thresholds in code (as decided). Only when a trip crosses a threshold does it call our own planner to prepare 2–3 alternatives. Tested with backtests.
+  - **Data agent D1–D2 — our own hand-written loop,** as already decided; the hand-reviewed results become the eval set.
+  - **D3 — a fair comparison:** run the same region both ways. **Managed Agents:** a scheduled deployment with built-in web search/fetch, a dollar session budget, and an outcome checklist per site. **Ours:** a Cloud Run Job, with extraction through the Message Batches API (50% off). Score both against the D2 eval set on accuracy, cost per site and upkeep time; keep the winner.
+  - **MCP server as a side effect:** for Managed Agents to write to our database, the spike exposes `propose_campsite_update` (and the read tools it needs) as an MCP server, with credentials in a Managed Agents vault. It can only write to the proposal queue — "propose, don't overwrite" still holds. This starts roadmap phase 7.
+- **Cost notes (from the docs):** Managed Agents bills model tokens at list price + $0.08 per session hour + $10 per 1,000 web searches; no batch discount. Tools that touch our database are ours either way (custom tools or our MCP server).
+- **Rejected:** A, Managed Agents for all scheduled work now (skips the hand-written-loop learning decision; the weather watch is mostly a cron job and would need our tools over MCP; no batch discount); B, self-host permanently without trying it (we'd rebuild web fetching, run tracking and spend caps ourselves and never test whether Managed Agents does it better); D, the planner on Managed Agents too (every planner tool is ours anyway; extra hop on user-facing latency; reverses the harness decision).
+- **Why:** each job gets the tool that fits — plain code for a threshold check, an agent platform for open-ended web reading; the learning path stays intact; the choice for the data agent is made from evidence.
+- **Revisit if:** the D3 comparison is a clear win for Managed Agents → move scheduled data-agent runs there; or the weather watch's alternatives need open-ended research → reconsider for that step only.
+
+## 2026-11-10 — Budget per planned trip (Q17): target ≤ US$0.30, with hard caps
+- **Decision (option B):**
+  - **Target:** median **≤ US$0.30 per planned trip**, all-in (model + routing). The model is almost the whole bill — weather is free, Cloud Run roughly free at this scale.
+  - **Hard cap per conversation: US$1.50.** The agent loop tracks spend from each response's `usage`; near the cap it stops calling tools and answers with what it has ("Here's my best pick so far…") — never a cut-off answer. Also catches runaway loops.
+  - **Per-user caps from stage 2:** ~US$1/day and ~US$10/month, adjustable by role. Founder: no cap, alerts only.
+  - **Visible spend:** cost per trip, turn and tool logged from day one; Q13 evals report quality *and* cost per trip, so the model choice weighs both.
+  - **Billing alerts:** Anthropic and Google Cloud at A$20/month in stage 1.
+- **Starting estimate** (US$, ~16 model calls per trip — ~4 turns × ~4 calls; per call ~10k cached input, ~5k new, ~1.5k output incl. thinking; replace with real logs):
+  | Model (in / out / cache read per MTok) | Per trip | Light trip (8 calls) |
+  |---|---|---|
+  | Opus 5.5 ($4 / $20 / $0.20) | ~$0.90 | ~$0.45 |
+  | Sonnet 5.5 ($2 / $10 / $0.10) | ~$0.45 | ~$0.23 |
+  | Haiku 5.5 ($0.10 / $0.50) | ~$0.02 | ~$0.01 |
+- **Where the target comes from:** if Pitchd ever charged ~A$5/month, model cost should stay under ~a third of that; at ~4 trips/month plus small asks that's ~US$0.30 a trip. Reachable with a Sonnet-class planner + Haiku sub-tasks after caching and effort tuning; Opus only where evals show it's needed and it fits.
+- **Rejected:** A, no target (nothing to tune against; costs creep unnoticed); C, ≤ US$0.05 (forces Haiku everywhere and decides Q13 before the evals).
+- **Why:** gives the Q13 evals a real bar; caps protect against runaway loops and abuse before the beta; graceful wrap-up keeps the "never a broken answer" rule.
+- **Revisit if:** evals show quality needs a model that can't meet the target after tuning → decide then whether to raise it, knowing the cost; or real logs show trips cost far less than estimated → tighten it.
+
+## 2026-11-10 — Routing & drive times (Q15): estimate first, Mapbox for the top few
+- **Decision (option B):**
+  - **Estimate in PostGIS first:** filter and rank candidates by straight-line distance × a road factor (tuned per region type — coast, mountains, inland). Call the **Mapbox Matrix API only for the ~10 sites the agent will actually show** (~30 origin–destination pairs per trip vs ~100). Free for roughly 3,000 trips/month; ~US$0.06 a trip beyond that.
+  - **"On the way" amenities:** one Mapbox Directions request per trip for the route line — negligible.
+  - **`drive_time` is a thin interface over a provider,** so switching to a self-hosted router changes one module. **Trigger:** Mapbox routing passes ~US$50/month, or the terms block a cache we need → self-host OSRM or Valhalla on Australian OSM data (option C).
+  - **Geocode against our own data first:** towns, parks and campsite names from our DB plus the free Geoscience Australia gazetteer, with fuzzy matching (also handles misheard names like "Gan Guddy" → Ganguddy). Mapbox geocoding is the fallback, and its results aren't stored.
+  - **Before the build:** confirm Mapbox prices and product terms on mapbox.com — especially whether drive times may be cached briefly within a conversation, and the rule that routing results are shown on a Mapbox map (we use Mapbox maps, so it should be fine). Prices above are from third-party summaries: ~100k Matrix pairs and ~100k Directions requests free a month, then ~US$2 per 1,000; default terms appear to prohibit storing results; stored ("permanent") geocoding ~US$5 per 1,000.
+- **Rejected:** A, Mapbox Matrix for every candidate (~US$0.20 a trip at scale — nearly the whole Sonnet bill — for sites mostly dropped); C now, our own router (another service to run before volume justifies it); D, Google Routes (dearer, a second map vendor) or OpenRouteService (free-tier daily caps too tight).
+- **Why:** cuts routing to about a third, keeps it free through the beta, real drive times where the user sees them, and a clean exit to self-hosting.
+- **Revisit if:** estimated drive times rank sites badly (the road factor misleads) → widen the Matrix shortlist; or Mapbox spend hits the trigger → self-host.
+
+## 2026-11-10 — Agent hosting (Q11): Cloud Run in Sydney, Supabase in Sydney
+- **Decision:** the Python agent service runs on Google Cloud Run in `australia-southeast1` (Sydney). v2's Supabase project is created in `ap-southeast-2` (Sydney); Vercel functions are pinned to `syd1`.
+  - **Planner:** a Cloud Run service (FastAPI). Request timeout raised well above the 5-min default (60 min max) to cover phase 5b's longer runs.
+  - **Background work:** the data agent and weather watch run as **Cloud Run Jobs** triggered by **Cloud Scheduler** — same container image, different entry points. If Q14 moves scheduled work to Managed Agents, the Jobs just aren't used.
+  - **No work after the response:** CPU is only allocated during requests by default, so anything slow or deferred goes to a Job, never a background task in the service.
+  - **Resumable streams:** agent events are written to Postgres with IDs (already planned), so a reconnect that lands on a different instance resumes correctly.
+  - **Cold starts vs the ~2 s first-pins target:** stage 1 scales to zero and the web app sends a warm-up ping on open (the service is awake by the time you've typed); from stage 2, one minimum instance + startup CPU boost.
+  - **Auth between web and service** (left open in Q12): the browser streams **directly** from the agent service, not through Vercel (proxying would burn serverless time on long streams). A Next.js route turns the Auth.js session into a short-lived signed token (~10 min, refreshed) carrying user ID + role; the service verifies it with a public key, so only Next.js holds the private key. Needs a custom API domain and CORS limited to the web app's origin.
+  - **Ops:** secrets in Secret Manager; deploys from GitHub Actions with Workload Identity Federation (no stored keys); a billing budget alert from day one; confirm Sydney pricing for a minimum instance on the live calculator before stage 2.
+  - **Portability:** a plain `Dockerfile` with config in environment variables — it runs on Fly.io unchanged if Google Cloud gets in the way.
+- **Rejected:** Fly.io (close second — simpler setup and no cold starts, but a patchier reliability record, more to manage yourself, and basic scheduling); Railway and Render (no Australian region — every database query in a turn would cross to Singapore and back).
+- **Why:** same city as the database, which matters because one turn makes many queries; one platform fits both the interactive planner and the batch/scheduled agents; long timeouts suit agent turns; costs close to nothing at one user and scales without code changes; no lock-in.
+- **Revisit if:** cold starts still hurt with the warm-up ping, or Google Cloud setup and permissions eat more time than the learning is worth → move the same container to Fly.io `syd`.
+
+## 2026-11-10 — Python data layer (Q12): Python owns the schema; the web app reads through the agent API
+- **Decision (option B):** the Python service owns v2's schema and migrations, and is the only thing that talks to the database.
+  - **Schema + migrations:** SQLAlchemy 2.0 models and Alembic migrations in `agent/`. Alembic autogenerates from model changes; every migration is reviewed and committed with the code that needs it.
+  - **Python access:** SQLAlchemy async ORM on psycopg 3; plain SQL via SQLAlchemy Core where it earns it (PostGIS, heavy queries). PostGIS is enabled in the new Supabase project (GeoAlchemy2) for radius and along-route queries (`find_amenities`, phase 5b `plan_route`).
+  - **Web access:** none directly — no Prisma or other ORM in `web/`. Map viewport pins, site details, saved trips and "What Pitchd knows" are plain read endpoints on the Python service, the same API the future native app uses. TS types are generated from FastAPI's OpenAPI spec (`openapi-typescript`).
+  - **Auth:** Auth.js keeps Google OAuth with JWT sessions (no database adapter). Its sign-in callback asks the Python service to upsert the user and return their role (`admin | beta | user`). How the web app proves the user's identity on each call (a signed token the service verifies) is settled with Q11.
+  - **v1 data:** the one-off campsite + amenity copy is a Python script into v2's schema; v2 tables don't have to match v1's.
+  - **Supabase gotchas (into v2's `CLAUDE.md`):** turn off the auto-generated Data API, or enable RLS with no policies on every table, so the anon key can't read anything; the app connects through the Supavisor pooler in transaction mode with psycopg prepared statements disabled (`prepare_threshold=None`); Alembic uses the direct connection.
+- **Rejected:** A, Prisma owns it (the main writer would depend on a TS schema and a Node migration step; two model definitions drift; weak PostGIS support); C, psycopg + hand-written SQL migrations (every mapping by hand, no autogenerate while the schema is still moving — plain SQL stays available through Core); D, shared SQL migrations with both apps reading directly (data rules in two places, a third client for native, breaks the thin-client decision); E, the agent calling Next.js API routes as tools (backwards dependency, serverless cold starts on every tool call, logic in the thin layer). Also SQLModel (lags SQLAlchemy, awkward with Alembic) and supabase-py / PostgREST (HTTP hop, weak for transactions and geo queries).
+- **Why:** the owner of the schema should be its main writer; one API keeps logic in Python as the platform decision requires, so native is a new frontend; generated types keep the web app typed without an ORM; PostGIS becomes first-class; SQLAlchemy + Alembic is the standard Python stack with the most learning material.
+- **Supersedes:** `architecture.md`'s "schema migrations stay owned by Prisma" (written before D gave v2 its own database), and v1's "Prisma for all DB interactions — no raw SQL" convention for v2.
+- **Revisit if:** map viewport reads through the service are noticeably slow on a phone → serve pins as cached vector tiles or a CDN-cached endpoint before giving the web app its own database access.
+
 ## 2026-11-10 — Visual identity B7 · Type: Lora for the wordmark and a few headings, DM Sans for everything else
 - **Decision (option B):** two faces. Nunito (v1's default body font) is dropped. Sketch (all five body options at real sizes): https://claude.ai/artifact/Le1D31kxmCFKJHBRkoyfC3
 - **Lora** — Bold for the wordmark and the app icon "d" (exported as outlined SVG, so they never wait for the font — B5); SemiBold 17–19 px for the collapsed-sheet greeting; headings in the expanded sheet (trip titles, "Trips", "What Pitchd knows") and site detail titles. Never for reading text or anything under 15 px.

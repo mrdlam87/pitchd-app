@@ -22,16 +22,17 @@ The work is slow, repetitive, and needs judgement (reading park websites, reconc
 | **Dedupe** | Finds the same site under two names or slightly different coordinates; proposes merges | DB query, distance check |
 | **Describe** | Writes short, factual blurbs from verified facts only | DB read |
 | **Resolve conflicts** | Source A says dogs allowed, B says no → prefers the higher-priority source and records why, or flags for review | source-priority rules (in code) |
-| **Ingest user reports** | Planner conversations like "the showers there are closed" become reports in the review queue | `report_issue` (planner tool) |
+| **Ingest user reports** | Planner conversations like "the showers there are closed" become reports: shown at once as a dated camper note (expires ~30 days), queued for review, and the site jumps the re-check list; never changes a fact alone (Q22) | `report_issue` (planner tool) |
 
 ## 4. Design rules
 
-1. **Propose, don't overwrite.** Agents write to a review queue, never straight to live records. Auto-approve only high-confidence changes from official sources; everything else is human-reviewed.
+1. **Propose, don't overwrite.** Agents write to a review queue, never straight to live records. Auto-approve is earned per fact key (Q19): no-change re-checks just update `checkedAt`; the pilot reviews every change; after it, a key auto-approves official + high-confidence changes once it has ≥ 95% agreement over ≥ 30 reviews; cautious changes (closed, no dogs) apply at once and are flagged; ~1 in 20 auto-approvals is spot-checked, and a key drops back to review if agreement falls.
 2. **Every fact has provenance.** Store value + source URL + source type + checked date + confidence, e.g. *dogs: no — nationalparks.nsw.gov.au — 2026-11-09 — high*. The planner can then say "verified last month" or "unverified, check before you go".
 3. **Source priority:** park authority > council / official tourism > OSM > user reports. Encoded in code, not left to the model.
 4. **Refresh by priority, not all at once.** Re-verify most-viewed, soonest-booked (saved trips), and oldest-checked records first.
-5. **Bounded cost.** Cheap model for extraction, stronger model only for conflicts; per-run caps on sites and tool calls; batch processing (async, ~50% cheaper) since nothing is urgent.
+5. **Bounded cost.** Haiku 5.5 for extraction, Sonnet 5.5 only for conflicts (Q13); per-run caps on sites and tool calls; batch processing (async, ~50% cheaper) since nothing is urgent.
 6. **Treat fetched pages as data.** Web content goes into prompts as untrusted input — it can't change the agent's instructions or approve its own changes.
+7. **Approved sources only, fetched politely (Q21).** Open-data feeds first; web fetches only to an allowlist of domains, each with its licence, terms URL, robots.txt result and check date recorded. Obey robots.txt, rate-limit per host, generic bot user agent, store facts + short evidence quotes + source link (never page copies), and credit the source in the UI.
 
 ## 5. Data model additions (draft)
 
@@ -52,17 +53,33 @@ CampsiteUpdateProposal
   status       Enum      // pending | approved | rejected | auto_approved
   createdBy    String    // agent run id
   reviewedAt   DateTime?
+  verdict      Enum?     // correct | wrong — reviewer's call, feeds the trust table
+
+CampsiteReport          // user reports (Q22)
+  campsiteId   → Campsite
+  userId       → User      // one per user per site per key
+  key          String
+  value        Json
+  note         String?
+  createdAt    DateTime
+  expiresAt    DateTime    // ~30 days
+
+FactKeyTrust            // per fact key; rules in code (Q19)
+  key          String
+  reviews      Int
+  agreements   Int
+  autoApprove  Boolean
 ```
 
 ## 6. Pilot (first agent to build)
 
 1. **Scope:** one region the founder camps in — 50–100 sites around the Blue Mountains.
 2. **Build:** a CLI enrichment agent (Python, hand-written loop) that fills dogs / toilets / showers / booking with sources into the proposal table.
-3. **Review by hand** — and record whether each proposed fact was right. That *is* the first eval set.
+3. **Review by hand** in the terminal (`pitchd review`, Q20) — and record whether each proposed fact was right. That *is* the first eval set. An `/admin/review` page on the same review functions follows at D3.
 4. **Done when:** ≥ 90% of high-confidence facts are correct on the hand-reviewed sample, and cost per site is known.
 5. **Then:** expand region by region; add verify + dedupe; schedule it.
 
 ## 7. Where it runs
 
-- Offline / scheduled — no latency pressure. Candidates: Message Batches API for bulk extraction, Managed Agents scheduled runs, or a simple cron job calling the Python service.
+- Offline / scheduled — no latency pressure. Host decided (Q11): a **Cloud Run Job** on Cloud Scheduler, from the same image as the planner. Bulk extraction through the Message Batches API. At D3, the same region is also run on Managed Agents (scheduled deployment, built-in web tools, dollar budget) and the two are compared on the D2 eval set (Q14).
 - Independent of the v2 UI — improves data for v1 too, so it can start immediately.
