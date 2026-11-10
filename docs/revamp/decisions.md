@@ -79,7 +79,7 @@
   | Secondary text | #8a9e8a muted / #5a7a5a sage | 2.6 / 4.4:1 | #4f6b4f (sage, one shade darker); muted grey retired for text (disabled and decoration only) | 5.4:1 |
   | Coral text | #e8674a | 3.0:1 | #b84a33 coral ink (B1) | 4.7:1 |
   | Text on weather colours | white on amber / green | 2.5 / 3.3:1 | ≥ 4.5:1 (colours in B4) | — |
-  | Input and chip borders | #e0dbd0 | 1.4:1 | #9a9282 (3:1 for controls); card borders stay soft but gain a shadow | 3.1:1 |
+  | Input and chip borders | #e0dbd0 | 1.4:1 | #928a7a (3:1 for controls, on both the background and white cards); card borders stay soft but gain a shadow | 3.1:1 on background, 3.4:1 on white |
   | Pins | flat colour, thin white ring | — | darker fill, 3 px white ring, dark hairline; top pick 28 px | — |
   | Text size | — | — | 13 px floor; weight 500+ below 15 px | — |
 - **Weather never by colour alone:** every day column has a label and an icon (ties to B4).
