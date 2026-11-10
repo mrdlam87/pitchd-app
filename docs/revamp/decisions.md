@@ -2,6 +2,14 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — v1 is frozen; retired once v2 handles real trips
+- **Context:** the founder is v1's only user.
+- **Now:** freeze v1 — no new features, M7 polish stops. Only fix what blocks the founder (login, outages). Close or label open M7 issues/PRs "v1 frozen"; carry anything worth keeping into v2's backlog.
+- **Meanwhile:** v1 stays live at `pitchd-app.vercel.app` as the founder's fallback for real trips and a reference for behaviour and data.
+- **Retirement bar:** ~3 real trips planned end to end in v2 without needing v1 (founder's judgement — can be sooner).
+- **On retirement:** point the URL/domain at v2, archive the `pitchd-app` repo read-only, take a final DB backup, then pause/delete v1's Supabase project.
+- **Why:** focus for a solo builder learning a new stack; no gap without a working app; makes the separate-database decision safe; a concrete exit stops v1 lingering. No user comms needed.
+
 ## 2026-11-10 — Agent personality, scope and safety
 - **Personality:** a knowledgeable local mate — straight answer first, practical, honest about uncertainty and data freshness, warm and lightly Aussie (natural AU English, no forced slang), brief (2–4 sentences + cards), no hype.
 - **Scope:** clearly about camping trips — sites, weather, drive times, amenities, dog rules, multi-stop trips, packing, what to know before you go. Trip-adjacent asks (coffee/servo on the way) are fine when tools cover them; general chat, bookings/payments, and anything it can't back with data get a friendly redirect.

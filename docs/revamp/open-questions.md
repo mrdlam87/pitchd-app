@@ -7,7 +7,7 @@
 - **C. Platform:** **Decided:** mobile-first web first, native later (see `decisions.md`).
 - **D. Repo & database:** **Decided:** new `pitchd-v2` repo + separate Supabase project (see `decisions.md`).
 - **E. Agent personality & scope:** **Decided:** knowledgeable local mate; camping-trip scope; safety first (see `decisions.md`).
-- **F. v1's future:** keep running until v2 replaces it, freeze it, or retire it early?
+- **F. v1's future:** **Decided:** freeze now, keep live as fallback, retire after ~3 real trips in v2 (see `decisions.md`).
 - **G. Who's the next user after the founder,** and when?
 
 ## ⚠️ Before touching any v2 code
@@ -15,6 +15,7 @@
 - [x] Repo + database decided (D)
 - [ ] `pitchd-v2` repo created on GitHub (founder) and new Supabase project created
 - [ ] Docs moved from `docs/revamp/` into the v2 repo
+- [ ] v1 frozen: open M7 issues/PRs closed or labelled "v1 frozen"
 
 ## Product & UX
 1. **Layout:** map-first with a conversation sheet (evolves today's drawer), or conversation-first with the map as a panel? → Leaning map-first; prototype both.
