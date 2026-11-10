@@ -2,6 +2,12 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Harness H4 · Subagents: built-in Explore, five role agents, advisers rewritten
+- **Decision (option C):** explorer = built-in `Explore`; new agent files for planner (Opus), implementer (Sonnet; Opus for complex tasks), verifier (Haiku, can't edit code), reviewer (Opus, can't edit code) and eval-runner (Haiku). `senior-engineer` (Opus) and `ux-designer` (Sonnet) rewritten for v2 as advisers; `ux-designer` also reviews `web/` UI changes at step 7. v1 agent memory not carried over; only the advisers keep memory in v2. Tool limits enforced by hooks / permissions. Table in `harness-workflow.md`.
+- **Rejected:** built-in agents only; a file for every role; advisers doing the work.
+- **Why:** the right model per role, and the roles that check work can't change it.
+- **Revisit if:** Haiku verifiers misread failures, or Opus planning/review costs too much.
+
 ## 2026-11-10 — Harness H3b · Skills: project + built-in, Superpowers' focused skills inside `/harness`
 - **Decision (option C):** project skills `/harness`, `/decide`, `/eval`; built-in `code-review` (step 7, medium/high effort), `security-review` (step 8, when relevant), `claude-api` (model-calling `agent/` work), `run` (`web/` checks). Superpowers enabled and pinned in project settings; `/harness` borrows `brainstorming` (vague asks only), `test-driven-development` (`agent/` tools, scoring, thresholds only), `systematic-debugging`, `verification-before-completion`, `receiving-code-review`, `using-git-worktrees` (parallel only), `writing-skills` (setup). Not its flow skills (`writing-plans`, `executing-plans`, `subagent-driven-development`). Figma only when an issue links a design. Full table and leave-out list in `harness-workflow.md`.
 - **Rejected:** ignore Superpowers (rebuilds its good parts); call its flow skills per step or use it as the harness (no resume, plans outside `planning/`, review after every task).

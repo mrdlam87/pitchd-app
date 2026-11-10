@@ -32,7 +32,7 @@ These are already decided (see `decisions.md`). H1 decides *where* each one goes
 | H1 | `CLAUDE.md` layout — one file or split per folder | **Decided:** short root + `agent/` and `web/` files |
 | H2 | Where sessions run + work tracking — issues, plans, how a piece of work flows | **Decided:** local-first via Remote Control; milestones per phase; plan files in `planning/` (amended by H3) |
 | H3 | Skills / commands — the build flow | **Decided:** one resumable `/harness` skill; subagents do the heavy work; `/decide` + `/eval` separate; built-in + focused Superpowers skills inside the steps (H3b) |
-| H4 | Subagents — `senior-engineer`, `ux-designer`, any new ones; agent memory | Open |
+| H4 | Subagents — `senior-engineer`, `ux-designer`, any new ones; agent memory | **Decided:** built-in Explore + five role agents + both advisers rewritten |
 | H5 | Hooks — format / lint / test for Python + TS, guard rails | Open |
 | H6 | Permissions — allow / ask / deny rules | Open |
 | H7 | CI — checks and Claude review on PRs | Open |
@@ -140,3 +140,22 @@ These are already decided (see `decisions.md`). H1 decides *where* each one goes
 - **To confirm at H9:** whether `code-review` must be called from the main session (at higher effort it starts its own subagents, and subagents can't start subagents) — if so, its compact findings still keep main lean and the reviewer subagent handles only the Pitchd checklist; and that agent files can preload the skills each role needs (H4).
 - **Why:** reuse strong, maintained skills for focused jobs; keep the resumable `planning/` flow and the single end-of-work verify the founder chose.
 - **Revisit if:** a Superpowers update changes a borrowed skill's behaviour (hence the pinned version), or its flow skills become configurable enough to replace parts of `/harness`.
+
+### H4 — Subagents: built-in Explore, five role agents, two advisers rewritten (decided 2026-11-10)
+- **Decision (option C):**
+  | Agent | Source | Model | Can | Can't |
+  |---|---|---|---|---|
+  | **explorer** | Built-in `Explore` | Its default | Read and search | Edit anything |
+  | **planner** (also doc writer) | New | Opus — the plan is where mistakes are cheapest to catch | Read; write in `planning/` and `docs/` | Edit code |
+  | **implementer** | New; follows `agent/` or `web/` `CLAUDE.md` by area | Sonnet; Opus for tasks the plan marks complex | Edit code, run commands, use `claude-api` / TDD skills | Push, open PRs, edit `planning/` beyond ticking its task |
+  | **verifier** | New | Haiku — runs commands, reads logs | Run checks; write `verify.md` | Edit code — it reports, never fixes |
+  | **reviewer** (also triager) | New | Opus — stronger than the code it reviews | Read, read-only commands, `code-review` / `security-review`; write `review.md` | Edit code |
+  | **eval-runner** | New | Haiku (the eval grader stays Opus per Q13, set inside `/eval`) | Run `/eval`; write `evals.md` | Edit code or prompts |
+  | **senior-engineer** | Rewritten for v2 | Opus | Adviser for design questions — Python agent loop, FastAPI, SQLAlchemy/PostGIS, Cloud Run, Next.js thin client | Not a harness step |
+  | **ux-designer** | Rewritten for v2 | Sonnet | Adviser, **and** a second reviewer at step 7 for `web/` UI changes — checks against `vision.md` §4–5 and B1–B7 | Edit code |
+- **Agent memory:** nothing carries over from v1 (Prisma patterns, the v1 drawer, weather badges). In v2 only the two advisers keep project memory; the harness roles have none — their state is the `planning/` files, and memory would drift from them.
+- **Limits are enforced:** each agent file lists its allowed tools; writes outside `planning/` by the verifier and reviewer are blocked by a hook or permission rule (H5 / H6).
+- **Model aliases, not IDs,** in agent files (`opus`, `sonnet`, `haiku`), so a new model release needs no edit.
+- **Rejected:** A, built-in agents only (no per-role model or tool limits; instructions repeated in every call); B, a file per role including explorer (duplicates built-in Explore); D, advisers as workers (the same agent reviews its own kind of work; no per-role limits).
+- **Why:** each role gets the model it needs — Opus where judgement matters (plan, review), Haiku where it's mechanical (verify, evals) — and the roles that check work can't change it.
+- **Revisit if:** Haiku verifiers misread failures → Sonnet; or Opus planning/review costs too much per issue → Sonnet with high effort.
