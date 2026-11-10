@@ -2,6 +2,17 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Home screen: none — open on the map, the collapsed sheet is home (+ trip card)
+- **Decision:** no separate home screen. The app opens on the map (centred on the user, their home base, or an upcoming trip) with the sheet collapsed. Sketch: https://claude.ai/artifact/APTJwNAEX32ahex7iyqNZp (wireframe only).
+  - **Normal day:** a short greeting ("Evening Matt — where to this weekend?"), 3–4 quick chips and the input. Chips adapt to context: day of week ("Dry this weekend" on Thu/Fri), location ("Dump point near me" away from home), remembered preferences ("Dog-friendly within 2 h").
+  - **Upcoming trip:** its card leads the sheet ("Lake Burrendong · in 3 days · still dry", with weather days); tapping it reopens that trip's conversation; chips switch to trip tasks (packing list, plan something else). Until the background weather watch exists (phase 6), the card refreshes the forecast on open.
+  - **Forecast turned (later, with weather watch):** the card flags the change and Pitchd offers alternatives, not just a warning.
+  - **First run:** same screen with a one-line intro. Location is asked in context (a "Use my location" chip or a "near me" ask), never on launch; without it the map shows the whole state and the agent asks where you're starting from.
+  - **History:** saved trips and recent conversations live in the expanded sheet — no separate screen or menu.
+- **Rejected:** a v1-style separate home screen (two screens and a jump between them, the mode split we removed; an extra step every visit); opening with the sheet expanded (hides the map, which is the canvas).
+- **Why:** one screen, one mode from the first second; Thursday-night Matt can type within a second of opening; the map is the most useful first view; the trip card brings the "Watch" stage forward without needing push notifications.
+- **Revisit if:** new users in stage 2 don't understand what to do on first open → add a richer first-run sheet, not a separate screen.
+
 ## 2026-11-10 — Layout: map-first with a two-snap conversation sheet (option A)
 - **Decision:** a full-screen map with a bottom conversation sheet that has exactly two snap points. Sketch: https://claude.ai/artifact/PoaxgiCsEUwqkMZC4gfgFh (wireframe only, not the visual design).
   - **Collapsed (~35–40%):** the current turn only: the agent's summary line, assumption chips, a sideways card carousel synced with the pins (swipe a card → map pans to it), and the input box.

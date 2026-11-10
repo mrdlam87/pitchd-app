@@ -72,6 +72,7 @@ MVP of the revamp = **Describe → Agent works → Proposal → Refine → Commi
 7. **Every state is designed** — empty, error, no location, offline, agent unavailable — each a deliberate screen, not a fallback. Basics from day one: 44 pt touch targets, accessible text, readable in sunlight.
 8. **Honest when it can't.** No dry sites within range → say so and offer the trade-off ("dry if you drive 4.5 h, or showers Sunday morning only at X").
 9. **Search is agent-only; viewing is free.** There is no filter panel — every search goes through the agent, and quick chips are canned prompts. But the map is always explorable: pan, zoom, tap a pin for details, with "Ask Pitchd about this site" to bring the agent in. (See `decisions.md`.)
+10. **No home screen — the map is home.** The app opens on the map with the sheet collapsed: a greeting, context-aware chips and the input. An upcoming trip leads as a card; saved trips and recent conversations live in the expanded sheet. Location is asked in context, never on launch. (See `decisions.md`.)
 
 ## 6. What the agent is (and isn't)
 
