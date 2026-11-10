@@ -20,7 +20,8 @@ Two tracks: the **trip planner** (interactive, user-facing) and the **data agent
 | 2 | **Tool Runner + polish** | SDK helpers, streaming, error handling, prompt caching | Same behaviour with less code; streaming output; cache hits visible in usage |
 | 3 | **Service + UI** | FastAPI, streaming to a browser, structured outputs rendered as cards | The founder can plan a real trip in the Next.js app, on a phone |
 | 4 | **Memory & state** | Conversation persistence, user preferences, saved trips | Pitchd remembers the dog and setup; a conversation can be resumed |
-| 5 | **Evals** | Building a test set, grading agent output, comparing models/prompts with evidence | 20–50 real queries with a repeatable score; model choice made from data |
+| 5 | **Evals** | Building a test set, grading agent output, comparing models/prompts with evidence | 20–50 real queries with a repeatable score; model choice made from data; Sarah's killer query + variants included from the start |
+| 5b | **Multi-day trips** (Sarah) | Longer multi-step agent runs, planning a sequence, route-based tools, handling forecast horizons | "5-day caravan trip Melbourne → Adelaide with dump points and swimming stops" produces a day-by-day plan that passes its eval cases; ready before the stage 2 caravan tester |
 | 6 | **Multi-agent & background** | Sub-agents, scheduled jobs; compare self-hosted vs Managed Agents | Nightly "weather watch" alerts on saved trips |
 | 7 | **MCP server** (optional) | Standard tool protocol | Pitchd tools usable from Claude Desktop / Claude Code |
 

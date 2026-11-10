@@ -2,6 +2,16 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Sarah's multi-day route planning: model for it now, build it straight after evals
+- **Decision (option B):**
+  1. **First build:** a trip is an ordered list of stops from day one (a weekend trip is one stop) — no migration later. "On the way" amenities ("dump point or fuel on the way to X") are in, using the already-planned `find_amenities` along a route.
+  2. **New roadmap phase 5b — Multi-day trips, straight after evals:** route geometry; split the route into days by daily drive limit with one site per night; per-day weather — forecast within ~a week, beyond that typical conditions for the time of year (clearly labelled) and re-checked as the date nears; caravan constraints (access, length, dump points) from the data agent's facts. UI: route line on the map and day-by-day cards in the sheet's carousel; tapping a day centres the map on that leg — no new layout.
+  3. **Gate:** ready before the stage 2 caravan tester is invited.
+  4. **Evals:** Sarah's killer query plus 2–3 variants go into the phase 5 eval set from the start, so the gap is measured before the feature exists.
+- **Rejected:** in the first build (doubles the riskiest phase, delays the founder's real weekends); after weather watch (the stage 2 caravan tester would get an app that can't do her main trip; retrofitting multi-stop costs more); only if testers ask (Sarah's pain is already known).
+- **Why:** the weekend flow is the founder's own use and the riskiest part, so it goes first; modelling stops now is nearly free and changing it later isn't; building right after evals means the more complex agent is measured, not guessed; lands in time for the tester it's for.
+- **Revisit if:** phase 5 evals show the single-stop agent isn't reliable yet → fix that before starting 5b; or the founder starts planning multi-day trips himself → bring 5b forward.
+
 ## 2026-11-10 — Campsite availability: know, link, warn — no availability claims
 - **Decision (option B):** Pitchd knows whether a site needs booking, gives a one-tap "Check & book" link, warns in busy periods and offers a backup. It never claims a site is available unless it actually checked.
   - **Data:** the data agent adds sourced booking facts like any other `CampsiteFact`: `booking` (required / first_come / unknown), `booking_url` + provider (NSW Parks, Parks Vic, Hipcamp, park's own site), and `fee`.

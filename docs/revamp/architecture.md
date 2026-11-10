@@ -37,7 +37,8 @@
   | `geocode` | Place name → coordinates |
   | `drive_time` | Origin → destinations travel time |
   | `get_user_profile` / `update_preferences` | Remembered setup, dog, favourite regions |
-  | `save_trip` | Commit a plan |
+  | `save_trip` | Commit a plan — a trip is an ordered list of stops (a weekend trip is one stop) |
+  | `plan_route` *(phase 5b)* | Route geometry between stops; split into days by drive limit |
 - **Search is agent-only.** The frontend never calls search directly. The current `/api/search` pipeline (filters, distance, weather scoring) is ported into the deterministic `search_campsites` tool; the agent decides *what* to search, then compares and explains. Map pan/zoom and pin details remain plain data reads (viewing, not searching).
 - **Fast path:** simple asks ("dump points near Mudgee") should resolve in one tool call at low effort, with the first pins streamed to the map as soon as the tool returns. A hidden router can be added later if logs justify it.
 - **Degraded mode:** if the Claude API is unavailable, show saved trips and last results with a clear message.

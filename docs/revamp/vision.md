@@ -85,7 +85,7 @@ MVP of the revamp = **Describe → Agent works → Proposal → Refine → Commi
 ## 7. Personas, revisited
 
 - **Matt (primary)** — the revamp's first user is effectively the founder, who is Matt. Optimise for the weekend-decision flow first.
-- **Sarah (secondary)** — multi-day, route-based planning was post-MVP before. An agent makes it far more feasible (itinerary = a sequence of tool calls), so it's a strong candidate for revamp phase 2.
+- **Sarah (secondary)** — multi-day, route-based planning was post-MVP before. An agent makes it far more feasible (itinerary = a sequence of tool calls). **Decided:** trips are ordered stops from day one and "on the way" amenities ship in the first build; full itineraries (days split by drive limit, a site per night, per-day weather, caravan constraints, route line + day-by-day cards) come in roadmap phase 5b, straight after evals and before the stage 2 caravan tester.
 
 ## 8. Success signals (draft)
 
