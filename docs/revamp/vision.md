@@ -64,7 +64,7 @@ MVP of the revamp = **Describe → Agent works → Proposal → Refine → Commi
 ## 5. Interface principles
 
 1. **One way to search, one mode.** No search mode vs browse mode — map and conversation always coexist.
-2. **The map is the shared canvas; the conversation drives it.** Not a chat app with a map bolted on, and not a map with a chatbot bolted on. The agent's work shows up spatially. Candidate layout: map full-screen with a conversation sheet — redesigned from scratch, not v1's drawer (see §4).
+2. **The map is the shared canvas; the conversation drives it.** Not a chat app with a map bolted on, and not a map with a chatbot bolted on. The agent's work shows up spatially. **Layout (decided):** map full-screen with a two-snap conversation sheet — collapsed shows the current turn (summary, assumption chips, card carousel synced with pins, input); expanded shows the full thread. Input always visible; no half state. Desktop: the same pieces in a left sidebar beside the map. Redesigned from scratch, not v1's drawer (see §4 and `decisions.md`).
 3. **Tap and talk are equal.** Anything you can say, you can usually tap (chips, pins, cards), and anything you tap becomes context for the agent. Typing should never be mandatory for a refinement.
 4. **Show the work, on the map.** Never a bare spinner — short step lines plus pins appearing. Builds trust and hides latency; no walls of reasoning.
 5. **Answers are structured, not just prose.** The agent returns cards (site, weather days, drive time, why) rendered by the UI, with a short natural-language summary on top. The existing card + weather-pin conventions carry over.

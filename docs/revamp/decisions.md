@@ -2,6 +2,17 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Layout: map-first with a two-snap conversation sheet (option A)
+- **Decision:** a full-screen map with a bottom conversation sheet that has exactly two snap points. Sketch: https://claude.ai/artifact/PoaxgiCsEUwqkMZC4gfgFh (wireframe only, not the visual design).
+  - **Collapsed (~35–40%):** the current turn only: the agent's summary line, assumption chips, a sideways card carousel synced with the pins (swipe a card → map pans to it), and the input box.
+  - **Expanded (~90%):** the full thread: earlier turns, the agent's step lines, cards, chips, input.
+  - **Rules:** no half state; the input box is visible in both states; tapping a pin or card while expanded drops the sheet to collapsed and centres the map on it.
+  - **Desktop:** the same pieces in a fixed left sidebar (~400 px) next to the map. No sheet, so no gestures.
+- **Rejected:** B (conversation-first, map as a strip) — the agent's work no longer plays out on the map; C (Map ⇄ Chat tabs) — brings back two modes, v1's core problem; D (floating input + carousel, no thread) — kept as the fallback shape.
+- **Why:** the only option where the map stays the canvas *and* the conversation drives it; two snap points directly address v1's glitchy, over-loaded drawer; borrows D's carousel, the best part of D.
+- **Next:** prototype the sheet on a real phone (with `vaul` or similar) before building around it; the visual design is a separate, later pass.
+- **Revisit if:** the collapsed sheet feels cramped on a real phone → first move the chips to the expanded view; only then fall back to D's shape.
+
 ## 2026-11-10 — Staged rollout: founder → trusted campers → closed beta
 - **Stage 1 — founder only.** Move on when: ~3 real trips planned in v2; data pilot ≥ 90% accurate on high-confidence facts; cost per planned trip known; per-user rate limits and cost caps in place.
 - **Stage 2 — 3–5 trusted campers.** Deliberately varied: a caravan / long-trip camper (Sarah), a dog owner, a non-technical user, ideally someone outside Sydney. Invite-only via roles; short post-trip check-ins. Move on when they plan real trips unaided and the main confusions are fixed.

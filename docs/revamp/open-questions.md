@@ -2,7 +2,6 @@
 
 ## v2 rebuild (answer first — these shape everything else)
 - **A. What's wrong with v1's UI?** **Answered:** glitchy drawer; journey not well thought out or intuitive. Lessons and v2 design principles captured in `vision.md` §4.
-- **Next step for layout (Product & UX #1):** map-first, but the conversation sheet is redesigned from scratch — not v1's drawer.
 - **B. Brand:** ~~name~~ **kept as Pitchd.** Visual identity: recommendation is to refresh, not rethink — confirm during design.
 - **C. Platform:** **Decided:** mobile-first web first, native later (see `decisions.md`).
 - **D. Repo & database:** **Decided:** new `pitchd-v2` repo + separate Supabase project (see `decisions.md`).
@@ -18,7 +17,7 @@
 - [ ] v1 frozen: open M7 issues/PRs closed or labelled "v1 frozen"
 
 ## Product & UX
-1. **Layout:** map-first with a conversation sheet (evolves today's drawer), or conversation-first with the map as a panel? → Leaning map-first; prototype both.
+1. ~~**Layout**~~ **Decided:** map-first with a two-snap conversation sheet; sidebar on desktop (see `decisions.md`).
 2. **Home screen:** keep a home screen at all, or open straight onto the map with the agent prompt?
 3. **Clarifying questions:** how eager? Ask before searching, or assume and show editable assumptions? → Leaning "assume + show".
 4. **Voice input:** worth it early (planning in the car, hands busy at camp)?
@@ -27,6 +26,13 @@
 7. **Sarah's multi-day route planning:** revamp phase 2, or later?
 8. **Offline / patchy signal** on the trip — how much matters for v1?
 9. **Name & positioning:** does "Pitchd" still fit an agent companion? (Probably yes.)
+24. **Campsite availability:** can Pitchd tell whether a site is free for your dates? Raised 2026-11-10 — a pick is useless if it's booked out. Three kinds of site: bookable park sites (state booking systems, no known open API), private/holiday parks (own booking software or Hipcamp; partner APIs by agreement only), and free first-come sites (no availability data exists). Options, cheapest first:
+    1. **Booking-required fact** — the data agent records whether a site must be booked (with source), so the agent can say "book this one, it's not first-come".
+    2. **"Check & book" deep link** to the official booking page, dates pre-filled where the site allows. Pitchd never handles payments (keeps E's no-bookings rule).
+    3. **Busy-period warnings** from public holiday and school holiday calendars ("long weekend — book now or have a backup").
+    4. **Live check of the top 2–3 picks** — the agent reads the booking page for your dates. Fragile; needs a terms check per park authority. Later spike, NSW parks first.
+    5. **Partner APIs** with booking platforms — much later, if Pitchd grows.
+    → **Recommendation (not yet decided):** 1–3 in the first version; 4 as a later spike after a terms check. Never claim a site is available unless it was actually checked.
 
 ## Technical
 10. ~~Repo layout~~ **Resolved:** new `pitchd-v2` repo (see D).
