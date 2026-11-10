@@ -2,6 +2,24 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Visual identity B3 · Sunlight contrast: the default light theme is built for outdoors
+- **Decision (option B):** no separate outdoor mode — the normal light theme is sunlight-ready, and is checked on a real phone outside at midday before it's signed off. Sketch (with a rough glare slider): https://claude.ai/artifact/3uMTxiURbJA4Ym9rJi2XPg
+- **Rules:**
+  | Element | v1 | Contrast | v2 | Contrast |
+  |---|---|---|---|---|
+  | Key facts (summary line, card names) | #2d4a2d | 9.1:1 | #1a2e1a (`TEXT`) — aim 7:1+ | 13.3:1 |
+  | Secondary text | #8a9e8a muted / #5a7a5a sage | 2.6 / 4.4:1 | #4f6b4f (sage, one shade darker); muted grey retired for text (disabled and decoration only) | 5.4:1 |
+  | Coral text | #e8674a | 3.0:1 | #b84a33 coral ink (B1) | 4.7:1 |
+  | Text on weather colours | white on amber / green | 2.5 / 3.3:1 | ≥ 4.5:1 (colours in B4) | — |
+  | Input and chip borders | #e0dbd0 | 1.4:1 | #9a9282 (3:1 for controls); card borders stay soft but gain a shadow | 3.1:1 |
+  | Pins | flat colour, thin white ring | — | darker fill, 3 px white ring, dark hairline; top pick 28 px | — |
+  | Text size | — | — | 13 px floor; weight 500+ below 15 px | — |
+- **Weather never by colour alone:** every day column has a label and an icon (ties to B4).
+- **Contrast measured** against the background (#f7f5f0) and white cards. Dark mode (B2) already clears these bars.
+- **Rejected:** A, WCAG AA as the bar (set for indoor screens; 4.5:1 text washes out in direct sun); C, automatic outdoor mode (the web can't read the light sensor on iPhone; a third theme); D, a manual high-contrast toggle (nobody finds it while squinting at a campsite; a third theme).
+- **Why:** Pitchd is used outdoors, so the default must work there; no setting to find; also helps older eyes and cheap screens.
+- **Revisit if:** the midday phone test still fails on something → darken that value; if the theme feels heavy indoors, soften decoration (borders, shadows), never text.
+
 ## 2026-11-10 — Visual identity B2 · Dark mode: follow the phone, with an override
 - **Decision (option B):** light and dark are both designed. The app follows the phone's setting; "Appearance: System / Light / Dark" lives in the expanded sheet (beside "What Pitchd knows"). Sketch: https://claude.ai/artifact/9nMEPK1XHYhNkNnGNC5L2a
 - **Dark values (starting point):**
@@ -198,7 +216,7 @@
 
 ## 2026-11-09 — Keep the name "Pitchd" for v2
 - **Why:** Short, memorable, the camping pun still fits an agent companion, and it's already live.
-- **Visual identity refresh — in progress (B1–B7).** B1 palette and B2 dark mode decided (see their entries above). Original recommendation: keep the core palette (forest / sage / warm neutrals, coral used sparingly) but refresh — add dark mode, check sunlight contrast, give weather states distinct colours, test the wordmark at icon size, and design a small mark for the agent's presence. Define the agent's voice as part of the brand (ties to open question E).
+- **Visual identity refresh — in progress (B1–B7).** B1 palette, B2 dark mode and B3 sunlight contrast decided (see their entries above). Original recommendation: keep the core palette (forest / sage / warm neutrals, coral used sparingly) but refresh — add dark mode, check sunlight contrast, give weather states distinct colours, test the wordmark at icon size, and design a small mark for the agent's presence. Define the agent's voice as part of the brand (ties to open question E).
 
 ## 2026-11-09 — All search is agent-driven; map browsing kept
 - **Decision:** Remove direct search from the UI — no filter panel, no filter state, no direct search API calls from the frontend. Every search goes through the agent (typed, spoken, or via prompt chips).

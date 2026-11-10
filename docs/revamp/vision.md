@@ -79,8 +79,9 @@ MVP of the revamp = **Describe → Agent works → Proposal → Refine → Commi
 Refresh, not rethink. Decided so far:
 - **Palette (B1):** forest, sage and warm neutrals do most of the work; **coral means Pitchd** — the wordmark "d", the send button, the top pick and the agent's mark, nothing else. Coral text uses a darker coral ink for contrast. Weather has its own colours and is never coral.
 - **Dark mode (B2):** light and dark both designed; follows the phone, with a System / Light / Dark override. Dark is a warm green-black, the map switches to its night preset, and coral keeps its job.
+- **Sunlight (B3):** the default light theme is built for outdoor use — key facts 7:1, secondary text 4.5:1+, controls 3:1, 13 px text floor, stronger pins, weather never shown by colour alone — and is tested on a real phone outside at midday.
 
-Still open: sunlight contrast, weather-state colours, wordmark at icon size + app icon, the agent-presence mark, type.
+Still open: weather-state colours, wordmark at icon size + app icon, the agent-presence mark, type.
 
 ## 6. What the agent is (and isn't)
 
