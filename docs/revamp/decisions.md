@@ -2,6 +2,12 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Harness H5 · Hooks: format + lint-fix per edit, guard rails, no test hooks
+- **Decision (option C):** after each edit, format + lint-fix the file (ruff; Prettier + ESLint); guard rails block `.env*` access, edits to migrations already on `main`, DB commands against anything but the local Docker DB, verifier/reviewer writes outside `planning/`, and hand edits to generated API types; session start shows open `planning/` items. No test hooks — pyright / `tsc` / pytest / vitest run at verify and in CI. lefthook runs format + lint on staged files at commit. Tools: uv, ruff, pyright, pytest; npm, ESLint, Prettier, vitest.
+- **Rejected:** no hooks; format only; tests when Claude stops; mypy, Biome, the `pre-commit` framework.
+- **Why:** cheap problems caught instantly without slowing work; secrets, migration history and the live DB protected.
+- **Revisit if:** the edit hook gets slow, or type errors keep surfacing late.
+
 ## 2026-11-10 — Harness H4 · Subagents: built-in Explore, five role agents, advisers rewritten
 - **Decision (option C):** explorer = built-in `Explore`; new agent files for planner (Opus), implementer (Sonnet; Opus for complex tasks), verifier (Haiku, can't edit code), reviewer (Opus, can't edit code) and eval-runner (Haiku). `senior-engineer` (Opus) and `ux-designer` (Sonnet) rewritten for v2 as advisers; `ux-designer` also reviews `web/` UI changes at step 7. v1 agent memory not carried over; only the advisers keep memory in v2. Tool limits enforced by hooks / permissions. Table in `harness-workflow.md`.
 - **Rejected:** built-in agents only; a file for every role; advisers doing the work.

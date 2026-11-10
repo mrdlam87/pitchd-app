@@ -33,7 +33,7 @@ These are already decided (see `decisions.md`). H1 decides *where* each one goes
 | H2 | Where sessions run + work tracking — issues, plans, how a piece of work flows | **Decided:** local-first via Remote Control; milestones per phase; plan files in `planning/` (amended by H3) |
 | H3 | Skills / commands — the build flow | **Decided:** one resumable `/harness` skill; subagents do the heavy work; `/decide` + `/eval` separate; built-in + focused Superpowers skills inside the steps (H3b) |
 | H4 | Subagents — `senior-engineer`, `ux-designer`, any new ones; agent memory | **Decided:** built-in Explore + five role agents + both advisers rewritten |
-| H5 | Hooks — format / lint / test for Python + TS, guard rails | Open |
+| H5 | Hooks — format / lint / test for Python + TS, guard rails | **Decided:** format + lint-fix per edit, guard rails, session-start status; no test hooks; lefthook pre-commit |
 | H6 | Permissions — allow / ask / deny rules | Open |
 | H7 | CI — checks and Claude review on PRs | Open |
 | H8 | Tool tests and eval runs — where they fit | Open |
@@ -159,3 +159,32 @@ These are already decided (see `decisions.md`). H1 decides *where* each one goes
 - **Rejected:** A, built-in agents only (no per-role model or tool limits; instructions repeated in every call); B, a file per role including explorer (duplicates built-in Explore); D, advisers as workers (the same agent reviews its own kind of work; no per-role limits).
 - **Why:** each role gets the model it needs — Opus where judgement matters (plan, review), Haiku where it's mechanical (verify, evals) — and the roles that check work can't change it.
 - **Revisit if:** Haiku verifiers misread failures → Sonnet; or Opus planning/review costs too much per issue → Sonnet with high effort.
+
+### H5 — Hooks: format + lint-fix per edit, guard rails, no test hooks (decided 2026-11-10)
+- **Decision (option C):** hooks in the committed `.claude/settings.json`, so they run the same locally and in cloud.
+  | Moment | Hook |
+  |---|---|
+  | After each file edit | Format + lint-fix that file (ruff for `.py`; Prettier + ESLint for `.ts`/`.tsx`); leftover lint errors are sent back to Claude to fix. ~1 s |
+  | Before a tool runs | Guard rails (below) — blocked with a reason Claude sees |
+  | Session start | Show open `planning/` items and their current step (helps `/harness` resume) |
+  | When Claude stops | Nothing — type checks and tests run only in verify (step 6) and CI |
+- **Git pre-commit (lefthook):** the same format + lint on staged files, so every commit is clean whoever makes it.
+- **Guard rails:**
+  | Blocked | Why |
+  |---|---|
+  | Reading or editing `.env*` / secrets files | Keys stay out of the transcript |
+  | Editing an Alembic migration already on `main` | Applied migrations are history — make a new one |
+  | DB commands or migrations whose connection string isn't the local Docker DB | Only CI deploys touch Supabase (Q11) |
+  | Verifier or reviewer writing outside `planning/` | Enforces H4's "can't edit code" |
+  | Hand edits to `web/`'s generated API types | Regenerate from the OpenAPI spec (Q12) |
+- **Tools:**
+  | Job | `agent/` (Python) | `web/` (TS) |
+  |---|---|---|
+  | Packages | uv | npm |
+  | Format + lint | ruff | ESLint (Next.js rules) + Prettier |
+  | Types (verify + CI) | pyright, standard mode | `tsc --noEmit` |
+  | Tests (verify + CI) | pytest + pytest-asyncio against local Docker Postgres + PostGIS | vitest |
+  | Pre-commit | lefthook (both stacks) | lefthook |
+- **Rejected:** A, no hooks (formatting noise reaches review); B, format only (lint errors wait for verify); D, tests when Claude stops (runs after every reply — slower than the per-task checks already ruled out). Tools: mypy (slower; SQLAlchemy plugin deprecated); Biome (loses the Next.js lint rules); the `pre-commit` framework (needs Python even for `web/`-only work).
+- **Why:** catches the cheap problems instantly without slowing work; the guard rails protect secrets, migration history and the live database whatever the session is doing.
+- **Revisit if:** the edit hook gets slow as the repo grows → lint only, format at commit; or type errors keep surfacing late at verify → add a per-edit type check for the edited file only.
