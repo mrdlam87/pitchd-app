@@ -31,7 +31,7 @@ These are already decided (see `decisions.md`). H1 decides *where* each one goes
 |---|---|---|
 | H1 | `CLAUDE.md` layout — one file or split per folder | **Decided:** short root + `agent/` and `web/` files |
 | H2 | Where sessions run + work tracking — issues, plans, how a piece of work flows | **Decided:** local-first via Remote Control; milestones per phase; plan files in `planning/` (amended by H3) |
-| H3 | Skills / commands — the build flow | **Decided:** one resumable `/harness` skill; subagents do the heavy work; `/decide` + `/eval` separate. Skill selection in progress |
+| H3 | Skills / commands — the build flow | **Decided:** one resumable `/harness` skill; subagents do the heavy work; `/decide` + `/eval` separate; built-in + focused Superpowers skills inside the steps (H3b) |
 | H4 | Subagents — `senior-engineer`, `ux-designer`, any new ones; agent memory | Open |
 | H5 | Hooks — format / lint / test for Python + TS, guard rails | Open |
 | H6 | Permissions — allow / ask / deny rules | Open |
@@ -106,3 +106,37 @@ These are already decided (see `decisions.md`). H1 decides *where* each one goes
 - **Rejected:** five separate commands (v1) or five skills (option B/C) — more to remember and no resume; merging plan + implement without a checkpoint (D); local-only review or CI-only review — both are used (local review before the PR, CI as an independent second look that reads `review.md`); per-task checks after every task (too slow).
 - **Why:** one command to remember, resumable from any step on any machine; the plan-approval checkpoint stays; fresh subagents review work they didn't write; the main session stays small enough to last a whole issue.
 - **Revisit if:** cold-start token cost per issue is high in practice → let one implementer do several small tasks; or the end-only verify keeps sending fixes back for two rounds → widen `check first`.
+
+### H3b — Skill selection: project + built-in skills, Superpowers' focused skills inside `/harness` (decided 2026-11-10)
+- **Rule:** `/harness` only *requires* project skills (committed in `.claude/skills/`) and built-in Claude Code skills. Plugin skills are used when present, with a fallback — except Superpowers and Figma, which are enabled in the project's committed `.claude/settings.json` (Superpowers pinned to a version).
+- **Project skills (new):**
+  | Skill | Use |
+  |---|---|
+  | `/harness` | The build flow (H3) |
+  | `/decide` | Founder's decision format — options table, recommendation + why, plain language; on approval record in `decisions.md` (+ topic doc), commit and push. Step 12 uses its format for decisions made during an issue |
+  | `/eval` | One repeatable eval run (H8); `/harness` step 9 calls it |
+- **Built-in skills:**
+  | Skill | Step | Notes |
+  |---|---|---|
+  | `code-review` | 7 | Effort medium by default, high for complex or `infra` issues, never `max` unless the founder asks; Pitchd's rules come from `CLAUDE.md` + a short Pitchd checklist file |
+  | `security-review` | 8 | Only for auth, token, CORS, secrets, allowlist or prompt-input changes |
+  | `claude-api` | 3, 5 | Any `agent/` work that calls the model — current model IDs, parameters, migration notes; keeps the Q13 rules right |
+  | `run` | 6 | `web/` changes — start the app and check the changed screen works |
+  | `update-config`, `fewer-permission-prompts` | H5 / H6 | Writing and tuning hooks and permission rules |
+- **Superpowers (`obra/superpowers`, already used in v1 — `docs/superpowers/plans/`) — option C: `/harness` owns the flow, borrows the focused skills:**
+  | Step | Skill | Used by |
+  |---|---|---|
+  | 1–3, only when the ask is vague | `brainstorming` | Main, before the planner; skipped for a clear issue |
+  | 5 | `test-driven-development` — **only for `agent/` tools, scoring and thresholds** (where a wrong number is the bug); plain "code + tests" elsewhere | Implementer |
+  | 6 failures | `systematic-debugging` | Implementer, on a bounced task |
+  | 6 | `verification-before-completion` | Verifier |
+  | 11 | `receiving-code-review` — weigh CI comments, push back on wrong ones | Triager |
+  | Parallel tasks only | `using-git-worktrees` | Main |
+  | H9 setup | `writing-skills` (with `skill-creator`) | Writing `/harness`, `/decide`, `/eval` |
+  - **Not used inside `/harness`:** `writing-plans`, `executing-plans`, `subagent-driven-development` (they run their own flow — plans in `docs/superpowers/plans/`, no `state.md` resume, review after every task); `finishing-a-development-branch` (steps 10 + 12 cover it); `dispatching-parallel-agents` (tasks run one after another).
+  - **Check at H9:** Superpowers' session-start `using-superpowers` nudge must not pull Claude off `/harness`; if it does, turn it off for the project.
+- **Other plugin skills:** `figma-design-to-code` at steps 2 and 5 only when the issue has a Figma link; `skill-creator` for H9 setup.
+- **Left out:** `simplify` (overlaps `code-review`; auto-cleanups add PR churn); `frontend-design` (invents its own look — identity is decided in B1–B7); `engineering:code-review` (duplicate); `engineering:architecture` (we use `decisions.md` via `/decide`); `engineering:testing-strategy` / `system-design` (call by hand when useful); `engineering:debug` (Superpowers' `systematic-debugging` covers it); `engineering:deploy-checklist` (reconsider at P3 when Cloud Run deploys start); `loop`, `standup`, `incident-response`, `tech-debt`, docs/office skills.
+- **To confirm at H9:** whether `code-review` must be called from the main session (at higher effort it starts its own subagents, and subagents can't start subagents) — if so, its compact findings still keep main lean and the reviewer subagent handles only the Pitchd checklist; and that agent files can preload the skills each role needs (H4).
+- **Why:** reuse strong, maintained skills for focused jobs; keep the resumable `planning/` flow and the single end-of-work verify the founder chose.
+- **Revisit if:** a Superpowers update changes a borrowed skill's behaviour (hence the pinned version), or its flow skills become configurable enough to replace parts of `/harness`.
