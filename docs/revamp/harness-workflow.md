@@ -30,8 +30,8 @@ These are already decided (see `decisions.md`). H1 decides *where* each one goes
 | # | Topic | Status |
 |---|---|---|
 | H1 | `CLAUDE.md` layout — one file or split per folder | **Decided:** short root + `agent/` and `web/` files |
-| H2 | Where sessions run + work tracking — issues, plans, how a piece of work flows | **Decided:** local-first via Remote Control; milestones per phase, plan as an issue comment |
-| H3 | Skills / commands — updated `/plan`, `/implement`, `/pr`, others; new ones | Open |
+| H2 | Where sessions run + work tracking — issues, plans, how a piece of work flows | **Decided:** local-first via Remote Control; milestones per phase; plan files in `planning/` (amended by H3) |
+| H3 | Skills / commands — the build flow | **Decided:** one resumable `/harness` skill; subagents do the heavy work; `/decide` + `/eval` separate. Skill selection in progress |
 | H4 | Subagents — `senior-engineer`, `ux-designer`, any new ones; agent memory | Open |
 | H5 | Hooks — format / lint / test for Python + TS, guard rails | Open |
 | H6 | Permissions — allow / ask / deny rules | Open |
@@ -67,10 +67,42 @@ These are already decided (see `decisions.md`). H1 decides *where* each one goes
 - **Work tracking (option B):**
   1. **One GitHub milestone per roadmap phase** (`D1`, `D2`, `D3`, `P1` … `P7`, `P5b`); its description is that phase's "done when" from `learning-roadmap.md`.
   2. **Issues carry acceptance criteria**, as in v1. Labels: `agent`, `web`, `data-agent`, `infra`, `docs`, plus `evals` for anything that changes prompts, tools or model config (ties to H8).
-  3. **`/plan <n>` posts the agreed plan as a single "Plan" comment on the issue** and refines the criteria; changes edit that comment, not add another.
-  4. **`/implement <n>` reads that comment first** and ticks criteria as they're met.
-  5. **One issue → one branch → one PR** with `Closes #n`; small PRs — a phase is several issues.
-  6. **No `.claude/context/` folder in v2.**
+  3. ~~`/plan` posts the plan as an issue comment; `/implement` reads it~~ **Amended by H3:** the plan lives in `planning/<id>/plan.md`, committed on the work branch; the issue gets a one-line link to it.
+  4. **One issue → one branch → one PR** with `Closes #n`; small PRs — a phase is several issues.
+  5. **No `.claude/context/` folder in v2** (replaced by `planning/`).
 - **Rejected:** A, v1's committed plan files (pile up and go stale, noise in PR diffs); C, a markdown backlog (no criteria flow or PR links, merge conflicts); D, a Projects board on top (another thing to sync for one person); a gitignored local plan file (workable local-only, but invisible from the phone, cloud sessions and the CI reviewer).
 - **Why:** keeps the issue → `/plan` → `/implement` → PR habit that works; the plan survives any session and reads the same from the desk, the phone and CI — so the reviewer (H7) can check a PR against the agreed plan, not just the criteria.
 - **Revisit if:** editing plan comments proves clumsy in practice → try a plan section in the issue body instead.
+
+### H3 — One resumable `/harness` skill; subagents do the heavy work (decided 2026-11-10)
+- **Decision (founder's design):** a single `/harness` skill runs the whole build flow and replaces v1's `/plan`, `/implement`, `/pr`, `/address-pr` and `/wrap-up`. Run `/harness 42` (an issue) or `/harness "add get_forecast tool"` (an issue is created at intake). It finds or creates `planning/<id>/`, reads `state.md`, and carries on from the first step not done — so it **resumes at any step** after a break, a crash or a new session.
+- **Steps:**
+  | # | Step | Who | Writes | Stops for you? |
+  |---|---|---|---|---|
+  | 1 | Intake: issue or description, label, milestone | Main | `state.md` | No |
+  | 2 | Explore: relevant files, confirm what the plan will use exists, the right `CLAUDE.md` | **Explorer** (read-only) | `findings.md` | No |
+  | 3 | Plan: acceptance criteria, file-by-file tasks, risks, checks | **Planner** (reads `findings.md`, no code) | `plan.md` | **Yes — approve the plan** (main shows a summary) |
+  | 4 | Branch | Main | — | No |
+  | 5 | Implement, one task at a time (code + its tests) | **Implementer** per task | Code; tick in `plan.md` | Only if a task fails twice |
+  | 6 | Verify, once after all tasks: full tests + type checks for both stacks, build, Alembic down → up if there's a migration, OpenAPI types in sync, every acceptance criterion | **Verifier** (fresh) | `verify.md` | No — failures name the likely task and go back to 5; stops after 2 rounds |
+  | 7 | Code review: correctness, edge cases, failure paths, `CLAUDE.md` rules, unhappy-path tests; `[blocking]` / `[suggestion]`; max 2 fix rounds | **Reviewer** (fresh — didn't write the code) | `review.md` | Only if blocking findings remain |
+  | 8 | Security review — only when auth, the token route, CORS, secrets, the source allowlist or prompt input are touched | **Reviewer** | `review.md` | Only on unresolved findings |
+  | 9 | Evals, if labelled `evals` | **Eval runner** | `evals.md` | No |
+  | 10 | PR: `Closes #n`, links `plan.md` + `review.md`, lists suggestions not acted on with a reason each | Main | PR link in `state.md` | No |
+  | 11 | CI review follow-up: CI reads `review.md` and looks for what was missed; comments → fix table → fixes | **Triager** → implementer | `review.md` | **Yes — approve the fix list** |
+  | 12 | Close: decision log + roadmap docs, milestone progress, move the folder to `planning/done/` | **Doc writer** | Docs | No |
+- **Lean main session:** main only reads `state.md`, starts subagents, shows their summaries, takes approvals, and does the small git/GitHub actions (branch, PR, issue link). Every subagent writes its detail to a file in `planning/<id>/` and returns ≤ ~10 lines (what it did, pass/fail, open questions, which file). Main never loads full diffs, test logs or review notes.
+  - `/harness` must run in the main session — subagents can't start their own subagents. That also keeps it visible and steerable over Remote Control.
+  - Trade-off accepted: each subagent starts cold and re-reads what it needs (more tokens); `findings.md` keeps later cold starts cheap.
+- **Checks — two layers, not three:** per edit, hooks format + quick-lint the file (H5); then one full verify at step 6. No per-task test runs (founder's experience: too slow). **Exception:** the planner may mark a task `check first` — mainly a new Alembic migration or an agent API contract change that later tasks build on — and only that task runs its checks before the next starts.
+- **Sub-choices:**
+  - **Subagents, not separate sessions** (a3); tasks run one after another in the same checkout; a git worktree only if two tasks run in parallel. Separate `claude -p` sessions lose Remote Control visibility and need their own permissions.
+  - **Plan files committed** on the work branch (b1) — readable from the phone, by cloud sessions and by the CI reviewer, and reviewed in the PR beside the code. **Amends H2** (which had the plan as an issue comment).
+  - **After merge, moved to `planning/done/`** (c2); `CLAUDE.md` says `planning/done/` is history, not instructions.
+  - **The issue stays the entry point** (d1): milestones and labels from H2 stand; the issue links to `plan.md`.
+  - **`/decide` and `/eval` stay separate skills** (e2); `/harness` calls the eval command at step 9.
+- **`state.md`:** the 12-step checklist, branch, PR link, round counters for steps 6/7, and the last thing that happened.
+- **Subagent roles needed** (agent files, models and tools settled in H4): explorer, planner, implementer, verifier, reviewer, eval runner; triager and doc writer may be the reviewer and planner with different instructions. `senior-engineer` and `ux-designer` remain advisers.
+- **Rejected:** five separate commands (v1) or five skills (option B/C) — more to remember and no resume; merging plan + implement without a checkpoint (D); local-only review or CI-only review — both are used (local review before the PR, CI as an independent second look that reads `review.md`); per-task checks after every task (too slow).
+- **Why:** one command to remember, resumable from any step on any machine; the plan-approval checkpoint stays; fresh subagents review work they didn't write; the main session stays small enough to last a whole issue.
+- **Revisit if:** cold-start token cost per issue is high in practice → let one implementer do several small tasks; or the end-only verify keeps sending fixes back for two rounds → widen `check first`.

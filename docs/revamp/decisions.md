@@ -2,6 +2,12 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Harness H3 · One resumable `/harness` skill; subagents do the heavy work
+- **Decision (founder's design):** one `/harness <issue | description>` skill replaces v1's five commands. Twelve steps — intake, explore, plan (**approve**), branch, implement per task, verify once at the end, code review, security review (when auth/secrets/allowlist/prompt input touched), evals (if labelled), PR, CI review follow-up (**approve fixes**), close. State and outputs in `planning/<id>/` (`state.md`, `findings.md`, `plan.md`, `verify.md`, `review.md`, `evals.md`), committed on the branch, moved to `planning/done/` after merge; it resumes from the first unfinished step. Explorer, planner, implementer, verifier, reviewer and eval runner are subagents; the main session only orchestrates and gets ≤ ~10-line summaries. Checks: hooks per edit + one full verify at the end, with a `check first` exception for migrations / API contract changes. `/decide` and `/eval` stay separate. **Amends H2:** plan files replace the plan issue comment. Detail in `harness-workflow.md`.
+- **Rejected:** separate commands or skills per step (no resume); review only locally or only in CI; checks after every task (too slow).
+- **Why:** one command, resumable anywhere; fresh subagents review work they didn't write; the main session stays lean.
+- **Revisit if:** subagent cold starts cost too much per issue, or end-only verify keeps bouncing work back.
+
 ## 2026-11-10 — Harness H2 · Local-first sessions via Remote Control; plans live on the issue
 - **Decision:** v2 is built locally (Docker Postgres + PostGIS, real-phone testing over Wi-Fi, open network for evals), driven from the Claude app via Remote Control; cloud sessions are an occasional extra and the harness stays cloud-compatible at low priority. Work tracking is option B: one milestone per roadmap phase, issues with acceptance criteria and area labels (+ `evals`), `/plan` posts a single "Plan" comment on the issue that `/implement` reads, one issue → one PR, no `.claude/context/`. Detail in `harness-workflow.md`.
 - **Rejected:** cloud as the main build machine (per-container DB setup, network allowlist, no phone-over-Wi-Fi testing); committed plan files (go stale); markdown backlog; Projects board; gitignored local plan files (invisible to phone, cloud and CI).
