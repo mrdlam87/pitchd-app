@@ -82,8 +82,9 @@ Refresh, not rethink. Decided so far:
 - **Sunlight (B3):** the default light theme is built for outdoor use — key facts 7:1, secondary text 4.5:1+, controls 3:1, 13 px text floor, stronger pins, weather never shown by colour alone — and is tested on a real phone outside at midday.
 - **Weather colours (B4):** one "sun to rain" scale for pins and day columns — gold (dry), blue (mixed), navy (wet), plus a hollow "typical" state past the forecast range and a "!" badge for hazards. No green or red, so it survives colour blindness and glare and never clashes with coral.
 - **App icon (B5):** the wordmark's coral "d" on a forest square. The wordmark is never smaller than 15 px; below that the "d" icon is used instead.
+- **Agent mark (B6):** the same "d" tile, small, beside what Pitchd says; a coral arc while it works, a pulsing ring while listening, grey when offline. In the input, the send button becomes a stop button with the same arc.
 
-Still open: the agent-presence mark, type.
+Still open: type.
 
 ## 6. What the agent is (and isn't)
 

@@ -2,6 +2,29 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Visual identity B6 · Agent mark: the app icon's "d" tile, small
+- **Decision (option C):** the agent's presence is shown by the B5 "d" tile at 20 px beside what Pitchd says — the icon you tapped is the one talking to you. State is shown by a coral ring around the tile, never by a new shape. Sketch (options, states, sheet moments, "d" vs "Pd"): https://claude.ai/artifact/AoL2DqbEW4r8ac82JX2AyF
+  | State | Mark |
+  |---|---|
+  | Ready | Still tile beside the greeting and each answer |
+  | Working | Coral arc circles the tile while tools run, with the step line ("Checking weather around Mudgee…") and the map showing the area being checked |
+  | Writing | Arc stops once the answer streams |
+  | Listening | Pulsing ring while dictation is on |
+  | Offline / unavailable | Grey tile, with the offline banner |
+- **Where:**
+  | Place | Mark |
+  |---|---|
+  | Agent's summary line, greeting | 20 px tile, left of the text |
+  | Expanded thread | First line of each agent turn only — not on step lines, cards or chips |
+  | Input | No tile; the send button becomes a stop button with the same coral arc while working (no two coral marks side by side) |
+  | Map — "Ask Pitchd about this site" | 16 px tile on the button |
+  | Push notifications, browser tab | The app icon (B5) |
+- **Rules:** every state also has words — the mark is never the only signal; with reduced motion the arc and ring are drawn dotted and still; coral on screen stays limited to the tile, the top pick and send (B1).
+- **"Pd" considered** (as the mark, and as the icon): reads more like initials, but wouldn't match the "d" app icon, shrinks the coral to ~9 px at 20 px and runs together at 16 px. Kept "d" for both; "Pd" stays B5's fallback, and would replace both together if ever used.
+- **Rejected:** A, no mark (nothing shows Pitchd is working; agent text looks like app text); B, mascot (cartoon cuteness clashes with "no hype" and safety messages; a character to maintain); D, ember dot (reads as "unread"; not tied to the name — kept as the fallback); E, sparkle ✦ (every product uses it; points at the technology, not the mate).
+- **Why:** nothing new to learn; ties B1 (coral = Pitchd) and B5 together; carries the "never a bare spinner" principle.
+- **Revisit if:** the arc reads as a loading spinner rather than "Pitchd is working" in testing → lean more on the step lines and map, keep the tile still.
+
 ## 2026-11-10 — Visual identity B5 · App icon: the coral "d" on forest; wordmark minimum 15 px
 - **Decision (option D):** the app icon is the wordmark's coral "d" (Lora bold, #e8674a) alone on a forest square (#2d4a2d). Sketch (all options at real sizes): https://claude.ai/artifact/9g4dXtEegZv822wQUKHavZ
 - **Why:** it's the one part of the wordmark only Pitchd has ("Pitch" + "d" = pitched); one bold glyph stays legible down to 16 px; coral means Pitchd (B1), so the icon, the send button and the agent mark (B6) all point the same way. Coral on forest is 3.0:1 — enough for a large glyph.
@@ -246,7 +269,7 @@
 
 ## 2026-11-09 — Keep the name "Pitchd" for v2
 - **Why:** Short, memorable, the camping pun still fits an agent companion, and it's already live.
-- **Visual identity refresh — in progress (B1–B7).** B1 palette, B2 dark mode, B3 sunlight contrast, B4 weather colours and B5 app icon decided (see their entries above). Original recommendation: keep the core palette (forest / sage / warm neutrals, coral used sparingly) but refresh — add dark mode, check sunlight contrast, give weather states distinct colours, test the wordmark at icon size, and design a small mark for the agent's presence. Define the agent's voice as part of the brand (ties to open question E).
+- **Visual identity refresh — in progress (B1–B7).** B1 palette, B2 dark mode, B3 sunlight contrast, B4 weather colours, B5 app icon and B6 agent mark decided (see their entries above). Original recommendation: keep the core palette (forest / sage / warm neutrals, coral used sparingly) but refresh — add dark mode, check sunlight contrast, give weather states distinct colours, test the wordmark at icon size, and design a small mark for the agent's presence. Define the agent's voice as part of the brand (ties to open question E).
 
 ## 2026-11-09 — All search is agent-driven; map browsing kept
 - **Decision:** Remove direct search from the UI — no filter panel, no filter state, no direct search API calls from the frontend. Every search goes through the agent (typed, spoken, or via prompt chips).
