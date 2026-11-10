@@ -2,6 +2,66 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Harness H9 · Setup order: core by hand, a dry run, the rest when a phase needs it
+- **Decision (option B, with C's dry run):** founder creates `pitchd-v2`, the Sydney Supabase project and the review secret; docs move and v1 freezes; one local session builds the core harness by hand (layout, three `CLAUDE.md` files, settings with permissions + hooks + pinned Superpowers, lefthook, agents, `/harness` + `/decide`, docker compose PostGIS, CI + review, branch protection); the open points from H3–H6 are checked; a tiny dry-run issue goes through all 12 steps and the harness is fixed from it. `/eval` comes at P1, deploy workflows at P3, the cloud setup script last.
+- **Rejected:** everything up front; bootstrapping with a half-built harness; copying v1's setup.
+- **Why:** each piece is built when there's something real to test it on; the dry run shakes out the harness first.
+- **Revisit if:** the dry run shows a core piece is missing → fix before the next issue.
+
+## 2026-11-10 — Harness H8 · Tool tests and evals: four tiers
+- **Decision (option C):** (1) tool tests with recorded API responses and (2) agent-loop tests with a scripted fake model run on every PR, free; (3) a ~5-query smoke eval (~US$1) runs locally at `/harness` step 9 for `evals`-labelled work; (4) the full 20–50 query eval + data-agent accuracy (~US$10–25 per setup) runs via `/eval full`, required before any model or prompt config change merges and at model releases. Deterministic checks first, Opus grader second; reports quality, cost per trip and time to first pins vs a committed `agent/evals/baseline.json`. US$30 cap per eval run. Detail in `harness-workflow.md`.
+- **Rejected:** full evals on every PR; evals only by hand; nightly full evals.
+- **Why:** free tests guard every change; real-model runs happen where model behaviour can change.
+- **Revisit if:** data changes shift answers between model changes → weekly smoke eval.
+
+## 2026-11-10 — Harness H7 · CI: three required checks; Claude review once, then on request
+- **Decision (option B for review):** required `agent` (ruff, pyright, pytest on PostGIS, migration round trip, `alembic check`), `web` (ESLint, Prettier, `tsc`, vitest, build) and `contract` (regenerated OpenAPI types must match) checks; deploy workflows at P3. Claude review (Opus) runs once on open/ready and again only on `@claude review` or a `re-review` label; it reads the `CLAUDE.md` files, `plan.md` and `review.md`, checks against the plan and a Pitchd checklist, doesn't repeat `review.md`, never approves. `claude.yml` kept. Detail in `harness-workflow.md`.
+- **Rejected:** review on every push (v1); on every code-changing push; no CI review.
+- **Why:** checks keep both stacks and their contract honest; one independent review per PR is enough after local review.
+- **Revisit if:** problems reach `main` that a later re-review would have caught.
+
+## 2026-11-10 — Harness H6 · Permissions: committed allow / ask / deny lists, auto mode for `/harness`
+- **Decision (option C):** allow checks, local DB work, git (incl. pushing non-main branches) and `gh` issue/PR create; ask for new dependencies, `rm -rf`, fetches outside the allowlist and `.claude/` edits; deny secrets, force pushes, pushes to `main`, `gh pr merge`, `sudo`, deploys and Secret Manager (CI only), and Supabase DB commands. Auto mode during `/harness` runs; B (same lists, default mode) if auto mode isn't available. Bash sandbox checked at H9. Lists in `harness-workflow.md`.
+- **Rejected:** ask for everything; bypass in a dev container.
+- **Why:** `/harness` keeps moving over Remote Control; dangerous actions blocked in every mode.
+- **Revisit if:** prompts still interrupt often, or auto mode lets something through.
+
+## 2026-11-10 — Harness H5 · Hooks: format + lint-fix per edit, guard rails, no test hooks
+- **Decision (option C):** after each edit, format + lint-fix the file (ruff; Prettier + ESLint); guard rails block `.env*` access, edits to migrations already on `main`, DB commands against anything but the local Docker DB, verifier/reviewer writes outside `planning/`, and hand edits to generated API types; session start shows open `planning/` items. No test hooks — pyright / `tsc` / pytest / vitest run at verify and in CI. lefthook runs format + lint on staged files at commit. Tools: uv, ruff, pyright, pytest; npm, ESLint, Prettier, vitest.
+- **Rejected:** no hooks; format only; tests when Claude stops; mypy, Biome, the `pre-commit` framework.
+- **Why:** cheap problems caught instantly without slowing work; secrets, migration history and the live DB protected.
+- **Revisit if:** the edit hook gets slow, or type errors keep surfacing late.
+
+## 2026-11-10 — Harness H4 · Subagents: built-in Explore, five role agents, advisers rewritten
+- **Decision (option C):** explorer = built-in `Explore`; new agent files for planner (Opus), implementer (Sonnet; Opus for complex tasks), verifier (Haiku, can't edit code), reviewer (Opus, can't edit code) and eval-runner (Haiku). `senior-engineer` (Opus) and `ux-designer` (Sonnet) rewritten for v2 as advisers; `ux-designer` also reviews `web/` UI changes at step 7. v1 agent memory not carried over; only the advisers keep memory in v2. Tool limits enforced by hooks / permissions. Table in `harness-workflow.md`.
+- **Rejected:** built-in agents only; a file for every role; advisers doing the work.
+- **Why:** the right model per role, and the roles that check work can't change it.
+- **Revisit if:** Haiku verifiers misread failures, or Opus planning/review costs too much.
+
+## 2026-11-10 — Harness H3b · Skills: project + built-in, Superpowers' focused skills inside `/harness`
+- **Decision (option C):** project skills `/harness`, `/decide`, `/eval`; built-in `code-review` (step 7, medium/high effort), `security-review` (step 8, when relevant), `claude-api` (model-calling `agent/` work), `run` (`web/` checks). Superpowers enabled and pinned in project settings; `/harness` borrows `brainstorming` (vague asks only), `test-driven-development` (`agent/` tools, scoring, thresholds only), `systematic-debugging`, `verification-before-completion`, `receiving-code-review`, `using-git-worktrees` (parallel only), `writing-skills` (setup). Not its flow skills (`writing-plans`, `executing-plans`, `subagent-driven-development`). Figma only when an issue links a design. Full table and leave-out list in `harness-workflow.md`.
+- **Rejected:** ignore Superpowers (rebuilds its good parts); call its flow skills per step or use it as the harness (no resume, plans outside `planning/`, review after every task).
+- **Why:** reuse focused, maintained skills; keep the resumable flow and single end verify.
+- **Revisit if:** a Superpowers update changes a borrowed skill, or its session-start nudge fights `/harness`.
+
+## 2026-11-10 — Harness H3 · One resumable `/harness` skill; subagents do the heavy work
+- **Decision (founder's design):** one `/harness <issue | description>` skill replaces v1's five commands. Twelve steps — intake, explore, plan (**approve**), branch, implement per task, verify once at the end, code review, security review (when auth/secrets/allowlist/prompt input touched), evals (if labelled), PR, CI review follow-up (**approve fixes**), close. State and outputs in `planning/<id>/` (`state.md`, `findings.md`, `plan.md`, `verify.md`, `review.md`, `evals.md`), committed on the branch, moved to `planning/done/` after merge; it resumes from the first unfinished step. Explorer, planner, implementer, verifier, reviewer and eval runner are subagents; the main session only orchestrates and gets ≤ ~10-line summaries. Checks: hooks per edit + one full verify at the end, with a `check first` exception for migrations / API contract changes. `/decide` and `/eval` stay separate. **Amends H2:** plan files replace the plan issue comment. Detail in `harness-workflow.md`.
+- **Rejected:** separate commands or skills per step (no resume); review only locally or only in CI; checks after every task (too slow).
+- **Why:** one command, resumable anywhere; fresh subagents review work they didn't write; the main session stays lean.
+- **Revisit if:** subagent cold starts cost too much per issue, or end-only verify keeps bouncing work back.
+
+## 2026-11-10 — Harness H2 · Local-first sessions via Remote Control; plans live on the issue
+- **Decision:** v2 is built locally (Docker Postgres + PostGIS, real-phone testing over Wi-Fi, open network for evals), driven from the Claude app via Remote Control; cloud sessions are an occasional extra and the harness stays cloud-compatible at low priority. Work tracking is option B: one milestone per roadmap phase, issues with acceptance criteria and area labels (+ `evals`), `/plan` posts a single "Plan" comment on the issue that `/implement` reads, one issue → one PR, no `.claude/context/`. Detail in `harness-workflow.md`.
+- **Rejected:** cloud as the main build machine (per-container DB setup, network allowlist, no phone-over-Wi-Fi testing); committed plan files (go stale); markdown backlog; Projects board; gitignored local plan files (invisible to phone, cloud and CI).
+- **Why:** local suits DB, Docker, phone and eval work; Remote Control keeps the phone workflow; plans on the issue read the same everywhere, including to the CI reviewer.
+- **Revisit if:** plan comments prove clumsy → a plan section in the issue body.
+
+## 2026-11-10 — Harness H1 · `CLAUDE.md` layout: short root + `agent/` and `web/` files
+- **Decision (option B, with D's way out):** a short root `CLAUDE.md` (project, repo map, workflow, rules for both stacks), plus `agent/CLAUDE.md` (Python, Q11/Q12/Q13/Q17 rules, data-agent rules) and `web/CLAUDE.md` (thin client, generated types, auth token route, B1–B7 visual rules). ~100–150 lines each; a rule for both stacks lives only in the root. Topic files in `.claude/rules/` only if a folder file outgrows that. Full table in `harness-workflow.md`.
+- **Rejected:** one root file (too long with two stacks); topic rule files from the start (overkill before there's code).
+- **Why:** each session gets only the rules for the code it touches; matches the repo layout.
+- **Revisit if:** sessions keep missing a rule from the other folder → move it to the root.
+
 ## 2026-11-10 — Display of freshness & confidence (Q23): quiet unless it matters
 - **Decision (option C):**
   1. **Checked facts look plain.** An `official` or `council` fact at high/medium confidence, checked within 12 months, shows with no label ("Dogs: no").
