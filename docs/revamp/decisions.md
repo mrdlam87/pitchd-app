@@ -97,7 +97,7 @@
   | Card / sheet | #ffffff | #1d241d | — |
   | Border | #e0dbd0 | #344034 | — |
   | Text / headings | #2d4a2d | #e6ede1 | 13.3:1 |
-  | Secondary (sage) | #5a7a5a | #a3baa0 | 7.6:1 |
+  | Secondary (sage) | #4f6b4f (B3; v1 was #5a7a5a) | #a3baa0 | 7.6:1 |
   | Coral (fills) | #e8674a | #f07a5e | 5.8:1 |
   | Coral ink (text) | #b84a33 | #f4917a | 6.9:1 |
   | Text on coral | white | #1d241d (white on the brighter coral is only 2.7:1) | 5.8:1 |
@@ -114,7 +114,7 @@
   |---|---|---|
   | Warm neutrals | `SURFACE` #f7f5f0, white cards, `BORDER` #e0dbd0 | Most of the screen |
   | Forest | `FOREST_GREEN` #2d4a2d (`TEXT` #1a2e1a for body) | Headings, the agent's summary line, "Pitch" in the wordmark, user bubbles |
-  | Sage | `SAGE` #5a7a5a | Secondary text, chip labels, step lines — **one** sage (the prototype's #7a9e7a and #4a6a4a are retired) |
+  | Sage | `SAGE` #5a7a5a → **#4f6b4f** (darkened in B3 to reach 4.5:1 on the background) | Secondary text, chip labels, step lines — **one** sage (the prototype's #7a9e7a and #4a6a4a are retired) |
   | **Coral = Pitchd** | `CORAL` #e8674a | Only: the wordmark "d", the send / primary action, the top-pick outline, and the agent's mark (B6). At most one or two coral things on screen |
   | Coral ink *(new)* | #b84a33 | Coral **text** ("Top pick", links) — 4.7:1 on the background; v1's coral text is 3.0:1 |
   | Weather | decided in B4 | Its own set — **never coral** |
