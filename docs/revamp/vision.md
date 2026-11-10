@@ -74,6 +74,13 @@ MVP of the revamp = **Describe → Agent works → Proposal → Refine → Commi
 9. **Search is agent-only; viewing is free.** There is no filter panel — every search goes through the agent, and quick chips are canned prompts. But the map is always explorable: pan, zoom, tap a pin for details, with "Ask Pitchd about this site" to bring the agent in. (See `decisions.md`.)
 10. **No home screen — the map is home.** The app opens on the map with the sheet collapsed: a greeting, context-aware chips and the input. An upcoming trip leads as a card; saved trips and recent conversations live in the expanded sheet. Location is asked in context, never on launch. (See `decisions.md`.)
 
+## 5a. Visual identity (in progress — see `decisions.md`)
+
+Refresh, not rethink. Decided so far:
+- **Palette (B1):** forest, sage and warm neutrals do most of the work; **coral means Pitchd** — the wordmark "d", the send button, the top pick and the agent's mark, nothing else. Coral text uses a darker coral ink for contrast. Weather has its own colours and is never coral.
+
+Still open: dark mode, sunlight contrast, weather-state colours, wordmark at icon size + app icon, the agent-presence mark, type.
+
 ## 6. What the agent is (and isn't)
 
 **Is:** a planner for camping trips in Australia, grounded in Pitchd's campsite, amenity and weather data.

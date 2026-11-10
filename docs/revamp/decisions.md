@@ -2,6 +2,22 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Visual identity B1 · Palette: keep the family, give each colour one job
+- **Decision (option B):** keep forest / sage / warm neutrals with coral, and tighten the roles. Sketch: https://claude.ai/artifact/Sd5Bg25avPg9ohMpCzxhDB
+  | Colour | Token (v1 value) | Job |
+  |---|---|---|
+  | Warm neutrals | `SURFACE` #f7f5f0, white cards, `BORDER` #e0dbd0 | Most of the screen |
+  | Forest | `FOREST_GREEN` #2d4a2d (`TEXT` #1a2e1a for body) | Headings, the agent's summary line, "Pitch" in the wordmark, user bubbles |
+  | Sage | `SAGE` #5a7a5a | Secondary text, chip labels, step lines — **one** sage (the prototype's #7a9e7a and #4a6a4a are retired) |
+  | **Coral = Pitchd** | `CORAL` #e8674a | Only: the wordmark "d", the send / primary action, the top-pick outline, and the agent's mark (B6). At most one or two coral things on screen |
+  | Coral ink *(new)* | #b84a33 | Coral **text** ("Top pick", links) — 4.7:1 on the background; v1's coral text is 3.0:1 |
+  | Weather | decided in B4 | Its own set — **never coral** |
+- **What changes from v1:** coral stops meaning "poor weather" (`weatherScore.ts` uses #e8674a for the Poor badge and severe strip) and stops being used for text; duplicate prototype tokens are merged.
+- **Rejected:** A, keep v1 exactly (coral does four jobs, so a wet day looks like a highlight; coral text fails AA); C, ochre accent (sits next to the showers amber, blurs top pick and showery days; changes the wordmark); D, new "night sky + campfire" identity (loses the outdoorsy warmth; closer to generic tech apps; same accent-vs-weather clash).
+- **Why:** the palette isn't the problem — overloading one colour is. Coral meaning only "Pitchd" lets it carry into the agent's mark, and frees the weather colours for B4. Keeps v1's recognition.
+- **Still to tune:** exact values for dark mode (B2) and sunlight (B3) — roles stay as above.
+- **Revisit if:** sunlight testing (B3) shows the forest/sage contrast isn't enough outdoors → darken values, not change hues.
+
 ## 2026-11-10 — Offline & patchy signal: cope with weak signal now, trip pack later, offline maps with native
 - **Decision (option C, in two steps):**
   1. **First build** (needed for any real phone use):
@@ -162,7 +178,7 @@
 
 ## 2026-11-09 — Keep the name "Pitchd" for v2
 - **Why:** Short, memorable, the camping pun still fits an agent companion, and it's already live.
-- **Still open (recommendation, not yet decided):** keep the core palette (forest / sage / warm neutrals, coral used sparingly) but refresh — add dark mode, check sunlight contrast, give weather states distinct colours, test the wordmark at icon size, and design a small mark for the agent's presence. Define the agent's voice as part of the brand (ties to open question E).
+- **Visual identity refresh — in progress (B1–B7).** B1 palette decided (see the B1 entry above). Original recommendation: keep the core palette (forest / sage / warm neutrals, coral used sparingly) but refresh — add dark mode, check sunlight contrast, give weather states distinct colours, test the wordmark at icon size, and design a small mark for the agent's presence. Define the agent's voice as part of the brand (ties to open question E).
 
 ## 2026-11-09 — All search is agent-driven; map browsing kept
 - **Decision:** Remove direct search from the UI — no filter panel, no filter state, no direct search API calls from the frontend. Every search goes through the agent (typed, spoken, or via prompt chips).
