@@ -2,6 +2,12 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Harness H6 · Permissions: committed allow / ask / deny lists, auto mode for `/harness`
+- **Decision (option C):** allow checks, local DB work, git (incl. pushing non-main branches) and `gh` issue/PR create; ask for new dependencies, `rm -rf`, fetches outside the allowlist and `.claude/` edits; deny secrets, force pushes, pushes to `main`, `gh pr merge`, `sudo`, deploys and Secret Manager (CI only), and Supabase DB commands. Auto mode during `/harness` runs; B (same lists, default mode) if auto mode isn't available. Bash sandbox checked at H9. Lists in `harness-workflow.md`.
+- **Rejected:** ask for everything; bypass in a dev container.
+- **Why:** `/harness` keeps moving over Remote Control; dangerous actions blocked in every mode.
+- **Revisit if:** prompts still interrupt often, or auto mode lets something through.
+
 ## 2026-11-10 — Harness H5 · Hooks: format + lint-fix per edit, guard rails, no test hooks
 - **Decision (option C):** after each edit, format + lint-fix the file (ruff; Prettier + ESLint); guard rails block `.env*` access, edits to migrations already on `main`, DB commands against anything but the local Docker DB, verifier/reviewer writes outside `planning/`, and hand edits to generated API types; session start shows open `planning/` items. No test hooks — pyright / `tsc` / pytest / vitest run at verify and in CI. lefthook runs format + lint on staged files at commit. Tools: uv, ruff, pyright, pytest; npm, ESLint, Prettier, vitest.
 - **Rejected:** no hooks; format only; tests when Claude stops; mypy, Biome, the `pre-commit` framework.

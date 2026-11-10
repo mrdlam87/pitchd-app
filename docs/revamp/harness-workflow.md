@@ -34,7 +34,7 @@ These are already decided (see `decisions.md`). H1 decides *where* each one goes
 | H3 | Skills / commands — the build flow | **Decided:** one resumable `/harness` skill; subagents do the heavy work; `/decide` + `/eval` separate; built-in + focused Superpowers skills inside the steps (H3b) |
 | H4 | Subagents — `senior-engineer`, `ux-designer`, any new ones; agent memory | **Decided:** built-in Explore + five role agents + both advisers rewritten |
 | H5 | Hooks — format / lint / test for Python + TS, guard rails | **Decided:** format + lint-fix per edit, guard rails, session-start status; no test hooks; lefthook pre-commit |
-| H6 | Permissions — allow / ask / deny rules | Open |
+| H6 | Permissions — allow / ask / deny rules | **Decided:** committed allow / ask / deny lists; auto mode for `/harness` runs |
 | H7 | CI — checks and Claude review on PRs | Open |
 | H8 | Tool tests and eval runs — where they fit | Open |
 | H9 | Setup order — what gets created in `pitchd-v2` before the first line of code | Open |
@@ -188,3 +188,16 @@ These are already decided (see `decisions.md`). H1 decides *where* each one goes
 - **Rejected:** A, no hooks (formatting noise reaches review); B, format only (lint errors wait for verify); D, tests when Claude stops (runs after every reply — slower than the per-task checks already ruled out). Tools: mypy (slower; SQLAlchemy plugin deprecated); Biome (loses the Next.js lint rules); the `pre-commit` framework (needs Python even for `web/`-only work).
 - **Why:** catches the cheap problems instantly without slowing work; the guard rails protect secrets, migration history and the live database whatever the session is doing.
 - **Revisit if:** the edit hook gets slow as the repo grows → lint only, format at commit; or type errors keep surfacing late at verify → add a per-edit type check for the edited file only.
+
+### H6 — Permissions: committed allow / ask / deny lists, auto mode for `/harness` (decided 2026-11-10)
+- **Decision (option C):** rules in the committed `.claude/settings.json`; personal extras in `.claude/settings.local.json` (not committed). **Auto mode** during `/harness` runs, so routine actions don't stall while the founder is away from the phone; default mode otherwise. Deny always wins, in every mode. **Fallback if auto mode isn't available:** option B — the same lists in default mode, accept-edits during implement.
+  | Rule | Commands |
+  |---|---|
+  | **Allow** | Read / search; `uv run` ruff, pyright, pytest; `npm run` lint, typecheck, test, build; `docker compose` for the local DB; Alembic against local; OpenAPI type generation; `git` status, diff, log, add, commit, branch, checkout; `git push` to non-main branches; `gh` issue / PR view and create, issue comment and edit |
+  | **Ask** | Adding or upgrading dependencies (`uv add`, `npm install <pkg>`) — supply-chain check; `rm -rf`; network fetches to hosts outside the source allowlist; edits to `.claude/` settings, hooks or agents |
+  | **Deny** | Reading `.env*` / secret files; `git push --force`; any push to `main`; `gh pr merge` (the founder merges); `sudo`; `gcloud run deploy`, `vercel deploy`, Secret Manager commands (deploys only via CI with Workload Identity — Q11); DB commands against Supabase (backs up H5's guard) |
+- **Push allowed, merge denied:** `main` is protected on GitHub and every change arrives by PR; pushing a feature branch is safe and reversible, merging is the real gate.
+- **Later, checked at H9:** Claude Code's bash sandbox (repo-only writes, listed network hosts) as an extra layer — first check it works with Docker and `--host`.
+- **Rejected:** A, ask for everything (stalls `/harness` whenever the founder is away); D, bypass inside a dev container (Docker-in-Docker for Postgres, awkward phone testing, gives up H2's local benefits). B kept as the fallback.
+- **Why:** `/harness` keeps moving over Remote Control; the dangerous actions — secrets, force pushes, merges, deploys, the live DB — are blocked whatever the mode.
+- **Revisit if:** prompts still interrupt often → run `fewer-permission-prompts` and widen the allow list; or auto mode lets through something it shouldn't → add it to deny.
