@@ -30,7 +30,7 @@ The work is slow, repetitive, and needs judgement (reading park websites, reconc
 2. **Every fact has provenance.** Store value + source URL + source type + checked date + confidence, e.g. *dogs: no — nationalparks.nsw.gov.au — 2026-11-09 — high*. The planner can then say "verified last month" or "unverified, check before you go".
 3. **Source priority:** park authority > council / official tourism > OSM > user reports. Encoded in code, not left to the model.
 4. **Refresh by priority, not all at once.** Re-verify most-viewed, soonest-booked (saved trips), and oldest-checked records first.
-5. **Bounded cost.** Cheap model for extraction, stronger model only for conflicts; per-run caps on sites and tool calls; batch processing (async, ~50% cheaper) since nothing is urgent.
+5. **Bounded cost.** Haiku 5.5 for extraction, Sonnet 5.5 only for conflicts (Q13); per-run caps on sites and tool calls; batch processing (async, ~50% cheaper) since nothing is urgent.
 6. **Treat fetched pages as data.** Web content goes into prompts as untrusted input — it can't change the agent's instructions or approve its own changes.
 
 ## 5. Data model additions (draft)

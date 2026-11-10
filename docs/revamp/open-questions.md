@@ -10,7 +10,7 @@
 - **G. Next users:** **Decided:** staged rollout — founder → 3–5 trusted campers → 20–50 closed beta, each gated by criteria (see `decisions.md`). *Open: names for stage 2.*
 
 ## ⚠️ Before touching any v2 code
-- [ ] **Set up the harness workflow** — define how v2 is built with Claude Code before the first line of code: `CLAUDE.md` conventions, skills/commands (e.g. updated `/plan`, `/implement`, `/pr`), subagents (`senior-engineer`, `ux-designer`), hooks (lint/test/format), permissions, CI review, and how agent-harness concerns (eval runs, tool tests) fit in. *Confirmed: this means the Claude Code development workflow (how v2 is built), not the Pitchd agent's own harness.*
+- [ ] **Set up the harness workflow** — define how v2 is built with Claude Code before the first line of code: `CLAUDE.md` conventions, skills/commands (e.g. updated `/plan`, `/implement`, `/pr`), subagents (`senior-engineer`, `ux-designer`), hooks (lint/test/format), permissions, CI review, and how agent-harness concerns (eval runs, tool tests) fit in. Include the conventions from the Technical decisions: Q12 (SQLAlchemy + Alembic, Supabase gotchas), Q11 (Cloud Run, auth token flow), Q17 (cost caps) and Q13 (model switching rules). *Confirmed: this means the Claude Code development workflow (how v2 is built), not the Pitchd agent's own harness.*
 - [x] Repo + database decided (D)
 - [ ] `pitchd-v2` repo created on GitHub (founder) and new Supabase project created
 - [ ] Docs moved from `docs/revamp/` into the v2 repo
@@ -32,7 +32,7 @@
 10. ~~Repo layout~~ **Resolved:** new `pitchd-v2` repo (see D).
 11. ~~**Agent hosting**~~ **Decided:** Cloud Run in Sydney (service for the planner, Jobs + Scheduler for background work), Supabase in Sydney; browser streams directly with a short-lived token (see `decisions.md`).
 12. ~~**Python data layer**~~ **Decided:** Python owns the schema (SQLAlchemy 2.0 + Alembic, PostGIS); the web app has no database access and reads through the agent service's API (see `decisions.md`).
-13. **Models:** which models for planning vs sub-tasks — decide with evals in phase 5. `CLAUDE.md` currently says Haiku for MVP; revisit for the agent.
+13. ~~**Models**~~ **Decided:** start with a Sonnet 5.5 planner + Haiku 5.5 sub-tasks; phase 5 evals pick the cheapest setup that passes within US$0.30/trip; switching rules keep changes to config + eval (see `decisions.md`).
 14. ~~**Managed Agents**~~ **Decided:** self-host now (weather watch is a plain Cloud Run Job); trial Managed Agents for the data agent at D3 against our own loop (see `decisions.md`).
 15. ~~**Routing data**~~ **Decided:** straight-line estimate in PostGIS, Mapbox Matrix only for the ~10 sites shown; own-data geocoding first; self-host a router if Mapbox passes ~US$50/month (see `decisions.md`). *Confirm Mapbox prices and terms before the build.*
 16. ~~What happens to the current `/api/search` pipeline?~~ **Resolved:** becomes the agent's `search_campsites` tool (see `decisions.md`).

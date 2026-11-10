@@ -45,7 +45,7 @@
 - **Degraded mode:** if the Claude API is unavailable, show saved trips and last results with a clear message.
 - **Weak signal / offline:** agent streams are resumable (event IDs, so a dropped connection picks up where it stopped); the web app keeps shown results on screen and retries with timeouts; a PWA service worker caches saved trips (and later the trip pack) for offline viewing.
 - **Output contract:** the agent returns a short text summary plus structured results (site IDs, ranks, reasons) that the UI renders as cards and pins. Site IDs must come from tool results — validated server-side before rendering.
-- **Models:** to be decided with evals. Likely a capable model for planning, a cheap model for sub-tasks.
+- **Models (start; phase 5 evals pick):** Sonnet 5.5 planner (medium effort, low for simple asks); Haiku 5.5 for small sub-tasks and batched data-agent extraction (Sonnet 5.5 for conflicts); Opus 5.5 as the eval grader. Model + effort per job in config; code written to what all models share so a switch is a config change plus an eval run (see Q13 in `decisions.md`).
 
 ## Data agent (background)
 

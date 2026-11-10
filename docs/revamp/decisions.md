@@ -2,6 +2,28 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Models (Q13): Sonnet planner + Haiku sub-tasks to start; phase 5 evals pick; cheap to switch
+- **Decision (option B) — starting roles:**
+  | Job | Model | Effort |
+  |---|---|---|
+  | Planner (user-facing) | Sonnet 5.5 | Medium; low for simple asks ("dump points near Mudgee") |
+  | Small sub-tasks (stated-fact detection for memory, conversation titles, step-line wording) | Haiku 5.5 | Low; small prompts |
+  | Data agent extraction | Haiku 5.5 via the Message Batches API | Sonnet 5.5 only for source conflicts |
+  | Eval grader | Opus 5.5 | Offline, low volume — stronger than what it grades |
+- **How phase 5 chooses:** run the 20–50 query eval set across Haiku 5.5 (medium / high), Sonnet 5.5 (low / medium / high) and Opus 5.5 (low / medium). Score answer quality, cost per trip, time to first pins (~2 s target), and ask-or-assume correctness. **Pick the cheapest setup that passes the quality bar within ≤ US$0.30 a trip (Q17).** Haiku is the one to beat (~20× cheaper). Try the same model at lower effort before building any router — simpler, and one prompt cache.
+- **Switching rules (go into v2's `CLAUDE.md`) — so changing a model is a config change plus an eval run:**
+  1. **Model + effort per job live in config,** never hard-coded; every turn logs the model and effort used.
+  2. **Write to what all three models share:** never turn thinking off (depth is controlled by effort only); always set effort explicitly (defaults differ: medium on Opus/Haiku, high on Sonnet); never force a tool call (unsupported on Opus 5.5 / Sonnet 5.5) — use structured outputs and strict tool schemas for the card output contract.
+  3. **One refusal handler** that works with or without the API's built-in fallback model (on for Sonnet/Opus; Haiku has none, so plain retry + error path); always check `stop_reason` before reading content.
+  4. **Cap context size per job** (compaction / context editing) — Haiku's price jumps 5× above 100k-token prompts.
+  5. **Pass conversation history back unchanged,** including thinking blocks, so a model switch mid-conversation just works (the API drops reasoning the new model can't read). Expect one prompt-cache restart.
+  6. **Model upgrades:** read the migration notes → change config → run the evals → fix regressions. Usually half a day to two days, mostly prompt tuning.
+- **Cost of switching (with the rules):** config change in minutes; one eval run ~an hour and ~US$10–25 per setup at Sonnet prices (full sweep ~US$50–100); prompt re-tuning sometimes a day or two, guided by the evals.
+- **Rejected:** A, Haiku everywhere (v1's rule — in phases 1–4 you couldn't tell a tool bug from a model that isn't capable enough); C, Opus planner (2–3× the budget, slower first answers); D, a Haiku/Sonnet router now (premature — router only if logs justify it, per the search decision; two models means two prompt caches).
+- **Why:** a planner strong enough that early failures point at tools and prompts; close to budget after tuning; the switching rules keep the phase 5 choice — and every later model release — cheap.
+- **Supersedes:** v1's "Claude Haiku for all MVP AI features" convention, for v2.
+- **Revisit:** at phase 5 (the evals make the real choice), and at each new model release.
+
 ## 2026-11-10 — Managed Agents (Q14): self-host now; trial it for the data agent at D3
 - **Decision (option C):**
   - **Weather watch — no Managed Agents.** A Cloud Run Job on Cloud Scheduler (Q11) re-fetches each saved trip's forecast and applies the thresholds in code (as decided). Only when a trip crosses a threshold does it call our own planner to prepare 2–3 alternatives. Tested with backtests.
