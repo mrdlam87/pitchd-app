@@ -2,6 +2,26 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Visual identity B2 · Dark mode: follow the phone, with an override
+- **Decision (option B):** light and dark are both designed. The app follows the phone's setting; "Appearance: System / Light / Dark" lives in the expanded sheet (beside "What Pitchd knows"). Sketch: https://claude.ai/artifact/9nMEPK1XHYhNkNnGNC5L2a
+- **Dark values (starting point):**
+  | Role | Light (B1) | Dark | Contrast on dark card |
+  |---|---|---|---|
+  | Background | #f7f5f0 | #141a14 (green-black, not blue-black) | — |
+  | Card / sheet | #ffffff | #1d241d | — |
+  | Border | #e0dbd0 | #344034 | — |
+  | Text / headings | #2d4a2d | #e6ede1 | 13.3:1 |
+  | Secondary (sage) | #5a7a5a | #a3baa0 | 7.6:1 |
+  | Coral (fills) | #e8674a | #f07a5e | 5.8:1 |
+  | Coral ink (text) | #b84a33 | #f4917a | 6.9:1 |
+  | Text on coral | white | #1d241d (white on the brighter coral is only 2.7:1) | 5.8:1 |
+  | Weather | B4 | dark versions chosen with B4 | — |
+  | Map | Mapbox Standard, day preset | Mapbox Standard, night preset (no second custom style) | — |
+- **Build note:** semantic colour tokens (CSS variables, light + dark) from the first build — components never use raw hex — so dark mode is a token set, not a retrofit. Every designed state (empty, error, offline) is checked in both themes.
+- **Rejected:** A, light only (glaring at night at camp, when people check tomorrow's weather or the nearest toilet; white flash for dark-mode phones); C, manual toggle only (rarely found, ignores the phone); D, an extra red night-vision mode (weather colours stop working, a third theme to maintain — a gimmick before there are users).
+- **Why:** much of the real use is after dark at camp; following the phone is right with no effort; warm green-black keeps it feeling like Pitchd; B1's roles carry over unchanged.
+- **Revisit if:** testers at camp ask for something dimmer than dark mode → reconsider a night mode then.
+
 ## 2026-11-10 — Visual identity B1 · Palette: keep the family, give each colour one job
 - **Decision (option B):** keep forest / sage / warm neutrals with coral, and tighten the roles. Sketch: https://claude.ai/artifact/Sd5Bg25avPg9ohMpCzxhDB
   | Colour | Token (v1 value) | Job |
@@ -178,7 +198,7 @@
 
 ## 2026-11-09 — Keep the name "Pitchd" for v2
 - **Why:** Short, memorable, the camping pun still fits an agent companion, and it's already live.
-- **Visual identity refresh — in progress (B1–B7).** B1 palette decided (see the B1 entry above). Original recommendation: keep the core palette (forest / sage / warm neutrals, coral used sparingly) but refresh — add dark mode, check sunlight contrast, give weather states distinct colours, test the wordmark at icon size, and design a small mark for the agent's presence. Define the agent's voice as part of the brand (ties to open question E).
+- **Visual identity refresh — in progress (B1–B7).** B1 palette and B2 dark mode decided (see their entries above). Original recommendation: keep the core palette (forest / sage / warm neutrals, coral used sparingly) but refresh — add dark mode, check sunlight contrast, give weather states distinct colours, test the wordmark at icon size, and design a small mark for the agent's presence. Define the agent's voice as part of the brand (ties to open question E).
 
 ## 2026-11-09 — All search is agent-driven; map browsing kept
 - **Decision:** Remove direct search from the UI — no filter panel, no filter state, no direct search API calls from the frontend. Every search goes through the agent (typed, spoken, or via prompt chips).
