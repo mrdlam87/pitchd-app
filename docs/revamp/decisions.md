@@ -2,6 +2,22 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Visual identity B4 · Weather colours: one "sun to rain" scale for pins and day columns
+- **Decision (option B):** gold → blue → navy, used for both map pins and card day columns. Sketch (with colour-blind and glare views): https://claude.ai/artifact/UFQap2zw6D1grvZM6A8W8H
+  | State | Light pin | Light day tint (dark text) | Dark pin | Dark day tint / text | Meaning |
+  |---|---|---|---|---|---|
+  | **Dry** | #f0b72f | #fbe7b0 | #f5c542 | #3d3417 / #f5e3a8 | Under ~20% rain chance, no hazards |
+  | **Mixed** | #5f93bf | #dbe8f1 | #7ab0e0 | #22313c / #cfe1ee | Showers, or a wet part of the day |
+  | **Wet** | #24486e | #a9c3de | #3f72b8 | #1c3550 / #cfe0f5 | Rain most of the day |
+  | **Typical** | hollow dashed pin | hatched neutral | same | same | Past the forecast range — "typical for May" (phase 5b) |
+  | **Hazard** | dark "!" badge on any state | dark outline + reason in words | light "!" badge | light outline | Storm, strong wind, extreme heat, fire ban |
+- **Rules:** day-column text 8–12:1 on every tint; an icon and label on every day (B3); pins set off from the map by B3's white ring + hairline (light ring in dark mode); coral never used for weather (B1) — it stays the top-pick ring.
+- **Simpler than v1:** three colours replace v1's six strip colours (`condColorForCode`) and the separate Great/Good/Poor badge (`getWeatherBadge`). The 0–100 score still ranks sites in code; it just isn't shown as extra colours. Thresholds between states live in code with tests, like the alert thresholds.
+- **To check later:** v1's water-fill amenity pin is blue (#2a8ab0) — amenity pins carry icons, but review the clash when amenity pins are designed.
+- **Rejected:** A, v1 traffic light (wet = coral clashes with the brand; green/amber merge for red-green colour blindness; green pins vanish on a green map; white on amber 2.5:1); C, colour-blind-safe traffic light (vermilion still near coral; green still blends into the map; red for rain reads as danger, which belongs to safety); D, blues only (dry — the answer people want — is the faintest thing on the map).
+- **Why:** a scale campers already read; yellow vs blue survives red-green colour blindness (~1 in 12 Australian men); light-to-dark steps survive glare and greyscale; no green or red, so no clash with the map, the brand or safety alerts.
+- **Revisit if:** testers misread the scale without "green = good" → strengthen the icons and labels before changing colours.
+
 ## 2026-11-10 — Visual identity B3 · Sunlight contrast: the default light theme is built for outdoors
 - **Decision (option B):** no separate outdoor mode — the normal light theme is sunlight-ready, and is checked on a real phone outside at midday before it's signed off. Sketch (with a rough glare slider): https://claude.ai/artifact/3uMTxiURbJA4Ym9rJi2XPg
 - **Rules:**
@@ -216,7 +232,7 @@
 
 ## 2026-11-09 — Keep the name "Pitchd" for v2
 - **Why:** Short, memorable, the camping pun still fits an agent companion, and it's already live.
-- **Visual identity refresh — in progress (B1–B7).** B1 palette, B2 dark mode and B3 sunlight contrast decided (see their entries above). Original recommendation: keep the core palette (forest / sage / warm neutrals, coral used sparingly) but refresh — add dark mode, check sunlight contrast, give weather states distinct colours, test the wordmark at icon size, and design a small mark for the agent's presence. Define the agent's voice as part of the brand (ties to open question E).
+- **Visual identity refresh — in progress (B1–B7).** B1 palette, B2 dark mode, B3 sunlight contrast and B4 weather colours decided (see their entries above). Original recommendation: keep the core palette (forest / sage / warm neutrals, coral used sparingly) but refresh — add dark mode, check sunlight contrast, give weather states distinct colours, test the wordmark at icon size, and design a small mark for the agent's presence. Define the agent's voice as part of the brand (ties to open question E).
 
 ## 2026-11-09 — All search is agent-driven; map browsing kept
 - **Decision:** Remove direct search from the UI — no filter panel, no filter state, no direct search API calls from the frontend. Every search goes through the agent (typed, spoken, or via prompt chips).
