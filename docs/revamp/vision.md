@@ -74,17 +74,16 @@ MVP of the revamp = **Describe → Agent works → Proposal → Refine → Commi
 9. **Search is agent-only; viewing is free.** There is no filter panel — every search goes through the agent, and quick chips are canned prompts. But the map is always explorable: pan, zoom, tap a pin for details, with "Ask Pitchd about this site" to bring the agent in. (See `decisions.md`.)
 10. **No home screen — the map is home.** The app opens on the map with the sheet collapsed: a greeting, context-aware chips and the input. An upcoming trip leads as a card; saved trips and recent conversations live in the expanded sheet. Location is asked in context, never on launch. (See `decisions.md`.)
 
-## 5a. Visual identity (in progress — see `decisions.md`)
+## 5a. Visual identity (decided — see `decisions.md`)
 
-Refresh, not rethink. Decided so far:
+Refresh, not rethink:
 - **Palette (B1):** forest, sage and warm neutrals do most of the work; **coral means Pitchd** — the wordmark "d", the send button, the top pick and the agent's mark, nothing else. Coral text uses a darker coral ink for contrast. Weather has its own colours and is never coral.
 - **Dark mode (B2):** light and dark both designed; follows the phone, with a System / Light / Dark override. Dark is a warm green-black, the map switches to its night preset, and coral keeps its job.
 - **Sunlight (B3):** the default light theme is built for outdoor use — key facts 7:1, secondary text 4.5:1+, controls 3:1, 13 px text floor, stronger pins, weather never shown by colour alone — and is tested on a real phone outside at midday.
 - **Weather colours (B4):** one "sun to rain" scale for pins and day columns — gold (dry), blue (mixed), navy (wet), plus a hollow "typical" state past the forecast range and a "!" badge for hazards. No green or red, so it survives colour blindness and glare and never clashes with coral.
 - **App icon (B5):** the wordmark's coral "d" on a forest square. The wordmark is never smaller than 15 px; below that the "d" icon is used instead.
 - **Agent mark (B6):** the same "d" tile, small, beside what Pitchd says; a coral arc while it works, a pulsing ring while listening, grey when offline. In the input, the send button becomes a stop button with the same arc.
-
-Still open: type.
+- **Type (B7):** Lora for the wordmark, the greeting and a few headings; DM Sans for everything the agent says and all UI text (15 px reading text, 13 px minimum, tabular figures). Two faces; v1's Nunito is dropped.
 
 ## 6. What the agent is (and isn't)
 

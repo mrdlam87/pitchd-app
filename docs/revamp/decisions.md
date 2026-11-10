@@ -2,6 +2,21 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Visual identity B7 · Type: Lora for the wordmark and a few headings, DM Sans for everything else
+- **Decision (option B):** two faces. Nunito (v1's default body font) is dropped. Sketch (all five body options at real sizes): https://claude.ai/artifact/Le1D31kxmCFKJHBRkoyfC3
+- **Lora** — Bold for the wordmark and the app icon "d" (exported as outlined SVG, so they never wait for the font — B5); SemiBold 17–19 px for the collapsed-sheet greeting; headings in the expanded sheet (trip titles, "Trips", "What Pitchd knows") and site detail titles. Never for reading text or anything under 15 px.
+- **DM Sans** — everything the agent says and all UI text:
+  | Role | Size / line | Weight |
+  |---|---|---|
+  | Agent summary, input | 15 / 21 | 400; lead sentence 700 |
+  | Card title | 15 / 20 | 700 |
+  | Chips, card facts, day columns, step lines | 13 / 18 | 500–600 (B3: 500+ under 15 px) |
+  | Numbers (drive times, temperatures, rain %, times) | any | tabular figures |
+- **Rules:** 13 px is the smallest text anywhere (B3); sizes in rem so the phone's text-size setting scales them; load only the weights used (Lora 600/700; DM Sans 400–700 with optical sizes); fonts cached by the PWA service worker after first load.
+- **Rejected:** A, Nunito (rounded ends blur first in glare; wide letters fit less in the sheet; looks young next to Lora); C, Inter (adds no character; a bit cold next to Lora); D, system font (looks different on every phone, no brand character — kept as the fallback if load size ever matters more); E, Atkinson Hyperlegible (quirky next to Lora; fewer weights; no tabular figures).
+- **Why:** already the prototype's look; optical sizes keep small text legible in sun; tabular figures for the numbers cards are full of; pairs warmly with Lora; two faces instead of v1's three.
+- **Revisit if:** the midday sunlight test (B3) shows DM Sans at 13 px struggling → raise the floor or weight first; only then try the system font.
+
 ## 2026-11-10 — Visual identity B6 · Agent mark: the app icon's "d" tile, small
 - **Decision (option C):** the agent's presence is shown by the B5 "d" tile at 20 px beside what Pitchd says — the icon you tapped is the one talking to you. State is shown by a coral ring around the tile, never by a new shape. Sketch (options, states, sheet moments, "d" vs "Pd"): https://claude.ai/artifact/AoL2DqbEW4r8ac82JX2AyF
   | State | Mark |
@@ -269,7 +284,7 @@
 
 ## 2026-11-09 — Keep the name "Pitchd" for v2
 - **Why:** Short, memorable, the camping pun still fits an agent companion, and it's already live.
-- **Visual identity refresh — in progress (B1–B7).** B1 palette, B2 dark mode, B3 sunlight contrast, B4 weather colours, B5 app icon and B6 agent mark decided (see their entries above). Original recommendation: keep the core palette (forest / sage / warm neutrals, coral used sparingly) but refresh — add dark mode, check sunlight contrast, give weather states distinct colours, test the wordmark at icon size, and design a small mark for the agent's presence. Define the agent's voice as part of the brand (ties to open question E).
+- **Visual identity refresh — decided (B1–B7, 2026-11-10):** palette, dark mode, sunlight contrast, weather colours, app icon, agent mark and type — see their entries above. Original recommendation, now confirmed: keep the core palette (forest / sage / warm neutrals, coral used sparingly) but refresh — add dark mode, check sunlight contrast, give weather states distinct colours, test the wordmark at icon size, and design a small mark for the agent's presence. Define the agent's voice as part of the brand (ties to open question E).
 
 ## 2026-11-09 — All search is agent-driven; map browsing kept
 - **Decision:** Remove direct search from the UI — no filter panel, no filter state, no direct search API calls from the frontend. Every search goes through the agent (typed, spoken, or via prompt chips).

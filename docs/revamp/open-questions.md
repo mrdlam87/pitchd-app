@@ -2,7 +2,7 @@
 
 ## v2 rebuild (answer first — these shape everything else)
 - **A. What's wrong with v1's UI?** **Answered:** glitchy drawer; journey not well thought out or intuitive. Lessons and v2 design principles captured in `vision.md` §4.
-- **B. Brand:** ~~name~~ **kept as Pitchd.** Visual identity refresh, worked through one sub-question at a time: ~~B1 palette~~ **decided** (keep the family, coral = Pitchd only); ~~B2 dark mode~~ **decided** (follow the phone, with an override); ~~B3 sunlight contrast~~ **decided** (default light theme built for outdoors); ~~B4 weather-state colours~~ **decided** (sun-to-rain scale); ~~B5 wordmark at icon size + app icon~~ **decided** (coral "d" on forest; wordmark min 15 px); ~~B6 agent-presence mark~~ **decided** (the "d" tile, with a coral ring for state); B7 type — still open.
+- **B. Brand:** ~~name~~ **kept as Pitchd.** ~~Visual identity~~ **Decided (B1–B7):** keep the palette family with coral = Pitchd only; dark mode follows the phone; default light theme built for sunlight; sun-to-rain weather colours; coral "d" app icon and agent mark; Lora + DM Sans (see `decisions.md`).
 - **C. Platform:** **Decided:** mobile-first web first, native later (see `decisions.md`).
 - **D. Repo & database:** **Decided:** new `pitchd-v2` repo + separate Supabase project (see `decisions.md`).
 - **E. Agent personality & scope:** **Decided:** knowledgeable local mate; camping-trip scope; safety first (see `decisions.md`).
@@ -25,7 +25,7 @@
 6. ~~**Memory**~~ **Decided:** stated facts saved automatically with Undo; inferences asked first; shown in chips when used; "What Pitchd knows" list + conversational edits (see `decisions.md`).
 7. ~~**Sarah's multi-day route planning**~~ **Decided:** trips modelled as ordered stops from day one + "on the way" amenities in the first build; full multi-day itineraries in new roadmap phase 5b, straight after evals, before the stage 2 caravan tester (see `decisions.md`).
 8. ~~**Offline / patchy signal**~~ **Decided:** first build copes with weak signal (resumable streams, designed offline states, saved trips offline); trip pack + queued messages with the "On the trip" stage; offline maps with native (see `decisions.md`).
-9. ~~**Name & positioning**~~ **Resolved:** keeping "Pitchd" (see B in `decisions.md`). Visual identity refresh still open.
+9. ~~**Name & positioning**~~ **Resolved:** keeping "Pitchd" (see B in `decisions.md`). Visual identity refresh decided (B1–B7).
 24. ~~**Campsite availability**~~ **Decided:** know whether to book, "Check & book" link, busy-period warnings + backup, "Not booked yet" nudge; never claim availability unless checked; live checks a later spike (see `decisions.md`).
 
 ## Technical
