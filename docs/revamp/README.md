@@ -11,6 +11,7 @@
 | [learning-roadmap.md](learning-roadmap.md) | Phased build plan that doubles as a learning path |
 | [decisions.md](decisions.md) | Decision log — what we chose and why |
 | [open-questions.md](open-questions.md) | Things still to work out |
+| [harness-workflow.md](harness-workflow.md) | How v2 is built with Claude Code — `CLAUDE.md`, skills, subagents, hooks, permissions, CI, evals (in progress) |
 
 ## Status
 - **Stage:** Brainstorming (started 2026-11-09). Core v2 questions A–G answered 2026-11-10 — see `decisions.md`. Product & UX: the six design-stage questions (layout, home screen, ask-or-assume, memory, proactive alerts, voice) plus campsite availability, multi-day route planning and offline decided 2026-11-10. Visual identity refresh (B1–B7: palette, dark mode, sunlight, weather colours, app icon, agent mark, type) decided 2026-11-10 — sketches linked from each entry. Technical: Q12 (Python data layer), Q11 (agent hosting), Q15 (routing), Q17 (budget per trip), Q14 (Managed Agents) and Q13 (models) decided 2026-11-10 — all Technical questions done. Data agent: Q19 (auto-approve), Q20 (review UI), Q21 (source access), Q22 (user reports) and Q23 (display) decided 2026-11-10 — all numbered questions done.
