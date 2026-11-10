@@ -2,6 +2,15 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Voice: dictation into the input box now; full voice mode with native
+- **Decision (option B):** a mic button in the input uses the browser's speech recognition; the words appear in the input box, the user checks and taps send. Auto-send after a pause can be tested later.
+  - **Fallback:** where the browser has no speech recognition (patchy on iPhone, especially as a Home Screen app), hide the mic and rely on the keyboard's dictation key.
+  - **Misheard place names** are the agent's job, not the speech layer's: `geocode` matches loosely ("Gan Guddy" → Ganguddy) and asks "Did you mean…?" only when it's unclear (per the ask-or-assume rules). Misheard names become eval cases.
+  - **No spoken replies yet** — the answer is cards and the map.
+- **Rejected for now:** no voice (hides a real use case); push-to-talk with our own transcription (per-use cost, another service, more latency and privacy questions — the next step only if B fails); full voice mode (big build, loses cards and map, unsafe for a driver looking at the screen — belongs with native / CarPlay / Android Auto).
+- **Why:** covers the real cases (passenger in the car, hands busy at camp) for almost no cost; seeing the transcript before sending protects accuracy; keeps the learning focus on the agent; full voice raises driving-safety questions a web app can't answer well.
+- **Revisit if:** dictation often mishears place names on the founder's phone → move to our own transcription; voice gets used a lot on trips → plan a voice mode for the native app.
+
 ## 2026-11-10 — Proactive alerts: in-app card + web push, email fallback, strict triggers
 - **Channels:** the home-sheet trip card (Q2) always shows changes on open; **web push** is the main out-of-app channel; **email** is the fallback for anyone without push (notably iPhone users who haven't added Pitchd to their Home Screen — iOS web push only works for installed PWAs). No SMS.
 - **Opt-in per trip:** on saving a trip, Pitchd asks "Want me to watch the forecast for this trip?" — and asks for push permission then, when the value is obvious. Never on first open.

@@ -13,12 +13,12 @@
 | [open-questions.md](open-questions.md) | Things still to work out |
 
 ## Status
-- **Stage:** Brainstorming (started 2026-11-09). Core v2 questions A–G answered 2026-11-10 — see `decisions.md`. Product & UX: layout, home screen, ask-or-assume, memory and proactive alerts decided 2026-11-10; working through the rest.
+- **Stage:** Brainstorming (started 2026-11-09). Core v2 questions A–G answered 2026-11-10 — see `decisions.md`. Product & UX: the six design-stage questions (layout, home screen, ask-or-assume, memory, proactive alerts, voice) decided 2026-11-10.
 - **Current app:** M1–M6 live at https://pitchd-app.vercel.app — stays running while the revamp is explored
 - **Goals:** (1) make the agent the focal experience, (2) a hands-on learning exercise in building agents, (3) start with one user (the founder) but design to scale
 
 ## Next session — start here
 1. Read every file in `docs/revamp/` (start with `decisions.md` and `open-questions.md`).
-2. **Next up:** work through the **Product & UX** design-stage questions in `open-questions.md` one at a time — ~~layout~~, ~~home screen~~, ~~ask-or-assume~~, ~~memory~~, ~~proactive alerts~~ (done), voice — giving a recommendation and the reasoning for each, then recording the founder's decision in `decisions.md` (and `vision.md` where relevant).
+2. **Next up:** the remaining Product & UX questions in `open-questions.md` — #24 campsite availability (has a recommendation), #7 Sarah's multi-day route planning, #8 offline / patchy signal — then the visual identity refresh (B). The six design-stage questions are done; sketches are linked from their `decisions.md` entries.
 3. Format the founder likes: one question at a time, options table, clear recommendation + why, record on approval, commit and push after each.
 4. Remember the pre-code checklist in `open-questions.md` — the Claude Code development workflow must be set up in `pitchd-v2` before any code.
