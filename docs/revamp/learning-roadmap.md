@@ -10,7 +10,7 @@ Two tracks: the **trip planner** (interactive, user-facing) and the **data agent
 |---|---|---|---|
 | D1 | **Single-region enrichment pilot** (CLI) | The tool loop, web search/fetch, structured extraction, provenance | 50–100 Blue Mountains sites have sourced facts in the proposal table |
 | D2 | **Hand review = first eval** | Grading agent output, measuring accuracy and cost per site | ≥ 90% of high-confidence facts correct; cost per site known |
-| D3 | **Verify + dedupe + schedule** | Batch processing, scheduled runs, conflict rules; self-hosted vs Managed Agents comparison; first MCP server | Region-by-region refresh running on a schedule; Managed Agents vs our own Job scored on the D2 eval set and the winner kept |
+| D3 | **Verify + dedupe + schedule** | Batch processing, scheduled runs, conflict rules; self-hosted vs Managed Agents comparison; first MCP server; `/admin/review` page | Region-by-region refresh running on a schedule; Managed Agents vs our own Job scored on the D2 eval set and the winner kept |
 
 ### Trip planner track
 

@@ -2,6 +2,16 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Review UI (Q20): terminal tool for the pilot, admin page at D3
+- **Decision (option B, then A):**
+  - **Pilot: a terminal review tool** (`pitchd review`) in the data agent's CLI. Shows one proposal at a time — site, current value, proposed value, source link and quoted evidence — with keys for approve / reject / skip and a right/wrong verdict.
+  - **One review code path.** Approve/reject and verdicts go through shared review functions that also update the per-key trust table (Q19). Nothing edits `status` directly.
+  - **Read-only CSV export** of past verdicts for accuracy reports — never imported back.
+  - **Later (D3, when the data agent is scheduled): an `/admin/review` page** in the v2 web app, `admin` role only, served through the agent API and calling the same review functions — a new screen, not new logic. Built when the queue becomes a few items a week worth clearing from a phone.
+- **Rejected:** A first — blocks the pilot on the v2 web app, auth and API; C spreadsheet round-trip — import errors and stale copies; D Supabase table editor — raw JSON, no evidence view, bypasses the trust table.
+- **Why:** reviewing can start now with almost nothing to build, every verdict is recorded in one place, and the nicer screen comes when it's needed.
+- **Revisit if:** the pilot review is slow enough in a terminal that a basic page would pay for itself sooner.
+
 ## 2026-11-10 — Auto-approve threshold (Q19): earn trust per kind of fact
 - **Decision (option C):**
   1. **No-change re-checks apply straight away.** A re-check that finds the same value only updates `checkedAt` — not a change, no review. This is most of the volume after the first pass.

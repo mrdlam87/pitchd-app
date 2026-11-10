@@ -65,7 +65,7 @@ FactKeyTrust            // per fact key; rules in code (Q19)
 
 1. **Scope:** one region the founder camps in — 50–100 sites around the Blue Mountains.
 2. **Build:** a CLI enrichment agent (Python, hand-written loop) that fills dogs / toilets / showers / booking with sources into the proposal table.
-3. **Review by hand** — and record whether each proposed fact was right. That *is* the first eval set.
+3. **Review by hand** in the terminal (`pitchd review`, Q20) — and record whether each proposed fact was right. That *is* the first eval set. An `/admin/review` page on the same review functions follows at D3.
 4. **Done when:** ≥ 90% of high-confidence facts are correct on the hand-reviewed sample, and cost per site is known.
 5. **Then:** expand region by region; add verify + dedupe; schedule it.
 

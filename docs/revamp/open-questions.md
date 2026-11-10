@@ -39,7 +39,7 @@
 
 ## Data agent
 19. ~~**Auto-approve threshold**~~ **Decided:** no-change re-checks apply; pilot reviews everything; then auto-approve per fact key once ≥ 95% agreement over ≥ 30 reviews (official + high only); cautious changes apply at once and are flagged; 1-in-20 spot checks (see `decisions.md`).
-20. **Review UI:** a simple admin page, a CLI, or a spreadsheet export for reviewing proposals?
+20. ~~**Review UI**~~ **Decided:** terminal review tool for the pilot; `/admin/review` page at D3 on the same review functions (see `decisions.md`).
 21. **Source access:** do park authority sites allow automated access? Check terms; prefer official open-data feeds (e.g. data.gov.au) where they exist.
 22. **User reports:** how are they weighed — and how many reports before a fact changes?
 23. **Display:** how does the UI show freshness/confidence without clutter?
