@@ -6,7 +6,7 @@
 - **B. Brand:** ~~name~~ **kept as Pitchd.** Visual identity: recommendation is to refresh, not rethink — confirm during design.
 - **C. Platform:** **Decided:** mobile-first web first, native later (see `decisions.md`).
 - **D. Repo & database:** **Decided:** new `pitchd-v2` repo + separate Supabase project (see `decisions.md`).
-- **E. Agent personality & scope:** tone, how Aussie, and how strictly it stays on camping topics.
+- **E. Agent personality & scope:** **Decided:** knowledgeable local mate; camping-trip scope; safety first (see `decisions.md`).
 - **F. v1's future:** keep running until v2 replaces it, freeze it, or retire it early?
 - **G. Who's the next user after the founder,** and when?
 

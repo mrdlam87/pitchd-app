@@ -2,6 +2,15 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Agent personality, scope and safety
+- **Personality:** a knowledgeable local mate — straight answer first, practical, honest about uncertainty and data freshness, warm and lightly Aussie (natural AU English, no forced slang), brief (2–4 sentences + cards), no hype.
+- **Scope:** clearly about camping trips — sites, weather, drive times, amenities, dog rules, multi-stop trips, packing, what to know before you go. Trip-adjacent asks (coffee/servo on the way) are fine when tools cover them; general chat, bookings/payments, and anything it can't back with data get a friendly redirect.
+- **Safety first:** fire bans, closures and flood warnings are surfaced prominently, even unprompted. Emergencies → 000 and official sources; never improvised safety advice; never claims certainty about road access, water or safety.
+- **Locale:** Australian English spelling, metric units, local time zones (multi-state trips cross zones).
+- **Memory:** trip-relevant facts (dog, setup, home base, favourite regions, drive tolerance) remembered automatically, always visible and editable; nothing else without asking.
+- **Why:** a frequent-use companion needs a voice that wears well; trust is the product; mobile, time-pressed use; focused scope makes a better, cheaper, more testable agent; outdoor safety is a real-world harm and a differentiator.
+- **Revisit if:** the founder's own use finds the voice too flat or too chatty.
+
 ## 2026-11-09 — New `pitchd-v2` repo + separate Supabase project
 - **Repo:** new `pitchd-v2` repo containing `web/` (Next.js thin client), `agent/` (Python planner + data agent, tools, prompts, evals), `docs/` (moved from `docs/revamp/`), and a fresh `CLAUDE.md`.
 - **Database:** a new Supabase project for v2. Campsite + amenity data copied across once; v2 owns its schema; the data agent can't affect live v1.

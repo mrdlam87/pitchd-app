@@ -79,7 +79,7 @@ MVP of the revamp = **Describe → Agent works → Proposal → Refine → Commi
 
 **Isn't (for now):** a general travel chatbot, a booking engine, or a source of facts it can't back with data. Off-topic asks get a friendly redirect.
 
-**Personality (draft):** friendly, concise, practical, a bit Aussie but not a caricature. Gives a straight answer, then the reasoning.
+**Personality (decided):** a knowledgeable local mate — straight answer first, practical, honest about uncertainty, lightly Aussie, brief, no hype. Safety (fire bans, closures, floods) always surfaced first. Full detail in `decisions.md`.
 
 ## 7. Personas, revisited
 
