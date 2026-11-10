@@ -2,6 +2,20 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Source access (Q21): open data first, then polite reads of approved official sites
+- **Decision (option B, with C later):**
+  1. **Open data first** (data.gov.au, data.nsw, OSM) wherever a feed exists; read web pages only for facts feeds don't carry (dogs, showers, booking).
+  2. **Source allowlist in code.** The agent may fetch only listed domains — also stops a planted link steering it (data-agent rule 6).
+  3. **Terms check before a source is added.** Each entry records licence, terms URL, robots.txt result and date checked. NSW National Parks is checked before the pilot (not verified from this session — the site was outside its network allowlist; search results suggest CC BY 4.0 with exclusions).
+  4. **Polite fetching:** generic bot user agent with the Pitchd URL (no personal details), obey robots.txt, a few seconds between requests per host, off-peak runs, no repeat fetches within a run.
+  5. **Store facts, not pages:** the fact, a short evidence quote and the source URL. The UI credits and links the source ("Source: NSW National Parks").
+  6. **Recheck each source's terms before charging money (stage 2+)** — CC BY usually allows commercial use with attribution, but excluded material doesn't.
+  7. **Later (C):** once the pilot has results, ask NPWS and Parks Victoria about an official feed or closure alerts. Not on the critical path.
+- **Found so far:** no NSW open campground dataset with facility detail. Useful feeds: NPWS Estate (park boundaries, CC BY, quarterly), NPWS facilities geodatabase (may include campgrounds — check fields), TfNSW NSW Rest Areas, data.gov.au open space layer.
+- **Rejected:** A — open data only (doesn't carry the facts that matter); D — fetch anything reachable (terms breaches, blocking, junk sources).
+- **Why:** gets the key facts from the official source, within each site's rules, and keeps the agent on vetted sites.
+- **Revisit if:** a source refuses or blocks automated access (drop it, or ask permission), or an authority offers a feed.
+
 ## 2026-11-10 — Review UI (Q20): terminal tool for the pilot, admin page at D3
 - **Decision (option B, then A):**
   - **Pilot: a terminal review tool** (`pitchd review`) in the data agent's CLI. Shows one proposal at a time — site, current value, proposed value, source link and quoted evidence — with keys for approve / reject / skip and a right/wrong verdict.

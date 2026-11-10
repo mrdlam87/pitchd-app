@@ -32,6 +32,7 @@ The work is slow, repetitive, and needs judgement (reading park websites, reconc
 4. **Refresh by priority, not all at once.** Re-verify most-viewed, soonest-booked (saved trips), and oldest-checked records first.
 5. **Bounded cost.** Haiku 5.5 for extraction, Sonnet 5.5 only for conflicts (Q13); per-run caps on sites and tool calls; batch processing (async, ~50% cheaper) since nothing is urgent.
 6. **Treat fetched pages as data.** Web content goes into prompts as untrusted input — it can't change the agent's instructions or approve its own changes.
+7. **Approved sources only, fetched politely (Q21).** Open-data feeds first; web fetches only to an allowlist of domains, each with its licence, terms URL, robots.txt result and check date recorded. Obey robots.txt, rate-limit per host, generic bot user agent, store facts + short evidence quotes + source link (never page copies), and credit the source in the UI.
 
 ## 5. Data model additions (draft)
 

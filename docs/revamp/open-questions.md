@@ -12,6 +12,7 @@
 ## ⚠️ Before touching any v2 code
 - [ ] **Set up the harness workflow** — define how v2 is built with Claude Code before the first line of code: `CLAUDE.md` conventions, skills/commands (e.g. updated `/plan`, `/implement`, `/pr`), subagents (`senior-engineer`, `ux-designer`), hooks (lint/test/format), permissions, CI review, and how agent-harness concerns (eval runs, tool tests) fit in. Include the conventions from the Technical decisions: Q12 (SQLAlchemy + Alembic, Supabase gotchas), Q11 (Cloud Run, auth token flow), Q17 (cost caps) and Q13 (model switching rules). *Confirmed: this means the Claude Code development workflow (how v2 is built), not the Pitchd agent's own harness.*
 - [x] Repo + database decided (D)
+- [ ] NSW National Parks terms + robots.txt checked and recorded as the first source-allowlist entry (Q21) — before the data agent pilot
 - [ ] `pitchd-v2` repo created on GitHub (founder) and new Supabase project created
 - [ ] Docs moved from `docs/revamp/` into the v2 repo
 - [ ] v1 frozen: open M7 issues/PRs closed or labelled "v1 frozen"
@@ -40,7 +41,7 @@
 ## Data agent
 19. ~~**Auto-approve threshold**~~ **Decided:** no-change re-checks apply; pilot reviews everything; then auto-approve per fact key once ≥ 95% agreement over ≥ 30 reviews (official + high only); cautious changes apply at once and are flagged; 1-in-20 spot checks (see `decisions.md`).
 20. ~~**Review UI**~~ **Decided:** terminal review tool for the pilot; `/admin/review` page at D3 on the same review functions (see `decisions.md`).
-21. **Source access:** do park authority sites allow automated access? Check terms; prefer official open-data feeds (e.g. data.gov.au) where they exist.
+21. ~~**Source access**~~ **Decided:** open data first; then polite reads of an allowlist of official sites, each terms-checked before it's added; store facts + short quotes + link; ask authorities for feeds later (see `decisions.md`).
 22. **User reports:** how are they weighed — and how many reports before a fact changes?
 23. **Display:** how does the UI show freshness/confidence without clutter?
 
