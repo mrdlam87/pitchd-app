@@ -28,7 +28,7 @@
 
 ## Agent
 
-- **Harness:** start with a hand-written tool loop on the Messages API (learning), then move to the SDK's Tool Runner. Evaluate Managed Agents later for background/scheduled work.
+- **Harness:** start with a hand-written tool loop on the Messages API (learning), then move to the SDK's Tool Runner. Background work is self-hosted (Cloud Run Jobs); Managed Agents is trialled for the data agent at D3 against our own loop (see Q14 in `decisions.md`).
 - **Tools (first cut):**
   | Tool | Purpose |
   |---|---|

@@ -10,7 +10,7 @@ Two tracks: the **trip planner** (interactive, user-facing) and the **data agent
 |---|---|---|---|
 | D1 | **Single-region enrichment pilot** (CLI) | The tool loop, web search/fetch, structured extraction, provenance | 50–100 Blue Mountains sites have sourced facts in the proposal table |
 | D2 | **Hand review = first eval** | Grading agent output, measuring accuracy and cost per site | ≥ 90% of high-confidence facts correct; cost per site known |
-| D3 | **Verify + dedupe + schedule** | Batch processing, scheduled runs, conflict rules | Region-by-region refresh running on a schedule |
+| D3 | **Verify + dedupe + schedule** | Batch processing, scheduled runs, conflict rules; self-hosted vs Managed Agents comparison; first MCP server | Region-by-region refresh running on a schedule; Managed Agents vs our own Job scored on the D2 eval set and the winner kept |
 
 ### Trip planner track
 
@@ -22,7 +22,7 @@ Two tracks: the **trip planner** (interactive, user-facing) and the **data agent
 | 4 | **Memory & state** | Conversation persistence, user preferences, saved trips | Pitchd remembers the dog and setup; a conversation can be resumed |
 | 5 | **Evals** | Building a test set, grading agent output, comparing models/prompts with evidence | 20–50 real queries with a repeatable score; model choice made from data; Sarah's killer query + variants included from the start |
 | 5b | **Multi-day trips** (Sarah) | Longer multi-step agent runs, planning a sequence, route-based tools, handling forecast horizons | "5-day caravan trip Melbourne → Adelaide with dump points and swimming stops" produces a day-by-day plan that passes its eval cases; ready before the stage 2 caravan tester |
-| 6 | **Multi-agent & background** | Sub-agents, scheduled jobs; compare self-hosted vs Managed Agents | Nightly "weather watch" alerts on saved trips |
+| 6 | **Multi-agent & background** | Sub-agents, scheduled jobs (Cloud Run Jobs); deterministic checks that hand off to the agent | Nightly "weather watch" alerts on saved trips (the Managed Agents comparison moved to D3) |
 | 7 | **MCP server** (optional) | Standard tool protocol | Pitchd tools usable from Claude Desktop / Claude Code |
 
 ## Notes

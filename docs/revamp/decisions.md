@@ -2,6 +2,17 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Managed Agents (Q14): self-host now; trial it for the data agent at D3
+- **Decision (option C):**
+  - **Weather watch — no Managed Agents.** A Cloud Run Job on Cloud Scheduler (Q11) re-fetches each saved trip's forecast and applies the thresholds in code (as decided). Only when a trip crosses a threshold does it call our own planner to prepare 2–3 alternatives. Tested with backtests.
+  - **Data agent D1–D2 — our own hand-written loop,** as already decided; the hand-reviewed results become the eval set.
+  - **D3 — a fair comparison:** run the same region both ways. **Managed Agents:** a scheduled deployment with built-in web search/fetch, a dollar session budget, and an outcome checklist per site. **Ours:** a Cloud Run Job, with extraction through the Message Batches API (50% off). Score both against the D2 eval set on accuracy, cost per site and upkeep time; keep the winner.
+  - **MCP server as a side effect:** for Managed Agents to write to our database, the spike exposes `propose_campsite_update` (and the read tools it needs) as an MCP server, with credentials in a Managed Agents vault. It can only write to the proposal queue — "propose, don't overwrite" still holds. This starts roadmap phase 7.
+- **Cost notes (from the docs):** Managed Agents bills model tokens at list price + $0.08 per session hour + $10 per 1,000 web searches; no batch discount. Tools that touch our database are ours either way (custom tools or our MCP server).
+- **Rejected:** A, Managed Agents for all scheduled work now (skips the hand-written-loop learning decision; the weather watch is mostly a cron job and would need our tools over MCP; no batch discount); B, self-host permanently without trying it (we'd rebuild web fetching, run tracking and spend caps ourselves and never test whether Managed Agents does it better); D, the planner on Managed Agents too (every planner tool is ours anyway; extra hop on user-facing latency; reverses the harness decision).
+- **Why:** each job gets the tool that fits — plain code for a threshold check, an agent platform for open-ended web reading; the learning path stays intact; the choice for the data agent is made from evidence.
+- **Revisit if:** the D3 comparison is a clear win for Managed Agents → move scheduled data-agent runs there; or the weather watch's alternatives need open-ended research → reconsider for that step only.
+
 ## 2026-11-10 — Budget per planned trip (Q17): target ≤ US$0.30, with hard caps
 - **Decision (option B):**
   - **Target:** median **≤ US$0.30 per planned trip**, all-in (model + routing). The model is almost the whole bill — weather is free, Cloud Run roughly free at this scale.
