@@ -41,7 +41,7 @@ The original origin story still holds — the killer query is the same — but t
 | **Refine** | "Closer", "drier", "somewhere with a shower" — by chat or refinement chips; tap a pin to ask "why this one?" | Keeps the conversation context; re-runs only what changed |
 | **Commit** | Saves the trip (site, dates, who's coming, setup); for sites that need booking, a "Check & book" link and a "Booked?" tick ("Not booked yet" shows on the trip card until ticked) | Writes to the trip store; offers a packing list matched to the forecast; never claims a site is available unless it checked |
 | **Watch** | Opts in when saving a trip. Gets a push (or email if no push) only when the forecast materially turns — "Saturday now 70% rain at X — want alternatives?" — plus safety alerts (fire ban, closure, flood) always, and a final check the day before | Background job re-checks saved trips; thresholds in code; max one weather alert per trip per day, quiet hours; proposes options rather than just alerting |
-| **On the trip** | Nearby dump points, water, fuel, toilets; works on patchy signal | Lightweight queries; cached data where possible |
+| **On the trip** | Nearby dump points, water, fuel, toilets; saved trip and a downloaded trip pack (amenities within ~50 km, last forecast, fire danger) work with no signal; messages typed offline send when signal returns | Lightweight queries; trip pack refreshed at save and at the day-before check; offline maps wait for native |
 | **Reflect** | Quick rating ("great site, too windy") | Updates preferences and adds signal for future ranking |
 
 MVP of the revamp = **Describe → Agent works → Proposal → Refine → Commit**. Watch, On the trip, Reflect come later.

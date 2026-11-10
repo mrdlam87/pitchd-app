@@ -2,6 +2,20 @@
 
 > Newest first. Each entry: decision, why, and what would make us revisit it.
 
+## 2026-11-10 — Offline & patchy signal: cope with weak signal now, trip pack later, offline maps with native
+- **Decision (option C, in two steps):**
+  1. **First build** (needed for any real phone use):
+     - **Designed offline / weak-signal states** — a clear banner ("No signal — showing your saved trip from 2:10 pm"), never a broken spinner.
+     - **Answers survive dropouts** — the stream resumes where it stopped, cards already shown stay put, automatic retries with timeouts.
+     - **Saved trips viewable offline** (PWA service worker + local cache) — trip card and details, facts, last forecast with its timestamp, booking and directions links, the trip's conversation. "Open in Google Maps" still works with Google's own offline maps.
+  2. **With the "On the trip" stage (later):**
+     - **Trip pack** — downloaded on save and again at the day-before check (Q5): dump points, water, toilets and fuel within ~50 km of each stop, plus the latest forecast and fire danger rating. Shown as a list with distances, no map: "Saved for offline: forecast, fire danger and 12 amenities near Lake Burrendong."
+     - **Queued messages** — typed offline, sent and answered when signal returns, with a note saying so.
+- **Native later:** offline maps and offline amenity search for a downloaded region (map tile licensing — Mapbox's offline support is aimed at its mobile SDKs; check terms before any web tile caching).
+- **Rejected:** online only (fails exactly when Sarah needs a dump point); saved trip only (weak signal, which is far more common than none, would still break answers mid-stream); full offline now (native-level work plus tile licensing).
+- **Why:** weak signal hits every user, so handling it is core, not an extra; a saved trip that opens offline is cheap and matters most at camp; the trip pack makes the last thing Pitchd tells you before losing signal — weather, fire danger, nearest dump point — available offline; full offline maps are already a listed trigger for going native.
+- **Revisit if:** real trips show the trip-pack list isn't enough without a map → that's the go-native signal.
+
 ## 2026-11-10 — Sarah's multi-day route planning: model for it now, build it straight after evals
 - **Decision (option B):**
   1. **First build:** a trip is an ordered list of stops from day one (a weekend trip is one stop) — no migration later. "On the way" amenities ("dump point or fuel on the way to X") are in, using the already-planned `find_amenities` along a route.

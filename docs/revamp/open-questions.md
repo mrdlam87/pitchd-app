@@ -24,7 +24,7 @@
 5. ~~**Proactive messages**~~ **Decided:** in-app trip card + web push, email fallback; opt-in per trip; strict triggers; safety always (see `decisions.md`).
 6. ~~**Memory**~~ **Decided:** stated facts saved automatically with Undo; inferences asked first; shown in chips when used; "What Pitchd knows" list + conversational edits (see `decisions.md`).
 7. ~~**Sarah's multi-day route planning**~~ **Decided:** trips modelled as ordered stops from day one + "on the way" amenities in the first build; full multi-day itineraries in new roadmap phase 5b, straight after evals, before the stage 2 caravan tester (see `decisions.md`).
-8. **Offline / patchy signal** on the trip — how much matters for v1?
+8. ~~**Offline / patchy signal**~~ **Decided:** first build copes with weak signal (resumable streams, designed offline states, saved trips offline); trip pack + queued messages with the "On the trip" stage; offline maps with native (see `decisions.md`).
 9. **Name & positioning:** does "Pitchd" still fit an agent companion? (Probably yes.)
 24. ~~**Campsite availability**~~ **Decided:** know whether to book, "Check & book" link, busy-period warnings + backup, "Not booked yet" nudge; never claim availability unless checked; live checks a later spike (see `decisions.md`).
 
